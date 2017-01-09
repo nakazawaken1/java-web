@@ -1,0 +1,26 @@
+nav {
+    background-color: #eeeeff;
+    display: table;
+    width: 100%;
+}
+
+nav span {
+    display: table-cell;
+}
+
+nav span[data-load=info] {
+    text-align: right;
+}
+
+form {
+    display: inline;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid black;
+  padding: 2px;
+}
