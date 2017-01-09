@@ -16,6 +16,10 @@ public class Session implements Attributes<Object> {
      * current session
      */
     transient final HttpSession raw;
+    
+    /**
+     * constructor
+     */
     Session() {
         raw = Request.request.get().getSession();
         raw.setMaxInactiveInterval(Config.app_session_timeout_seconds.integer());

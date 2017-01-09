@@ -13,8 +13,14 @@ import java.util.stream.Stream;
  */
 public class Xml {
     
+    /**
+     * indent
+     */
     public static final String indent = "  ";
     
+    /**
+     * newline
+     */
     public static final String newline = "\r\n";
 
     /**
@@ -71,6 +77,7 @@ public class Xml {
     }
 
     /**
+     * @param indent indent
      * @return string
      */
     public String toStringLower(String indent) {

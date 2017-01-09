@@ -45,7 +45,9 @@ public class Request implements Attributes<Object> {
         Try.r(() -> raw.setCharacterEncoding(StandardCharsets.UTF_8.name())).run();
         logger.info("request uri: " + raw.getRequestURI());
         logger.info("query string: " + raw.getQueryString());
-        path = Tool.string(raw.getRequestURI().substring(raw.getContextPath().length() + 1)).orElse("index.html");
+        String uri = raw.getRequestURI();
+        int rootLength = raw.getContextPath().length() + 1;
+        path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
         logger.info("path: " + path);
     }
     

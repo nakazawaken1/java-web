@@ -45,7 +45,7 @@ public enum Config {
     /**
      * class of suppress log
      */
-    log_exclude("org.glassfish.jersey.internal.Errors", ","),
+    log_exclude("", ","),
 
     /**
      * database suffix

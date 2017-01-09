@@ -162,31 +162,37 @@ public class Tool {
         }, false);
     }
 
-    public static void printFormat(PrintWriter writer, String line, TryBiConsumer<PrintWriter, String> replacer, String... closures) {
+    /**
+     * @param writer writer
+     * @param text text
+     * @param replacer replacer
+     * @param closures closures
+     */
+    public static void printFormat(PrintWriter writer, String text, TryBiConsumer<PrintWriter, String> replacer, String... closures) {
         for (boolean loop = true; loop;) {
             loop = false;
             for (int i = 0; i < closures.length; i += 2) {
                 String prefix = closures[i];
                 String suffix = closures[i + 1];
-                int begin = line.indexOf(prefix);
+                int begin = text.indexOf(prefix);
                 if (begin < 0) {
                     continue;
                 }
-                int end = line.indexOf(suffix, begin);
+                int end = text.indexOf(suffix, begin);
                 if (end < 0) {
                     continue;
                 }
-                writer.print(line.substring(0, begin));
+                writer.print(text.substring(0, begin));
                 if (replacer != null) {
-                    String tag = line.substring(begin + prefix.length(), end);
+                    String tag = text.substring(begin + prefix.length(), end);
                     Try.c(replacer).accept(writer, tag);
                 }
-                line = line.substring(end + suffix.length());
+                text = text.substring(end + suffix.length());
                 loop = true;
             }
         }
-        if (!line.isEmpty()) {
-            writer.print(line);
+        if (!text.isEmpty()) {
+            writer.print(text);
         }
     }
 
@@ -225,5 +231,14 @@ public class Tool {
      */
     public static String getContentType(String file) {
         return MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(file);
+    }
+
+    /**
+     * @param text text
+     * @param suffix suffix
+     * @return text
+     */
+    public static String suffix(String text, String suffix) {
+        return text.endsWith(suffix) ? text : text + suffix;
     }
 }

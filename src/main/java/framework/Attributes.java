@@ -10,6 +10,7 @@ import java.util.stream.Stream;
 
 /**
  * session scoped object
+ * @param <ValueType> value type
  */
 public interface Attributes<ValueType> extends Map<String, ValueType> {
     /**

@@ -17,7 +17,13 @@ import java.util.stream.Stream;
  */
 public enum Message {
     /*define message key here*/
-    text_hello;
+    
+    /**
+     * sample
+     */
+    text_hello,
+    
+    ;
 
     /**
      * messages from message.txt

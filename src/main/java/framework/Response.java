@@ -26,8 +26,9 @@ public class Response {
 
     /**
      * constructor
+     * @param consumer response action
      */
-    private Response(TryConsumer<HttpServletResponse> consumer) {
+    Response(TryConsumer<HttpServletResponse> consumer) {
         this.consumer = consumer;
     }
 
@@ -90,6 +91,7 @@ public class Response {
     }
 
     /**
+     * 302
      * @param location location
      * @return response
      */

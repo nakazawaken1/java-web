@@ -42,7 +42,7 @@ public class Try {
     /**
      * throwable consumer
      *
-     * @param <T>
+     * @param <T> object type
      */
     @FunctionalInterface
     public static interface TryConsumer<T> {
@@ -81,14 +81,14 @@ public class Try {
     /**
      * throwable consumer
      *
-     * @param <T>
-     * @param <U> 
+     * @param <T> object type
+     * @param <U> another object type
      */
     @FunctionalInterface
     public static interface TryBiConsumer<T, U> {
         /**
          * @param t object
-         * @param u 
+         * @param u another object
          * @throws Exception exception
          */
         void accept(T t, U u) throws Exception;
@@ -122,7 +122,7 @@ public class Try {
     /**
      * throwable consumer
      *
-     * @param <R>
+     * @param <R> return object type
      */
     @FunctionalInterface
     public static interface TryIntFunction<R> {

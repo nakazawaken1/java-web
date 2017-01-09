@@ -78,6 +78,12 @@ public class Server implements Servlet {
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
+        try {
+            if (!"config".equals(Server.class.getMethod("init", ServletConfig.class).getParameters()[0].getName())) {
+                throw new ServletException("must to enable compile option `-parameters`");
+            }
+        } catch (NoSuchMethodException | SecurityException e) {
+        }
         Config.startupLog();
         if (application == null) {
             application = new Application(config.getServletContext());
@@ -130,6 +136,13 @@ public class Server implements Servlet {
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
         Request request = new Request();
+        if (request.path == null) { /* no slash folder access */
+            new Response(r -> {
+                r.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+                r.setHeader("Location", application.contextPath());
+            }).flush();
+            return;
+        }
         Session session = new Session();
         try {
             if (Config.toURL(Config.app_view_folder.text(), request.path) != null) { /* exists */
