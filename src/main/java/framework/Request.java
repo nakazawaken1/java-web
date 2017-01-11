@@ -44,6 +44,7 @@ public class Request implements Attributes<Object> {
     Request() {
         Try.r(() -> raw.setCharacterEncoding(StandardCharsets.UTF_8.name())).run();
         logger.info("request uri: " + raw.getRequestURI());
+        logger.info("method: " + raw.getMethod());
         logger.info("query string: " + raw.getQueryString());
         String uri = raw.getRequestURI();
         int rootLength = raw.getContextPath().length() + 1;

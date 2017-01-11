@@ -40,7 +40,7 @@ public class Response {
         Objects.requireNonNull(file);
         return new Response(r -> {
             r.setContentType(Tool.getContentType(file));
-            r.getOutputStream().write(Files.readAllBytes(Paths.get(Config.toURL(Config.app_view_folder.text(), file).toURI())));
+            r.getOutputStream().write(Files.readAllBytes(Paths.get(Config.toURL(Config.app_view_folder.text(), file).get().toURI())));
         });
     }
 
@@ -61,7 +61,7 @@ public class Response {
         Objects.requireNonNull(name);
         return new Response(r -> {
             try (PrintWriter writer = r.getWriter();
-                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).toURI()))) {
+                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()))) {
                 lines.forEach(line -> {
                     Tool.printFormat(writer, line, replacer, "#{", "}", "${", "}", "<!--{", "}-->");
                     writer.println();

@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
 import java.util.ResourceBundle.Control;
-import java.util.stream.Stream;
 
 /**
  * Message
@@ -29,7 +28,7 @@ public enum Message {
      * messages from message.txt
      * <div>The locale setting can be specified in the server startup parameter - app.locale</div>
      */
-    private static final ResourceBundle messages = ResourceBundle.getBundle("message",
+    public static final ResourceBundle messages = ResourceBundle.getBundle("message",
             Optional.ofNullable(System.getProperty("app.locale")).map(Locale::new).orElse(Locale.getDefault()), Thread.currentThread().getContextClassLoader(),
             new Control() {
                 /*
@@ -76,35 +75,5 @@ public enum Message {
     @Override
     public String toString() {
         return get(id());
-    }
-    
-    /**
-     * @return map interface
-     */
-    public static Attributes<CharSequence> map() {
-        return new Attributes<CharSequence>() {
-
-            @Override
-            public Stream<String> names() {
-                return messages.keySet().stream();
-            }
-
-            @Override
-            public void setAttr(String name, CharSequence value) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void removeAttr(String name) {
-                throw new UnsupportedOperationException();
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public <T extends CharSequence> Optional<T> getAttr(String name) {
-                return Optional.of((T)Message.get(name));
-            }
-            
-        };
     }
 }

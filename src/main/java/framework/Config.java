@@ -9,7 +9,9 @@ import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -40,7 +42,7 @@ public enum Config {
     /**
      * log level
      */
-    log_level("CONFIG"),
+    log_level(Level.CONFIG),
 
     /**
      * class of suppress log
@@ -58,19 +60,19 @@ public enum Config {
     db_datasource_class,
 
     /**
-     * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
-     */
-    db_auto("update"),
-
-    /**
      * database connection string
      */
     db_url,
 
     /**
+     * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
+     */
+    db_setup(Db.Setup.UPDATE),
+
+    /**
      * session timeout(seconds, indefinite if negative value)
      */
-    app_session_timeout_seconds("1800"),
+    app_session_timeout_seconds(60 * 30),
 
     /**
      * upload folder
@@ -102,7 +104,7 @@ public enum Config {
     /**
      * logger
      */
-    private static final Logger logger = Logger.getLogger(Config.class.getCanonicalName());
+    transient private static final Logger logger = Logger.getLogger(Config.class.getCanonicalName());
 
     /**
      * variable bracket beginning mark
@@ -117,7 +119,7 @@ public enum Config {
     /**
      * properties
      */
-    private static final Properties properties = new Properties();
+    static final Properties properties;
 
     /**
      * log handler
@@ -125,9 +127,9 @@ public enum Config {
     private static volatile Handler handler;
     
     /**
-     * lock
+     * for initialize
      */
-    private static final Object lock = new Object();
+    private static final AtomicBoolean initialized = new AtomicBoolean();
 
     /**
      * default value
@@ -145,8 +147,8 @@ public enum Config {
      * @param defaultValue default value
      * @param separator separator
      */
-    private Config(String defaultValue, String separator) {
-        this.defaultValue = defaultValue;
+    private Config(Object defaultValue, String separator) {
+        this.defaultValue = Tool.string(defaultValue).orElse("");
         this.separator = separator;
     }
 
@@ -155,7 +157,7 @@ public enum Config {
      * 
      * @param defaultValue default value
      */
-    private Config(String defaultValue) {
+    private Config(Object defaultValue) {
         this(defaultValue, ",");
     }
 
@@ -165,20 +167,20 @@ public enum Config {
     private Config() {
         this("");
     }
+    
+    /**
+     * config file name
+     */
+    public static final String configFile = "config.txt";
 
     /**
      * load config
      */
     static {
-        try (InputStream in = toURL("config.txt").openStream(); InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-            Properties p = new Properties();
-            p.load(reader);
-            p.putAll(System.getProperties());
-            p.entrySet().forEach(pair -> {
-                String[] result = { (String) pair.getValue() };
-                resolve(result[0], properties, value -> result[0] = value, null);
-                properties.setProperty((String) pair.getKey(), result[0]);
-            });
+        properties = new Properties();
+        try (InputStream in = toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream(); InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+            properties.putAll(System.getProperties());
             for (;;) {
                 boolean[] loop = { false };
                 Set<String> missings = new LinkedHashSet<>();
@@ -198,7 +200,7 @@ public enum Config {
                 ps.println("-- listing config --");
                 String suffix = db_suffix.get().orElse("");
                 for (Config i : Config.values()) {
-                    String key = i.name();
+                    String key = i.toString();
                     ps.print(key + '=');
                     if (key.startsWith("db.") && i != db_suffix) {
                         ps.println(find(i + suffix).orElse(i.defaultValue));
@@ -210,6 +212,14 @@ public enum Config {
         } catch (IOException e) {
             Logger.getGlobal().warning(() -> e.toString());
         }
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Enum#toString()
+     */
+    @Override
+    public String toString() {
+        return super.toString().replace('_', '.');
     }
 
     /**
@@ -226,16 +236,9 @@ public enum Config {
      * @param relativePath relative path
      * @return url
      */
-    public static URL toURL(String... relativePath) {
+    public static Optional<URL> toURL(String... relativePath) {
         String path = Stream.of(relativePath).map(i -> Tool.trim("/", i, "/")).collect(Collectors.joining("/"));
-        return Thread.currentThread().getContextClassLoader().getResource(path);
-    }
-
-    /**
-     * @return id
-     */
-    public String id() {
-        return name().replace('_', '.');
+        return Optional.ofNullable(Thread.currentThread().getContextClassLoader().getResource(path));
     }
 
     /**
@@ -244,7 +247,7 @@ public enum Config {
      * @return config value
      */
     public Optional<String> get() {
-        return find(id());
+        return find(toString());
     }
 
     /**
@@ -277,6 +280,14 @@ public enum Config {
     public Stream<String> stream() {
         return Stream.of(text().split(separator)).filter(Tool.notEmpty);
     }
+    
+    /**
+     * @param enumClass enum class
+     * @return enum
+     */
+    public <T extends Enum<T>> T enumeration(Class<T> enumClass) {
+        return (T)Enum.valueOf(enumClass, text());
+    }
 
     /**
      * log initialize
@@ -300,15 +311,10 @@ public enum Config {
                 }
             }
             if (noEntry) {
-                if (handler == null) {
-                    synchronized (lock) {
-                        if (handler == null) {
-                            Handler h = new LogHandler(log_folder.text(), log_file_pattern.text());
-                            h.setLevel(level);
-                            h.setFormatter(new LogFormatter(log_format.text()));
-                            handler = h;
-                        }
-                    }
+                if (initialized.compareAndSet(false, true)) {
+                    handler = new LogHandler(log_folder.text(), log_file_pattern.text());
+                    handler.setLevel(level);
+                    handler.setFormatter(new LogFormatter(log_format.text()));
                 }
                 root.addHandler(handler);
                 Logger.getGlobal().info("addHandler: " + handler);
@@ -336,7 +342,7 @@ public enum Config {
      * @param args not use
      */
     public static void main(String[] args) {
-        Config.map().entrySet().forEach(pair -> {
+        properties.entrySet().forEach(pair -> {
             System.out.println(pair.getKey() + " = " + pair.getValue());
         });
     }
@@ -385,32 +391,12 @@ public enum Config {
     }
 
     /**
-     * @return map interface
+     * @param id id
+     * @param exception exception generator
+     * @return value
+     * @throws E exception type
      */
-    public static Attributes<CharSequence> map() {
-        return new Attributes<CharSequence>() {
-
-            @Override
-            public Stream<String> names() {
-                return properties.keySet().stream().map(i -> (String) i);
-            }
-
-            @Override
-            public void setAttr(String name, CharSequence value) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void removeAttr(String name) {
-                throw new UnsupportedOperationException();
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public <T extends CharSequence> Optional<T> getAttr(String name) {
-                return (Optional<T>) find(name);
-            }
-
-        };
+    public static <E extends Throwable> String getOrThrow(String id, Function<String, E> exception) throws E {
+        return find(id).orElseThrow(() -> exception.apply("config not found: " + id));
     }
 }

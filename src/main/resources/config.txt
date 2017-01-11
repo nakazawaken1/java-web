@@ -1,1 +1,13 @@
-app.session.timeout.seconds=60
+db.suffix=.mysql
+
+db.datasource.class.h2=org.h2.jdbcx.JdbcDataSource
+db.url.h2=jdbc:h2:~/db_anz
+
+db.datasource.class.oracle=oracle.jdbc.pool.OracleDataSource
+db.url.oracle=jdbc:oracle:thin:scott/tiger@192.168.200.27:1521:orcl
+
+db.datasource.class.mysql=com.mysql.jdbc.jdbc2.optional.MysqlDataSource
+db.url.mysql=jdbc:mysql://localhost/test?user=root&password=&characterEncoding=utf8
+
+db.datasource.class.postgres=org.postgresql.ds.PGSimpleDataSource
+db.url.postgres=jdbc:postgresql://localhost:5432/postgres

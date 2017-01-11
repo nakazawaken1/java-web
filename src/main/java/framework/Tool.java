@@ -1,12 +1,20 @@
 package framework;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
@@ -16,8 +24,15 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import javax.activation.MimetypesFileTypeMap;
+
+import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
+import org.codehaus.jackson.annotate.JsonMethod;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializationConfig.Feature;
 
 import framework.Try.TryBiConsumer;
 
@@ -203,22 +218,26 @@ public class Tool {
      * @return trimed text
      */
     public static String trim(String left, String text, String right) {
-        if(text == null) {
+        if (text == null) {
             return null;
         }
         int start = 0;
         int end = text.length() - 1;
-        while(start <= end) {
-            if(left.indexOf(text.charAt(start)) < 0) {
-                break;
+        if (left != null) {
+            while (start <= end) {
+                if (left.indexOf(text.charAt(start)) < 0) {
+                    break;
+                }
+                start++;
             }
-            start++;
         }
-        while(start <= end) {
-            if(right.indexOf(text.charAt(end)) < 0) {
-                break;
+        if (right != null) {
+            while (start <= end) {
+                if (right.indexOf(text.charAt(end)) < 0) {
+                    break;
+                }
+                end--;
             }
-            end--;
         }
         return text.substring(start, end + 1);
     }
@@ -240,5 +259,93 @@ public class Tool {
      */
     public static String suffix(String text, String suffix) {
         return text.endsWith(suffix) ? text : text + suffix;
+    }
+
+    /**
+     * @param key key
+     * @param value value
+     * @return entry
+     */
+    public static <K, V> Map.Entry<K, V> pair(K key, V value) {
+        return new AbstractMap.SimpleEntry<K, V>(key, value);
+    }
+
+    /**
+     * @param array array
+     * @param i index(support negative value)
+     * @return element
+     */
+    public static <T> T at(T[] array, int i) {
+        return array[i < 0 ? array.length + i : i];
+    }
+
+    /**
+     * list files
+     *
+     * @param location location
+     * @return file list
+     */
+    public static Stream<String> getResources(String location) {
+        return Config.toURL(location).map(Try.f(i -> {
+            File file = new File(i.toURI());
+            return file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file);
+        })).orElse(Stream.empty());
+    }
+
+    /**
+     * list files in jar
+     *
+     * @param jar jar file
+     * @return file list
+     */
+    private static Stream<String> getResourcesFromJar(File jar) {
+        try (ZipFile zip = new ZipFile(jar); Stream<? extends ZipEntry> stream = zip.stream()) {
+            return stream.map(ZipEntry::getName);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * list files in folder
+     *
+     * @param folder folder
+     * @return file list
+     */
+    private static Stream<String> getResourcesFromFolder(File folder) {
+        try(Stream<Path> list = Files.list(folder.toPath())) {
+            return list.map(path -> path.getFileName().toString());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * build map<String, Object>
+     *
+     * @param keyValues key, value, key, value...
+     * @return map
+     */
+    public static Map<String, Object> jsonMap(Object... keyValues) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            map.put(keyValues[i].toString(), keyValues[i + 1]);
+        }
+        return map;
+    }
+    
+    /**
+     * @param o object
+     * @return json
+     */
+    public static String json(Object o) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setVisibility(JsonMethod.FIELD, Visibility.PUBLIC_ONLY);
+        mapper.configure(Feature.FAIL_ON_EMPTY_BEANS, false);
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(o);
+        } catch (IOException e) {
+            return Objects.toString(o);
+        }
     }
 }

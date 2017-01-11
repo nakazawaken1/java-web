@@ -1,17 +1,14 @@
 package app.controller;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-
-import javax.sql.DataSource;
 
 import app.model.Data;
 import framework.Account;
+import framework.Db;
 import framework.Response;
 import framework.Session;
 import framework.Try;
@@ -30,22 +27,24 @@ import framework.annotation.Valid.Save;
 public class Main {
 
     /**
-     * @param ds data source
      * @param sql sql
      * @return response
      * @throws SQLException database error
      */
     @Http
     @Only(Administrator.class)
-    Response db(DataSource ds, @Query Optional<String> sql) throws SQLException {
+    Response db(@Query Optional<String> sql) throws SQLException {
         return Response.template("table.html", (out, name) -> {
-            try (Connection c = ds.getConnection(); PreparedStatement s = c.prepareStatement(sql.orElse("SHOW VARIABLES")); ResultSet r = s.executeQuery()) {
-                ResultSetMetaData meta = r.getMetaData();
-                int columns = meta.getColumnCount();
-                out.println(new Xml("tr").child("th", IntStream.rangeClosed(1, columns).mapToObj(Try.f(meta::getColumnName))));
-                while (r.next()) {
-                    out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns).mapToObj(Try.f(r::getString))));
-                }
+            try (Db db = Db.connect()) {
+                AtomicInteger columns = new AtomicInteger(-1);
+                db.query(sql.orElse("SHOW VARIABLES"), null).forEach(Try.c(rs -> {
+                    if(columns.compareAndSet(-1, 0)) {
+                        ResultSetMetaData meta = rs.getMetaData();
+                        columns.set(meta.getColumnCount());
+                        out.println(new Xml("tr").child("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
+                    }
+                    out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
+                }));
             }
         });
     }

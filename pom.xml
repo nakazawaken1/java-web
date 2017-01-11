@@ -52,6 +52,11 @@
 			<version>1.4.192</version>
 			<scope>runtime</scope>
 		</dependency>
+		<dependency><!-- json -->
+			<groupId>org.codehaus.jackson</groupId>
+			<artifactId>jackson-mapper-asl</artifactId>
+			<version>1.9.13</version>
+		</dependency>
 		<dependency><!-- excel -->
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml</artifactId>

@@ -10,6 +10,7 @@ import java.lang.reflect.Type;
 import java.sql.DriverManager;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -23,12 +24,9 @@ import javax.servlet.ServletResponse;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
-
-import com.mysql.jdbc.AbandonedConnectionCleanupThread;
-import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
 
 import app.controller.Main;
+import framework.Db.Setup;
 import framework.annotation.Http;
 import framework.annotation.Only;
 import framework.annotation.Query;
@@ -43,11 +41,6 @@ public class Server implements Servlet {
      * application scope object
      */
     transient static Application application;
-
-    /**
-     * data source
-     */
-    transient private static final MysqlDataSource dataSource = new MysqlDataSource();
 
     /**
      * logger
@@ -70,7 +63,12 @@ public class Server implements Servlet {
             return m;
         }));
     }
-
+    
+    /**
+     * for initialize
+     */
+    private static final AtomicBoolean initialized = new AtomicBoolean();
+    
     /*
      * (non-Javadoc)
      * 
@@ -88,7 +86,6 @@ public class Server implements Servlet {
         if (application == null) {
             application = new Application(config.getServletContext());
         }
-        dataSource.setURL(Config.db_url.text());
     }
 
     /*
@@ -99,7 +96,7 @@ public class Server implements Servlet {
     @Override
     public void destroy() {
         try {
-            AbandonedConnectionCleanupThread.shutdown();
+            Db.cleanup();
             Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver));
         } catch (Exception e) {
             logger.log(Level.WARNING, "destroy error", e);
@@ -133,6 +130,10 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
+        Tool.stream(req.getParameterNames()).forEach(logger::info);
+        if(initialized.compareAndSet(false, true)) {
+            Db.setup(Config.db_setup.enumeration(Setup.class));
+        }
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
         Request request = new Request();
@@ -145,7 +146,7 @@ public class Server implements Servlet {
         }
         Session session = new Session();
         try {
-            if (Config.toURL(Config.app_view_folder.text(), request.path) != null) { /* exists */
+            if (Config.toURL(Config.app_view_folder.text(), request.path).isPresent()) { /* exists */
                 Response.file(request.path).flush();
                 return;
             }
@@ -172,9 +173,6 @@ public class Server implements Servlet {
                         }
                         if (Application.class.isAssignableFrom(type)) {
                             return application;
-                        }
-                        if (DataSource.class.isAssignableFrom(type)) {
-                            return dataSource;
                         }
                         if (p.getAnnotation(Query.class) != null) {
                             String value = request.raw.getParameter(p.getName());
@@ -211,7 +209,8 @@ public class Server implements Servlet {
             return Tool.integer(value).orElse(0);
         }
         if (type == Optional.class) {
-            return Optional.ofNullable(convert(((ParameterizedType) p.getParameterizedType()).getActualTypeArguments()[0], null, value))
+            Type valueType = ((ParameterizedType) p.getParameterizedType()).getActualTypeArguments()[0];
+            return Optional.ofNullable(valueType == String.class ? value : convert(valueType, null, value))
                     .filter(i -> !(i instanceof String) || !((String) i).isEmpty());
         }
         return value;
