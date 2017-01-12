@@ -5,7 +5,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -125,7 +127,7 @@ public enum Config {
      * log handler
      */
     private static volatile Handler handler;
-    
+
     /**
      * for initialize
      */
@@ -167,7 +169,7 @@ public enum Config {
     private Config() {
         this("");
     }
-    
+
     /**
      * config file name
      */
@@ -177,10 +179,39 @@ public enum Config {
      * load config
      */
     static {
+        /* set default properties */
         properties = new Properties();
-        try (InputStream in = toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream(); InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+        Set<String> dbKeys = new HashSet<>();
+        for (Config i : Config.values()) {
+            String key = i.toString();
+            if (key.startsWith("db.") && i != db_suffix) {
+                dbKeys.add(key);
+            }
+            properties.setProperty(key, i.text());
+        }
+        try (InputStream in = toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream();
+                InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+            /* overwrite file properties */
             properties.load(reader);
-            properties.putAll(System.getProperties());
+
+            /* overwrite system properties(prefix "app. db. log." only) */
+            System.getProperties().forEach((k, v) -> {
+                String key = (String) k;
+                if (Stream.of("app.", "db.", "log.").anyMatch(key::startsWith)) {
+                    properties.setProperty(key, (String) v);
+                }
+            });
+
+            /* overwrite dynamic properties */
+            Map<String, String> backup = dbKeys.stream().filter(i -> Config.find(i).isPresent()).collect(Collectors.toMap(i -> i, properties::getProperty));
+            db_suffix.get().ifPresent(suffix -> {
+                for (String key : dbKeys) {
+                    find(key + suffix).ifPresent(value -> properties.setProperty(key, value));
+                }
+            });
+            backup.forEach((key, value) -> properties.setProperty(key, value));
+
+            /* resolve variables */
             for (;;) {
                 boolean[] loop = { false };
                 Set<String> missings = new LinkedHashSet<>();
@@ -195,26 +226,22 @@ public enum Config {
                     break;
                 }
             }
+
+            /* dump */
             startupLog();
             Logger.getGlobal().info(Tool.print(ps -> {
                 ps.println("-- listing config --");
-                String suffix = db_suffix.get().orElse("");
-                for (Config i : Config.values()) {
-                    String key = i.toString();
-                    ps.print(key + '=');
-                    if (key.startsWith("db.") && i != db_suffix) {
-                        ps.println(find(i + suffix).orElse(i.defaultValue));
-                    } else {
-                        ps.println(i.text());
-                    }
-                }
+                properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey()))
+                        .forEach(i -> ps.println(i.getKey() + "=" + i.getValue()));
             }));
         } catch (IOException e) {
             Logger.getGlobal().warning(() -> e.toString());
         }
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see java.lang.Enum#toString()
      */
     @Override
@@ -280,13 +307,13 @@ public enum Config {
     public Stream<String> stream() {
         return Stream.of(text().split(separator)).filter(Tool.notEmpty);
     }
-    
+
     /**
      * @param enumClass enum class
      * @return enum
      */
     public <T extends Enum<T>> T enumeration(Class<T> enumClass) {
-        return (T)Enum.valueOf(enumClass, text());
+        return (T) Enum.valueOf(enumClass, text());
     }
 
     /**
