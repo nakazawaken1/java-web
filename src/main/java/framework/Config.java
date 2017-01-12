@@ -182,10 +182,21 @@ public enum Config {
         /* set default properties */
         properties = new Properties();
         Set<String> dbKeys = new HashSet<>();
+<<<<<<< HEAD
         for (Config i : Config.values()) {
             String key = i.toString();
             if (key.startsWith("db.") && i != db_suffix) {
                 dbKeys.add(key);
+=======
+        Set<String> dbExistsKeys = new HashSet<>();
+        for (Config i : Config.values()) {
+            String key = i.toString();
+            if (key.startsWith("db.") && i != db_suffix) {
+                dbKeys.add(key);
+                if (!i.text().isEmpty()) {
+                    dbExistsKeys.add(key);
+                }
+>>>>>>> branch 'master' of https://github.com/nakazawaken1/java-web.git
             }
             properties.setProperty(key, i.text());
         }
@@ -312,7 +323,11 @@ public enum Config {
      * @param enumClass enum class
      * @return enum
      */
+<<<<<<< HEAD
     public <T extends Enum<T>> T enumOf(Class<T> enumClass) {
+=======
+    public <T extends Enum<T>> T enumeration(Class<T> enumClass) {
+>>>>>>> branch 'master' of https://github.com/nakazawaken1/java-web.git
         return (T) Enum.valueOf(enumClass, text());
     }
 
