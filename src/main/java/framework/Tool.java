@@ -8,7 +8,6 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -283,7 +282,7 @@ public class Tool {
      * list files
      *
      * @param location location
-     * @return file list
+     * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
         return Config.toURL(location).map(Try.f(i -> {
@@ -296,11 +295,11 @@ public class Tool {
      * list files in jar
      *
      * @param jar jar file
-     * @return file list
+     * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromJar(File jar) {
-        try (ZipFile zip = new ZipFile(jar); Stream<? extends ZipEntry> stream = zip.stream()) {
-            return stream.map(ZipEntry::getName);
+        try (ZipFile zip = new ZipFile(jar)) {
+            return zip.stream().map(ZipEntry::getName);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -310,11 +309,11 @@ public class Tool {
      * list files in folder
      *
      * @param folder folder
-     * @return file list
+     * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromFolder(File folder) {
-        try(Stream<Path> list = Files.list(folder.toPath())) {
-            return list.map(path -> path.getFileName().toString());
+        try {
+            return Files.list(folder.toPath()).map(path -> path.getFileName().toString());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

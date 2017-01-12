@@ -1,7 +1,7 @@
-db.suffix=.mysql
+db.suffix=.h2
 
 db.datasource.class.h2=org.h2.jdbcx.JdbcDataSource
-db.url.h2=jdbc:h2:~/db_anz
+db.url.h2=jdbc:h2:~/db_test
 
 db.datasource.class.oracle=oracle.jdbc.pool.OracleDataSource
 db.url.oracle=jdbc:oracle:thin:scott/tiger@192.168.200.27:1521:orcl

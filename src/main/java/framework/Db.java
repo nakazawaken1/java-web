@@ -200,7 +200,7 @@ public class Db implements AutoCloseable {
      * @return db
      */
     public static Db connect() {
-        return connect(Config.db_suffix.text());
+        return connect("");
     }
 
     /**
@@ -836,8 +836,11 @@ public class Db implements AutoCloseable {
         /* get all sql files(table.*.sql or data.*.sql) */
         String folder = Config.app_sql_folder.text();
         String suffix = ".sql";
-        List<String> all = Tool.getResources(folder).filter(file -> file.endsWith(suffix) && (file.startsWith("table.") || file.startsWith("data.")))
-                .peek(logger::info).collect(Collectors.toList());
+        List<String> all;
+        try(Stream<String> files = Tool.getResources(folder)) {
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith("table.") || file.startsWith("data.")))
+                    .peek(logger::info).collect(Collectors.toList());
+        }
 
         try (Db db = Db.connect()) {
             db.getSQL("setup.sql").map(sql -> db.execute(sql, null));
