@@ -312,7 +312,7 @@ public enum Config {
      * @param enumClass enum class
      * @return enum
      */
-    public <T extends Enum<T>> T enumeration(Class<T> enumClass) {
+    public <T extends Enum<T>> T enumOf(Class<T> enumClass) {
         return (T) Enum.valueOf(enumClass, text());
     }
 

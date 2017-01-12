@@ -132,7 +132,7 @@ public class Server implements Servlet {
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
         Tool.stream(req.getParameterNames()).forEach(logger::info);
         if(initialized.compareAndSet(false, true)) {
-            Db.setup(Config.db_setup.enumeration(Setup.class));
+            Db.setup(Config.db_setup.enumOf(Setup.class));
         }
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
