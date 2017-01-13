@@ -132,7 +132,7 @@ public enum Config {
     /**
      * for initialize
      */
-    private static final AtomicBoolean initialized = new AtomicBoolean();
+    private static final AtomicBoolean first = new AtomicBoolean(true);
 
     /**
      * default value
@@ -346,7 +346,7 @@ public enum Config {
                 }
             }
             if (noEntry) {
-                if (initialized.compareAndSet(false, true)) {
+                if (first.compareAndSet(true, false)) {
                     handler = new LogHandler(log_folder.text(), log_file_pattern.text());
                     handler.setLevel(level);
                     handler.setFormatter(new LogFormatter(log_format.text()));

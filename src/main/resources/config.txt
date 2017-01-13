@@ -4,10 +4,13 @@ db.datasource.class.h2=org.h2.jdbcx.JdbcDataSource
 db.url.h2=jdbc:h2:~/db_test
 
 db.datasource.class.oracle=oracle.jdbc.pool.OracleDataSource
-db.url.oracle=jdbc:oracle:thin:scott/tiger@192.168.200.27:1521:orcl
+db.url.oracle=jdbc:oracle:thin:system/?@localhost:1521:orcl
 
 db.datasource.class.mysql=com.mysql.jdbc.jdbc2.optional.MysqlDataSource
 db.url.mysql=jdbc:mysql://localhost/test?user=root&password=&characterEncoding=utf8
 
 db.datasource.class.postgres=org.postgresql.ds.PGSimpleDataSource
-db.url.postgres=jdbc:postgresql://localhost:5432/postgres
+db.url.postgres=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=?
+
+db.datasource.class.sqlserver=com.microsoft.sqlserver.jdbc.SQLServerDataSource
+db.url.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?

@@ -37,7 +37,7 @@ public class Main {
         return Response.template("table.html", (out, name) -> {
             try (Db db = Db.connect()) {
                 AtomicInteger columns = new AtomicInteger(-1);
-                db.query(sql.orElse("SHOW VARIABLES"), null).forEach(Try.c(rs -> {
+                db.query(sql.orElse(db.getBuilder().getVariablesSql()), null).forEach(Try.c(rs -> {
                     if(columns.compareAndSet(-1, 0)) {
                         ResultSetMetaData meta = rs.getMetaData();
                         columns.set(meta.getColumnCount());

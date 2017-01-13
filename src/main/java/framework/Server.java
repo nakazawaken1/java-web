@@ -68,7 +68,7 @@ public class Server implements Servlet {
     /**
      * for initialize
      */
-    private static final AtomicBoolean initialized = new AtomicBoolean();
+    private static final AtomicBoolean first = new AtomicBoolean(true);
     
     /*
      * (non-Javadoc)
@@ -133,7 +133,7 @@ public class Server implements Servlet {
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
         Tool.stream(req.getParameterNames()).forEach(logger::info);
-        if(initialized.compareAndSet(false, true)) {
+        if(first.compareAndSet(true, false)) {
             Db.setup(Config.db_setup.enumOf(Setup.class));
         }
         Request.request.set((HttpServletRequest) req);

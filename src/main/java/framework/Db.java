@@ -334,8 +334,22 @@ public class Db implements AutoCloseable {
             schema = "dbo";
             break;
         case H2:
+            builder = new Builder() {
+
+                @Override
+                public String getVariablesSql() {
+                    return "SELECT * FROM INFORMATION_SCHEMA.SETTINGS";
+                }
+            };
+            break;
         case MYSQL:
-            builder = new Builder();
+            builder = new Builder() {
+
+                @Override
+                public String getVariablesSql() {
+                    return "SHOW VARIABLES";
+                }
+            };
             break;
         }
     }
@@ -351,33 +365,16 @@ public class Db implements AutoCloseable {
             try {
                 Class<?> c = Class.forName(Config.getOrThrow(Config.db_datasource_class + key, RuntimeException::new));
                 DataSource ds = (DataSource) c.newInstance();
-                Stream.of(Tool.pair(Config.db_url, "setURL")).forEach(pair -> {
-                    Config.find(pair.getKey() + key).filter(Tool.notEmpty).ifPresent(value -> {
+                Config.find(Config.db_url + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
+                    for (String method : Tool.array("setURL", "setUrl")) {
                         try {
-                            String method = pair.getValue();
-                            if ("setURL".equals(method) && value.startsWith("jdbc:postgresql:")) {
-                                int p = value.indexOf('?');
-                                if (p >= 0)
-                                    value = value.substring(0, p);
-                                String[] a = value.split("/");
-                                if (a.length > 1) {
-                                    c.getMethod("setDatabaseName", String.class).invoke(ds, Tool.at(a, -1));
-                                    a = Tool.at(a, -2).split(":");
-                                    c.getMethod("setServerName", String.class).invoke(ds, a[0]);
-                                    if (a.length > 0) {
-                                        c.getMethod("setPortNumber", int.class).invoke(ds, Integer.valueOf(a[1]));
-                                    }
-                                } else if (a.length == 1) {
-                                    c.getMethod("setDatabaseName", String.class).invoke(ds, Tool.at(a[0].split(":"), -1));
-                                }
-                            } else {
-                                c.getMethod(method, String.class).invoke(ds, value);
-                            }
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                            c.getMethod(method, String.class).invoke(ds, value);
+                            break;
+                        } catch (NoSuchMethodException e) {
+                            continue;
                         }
-                    });
-                });
+                    }
+                }));
                 logger.info("DataSource created #" + ds);
                 return ds;
             } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
@@ -399,6 +396,13 @@ public class Db implements AutoCloseable {
      */
     public Type getType() {
         return type;
+    }
+
+    /**
+     * @return builder
+     */
+    public Builder getBuilder() {
+        return builder;
     }
 
     /*
@@ -771,7 +775,7 @@ public class Db implements AutoCloseable {
             if (!column.nullable && builder.supportNullString) {
                 sql.append(" NOT NULL");
             }
-            if(!(column.value == null || (!Tool.string(column.value).isPresent() && !builder.supportNullString))) {
+            if (!(column.value == null || (!Tool.string(column.value).isPresent() && !builder.supportNullString))) {
                 sql.append(" DEFAULT ").append(builder.escape(column.value));
             }
             Tool.string(column.display).map(j -> " COMMENT " + j).ifPresent(sql::append);
@@ -845,9 +849,9 @@ public class Db implements AutoCloseable {
         String folder = Config.app_sql_folder.text();
         String suffix = ".sql";
         List<String> all;
-        try(Stream<String> files = Tool.getResources(folder)) {
-            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith("table.") || file.startsWith("data.")))
-                    .peek(logger::info).collect(Collectors.toList());
+        try (Stream<String> files = Tool.getResources(folder)) {
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith("table.") || file.startsWith("data."))).peek(logger::info)
+                    .collect(Collectors.toList());
         }
 
         try (Db db = Db.connect()) {
@@ -900,7 +904,7 @@ public class Db implements AutoCloseable {
     /**
      * sql builder for MySQL and H2
      */
-    public static class Builder {
+    abstract public static class Builder {
         /**
          * differentiate NULL from empty
          */
@@ -1005,13 +1009,20 @@ public class Db implements AutoCloseable {
         public String replace(String sql) {
             return Pattern.compile("VARCHAR2", Pattern.CASE_INSENSITIVE).matcher(sql).replaceAll("VARCHAR");
         }
+
+        /**
+         * @return sql of variables
+         */
+        abstract public String getVariablesSql();
     }
 
     /**
      * sql builder for PostgreSQL
      */
     public static class PostgresqlBuilder extends Builder {
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1033,7 +1044,9 @@ public class Db implements AutoCloseable {
             return sql.toString();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
@@ -1046,13 +1059,20 @@ public class Db implements AutoCloseable {
             }
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
+
+        @Override
+        public String getVariablesSql() {
+            return "SHOW ALL";
+        }
     }
 
     /**
      * sql builder for SQLServer
      */
     public static class SqlserverBuilder extends Builder {
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1093,7 +1113,9 @@ public class Db implements AutoCloseable {
             return sql.toString();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#escape(java.lang.Object)
          */
         @Override
@@ -1107,7 +1129,9 @@ public class Db implements AutoCloseable {
             return super.escape(value);
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#countSql(java.lang.String)
          */
         @Override
@@ -1116,6 +1140,11 @@ public class Db implements AutoCloseable {
             if (orderBy > 0 && sql.indexOf(" TOP ") < 0)
                 sql = sql.substring(0, orderBy);
             return "SELECT COUNT(*) FROM (" + sql + ") T__";
+        }
+
+        @Override
+        public String getVariablesSql() {
+            return "SELECT configuration_id, name, CONVERT(VARCHAR(1000), value) value, CONVERT(VARCHAR(1000), minimum) minimum, CONVERT(VARCHAR(1000), maximum) maximum, CONVERT(VARCHAR(1000), value_in_use) value_in_use, description, is_dynamic, is_advanced FROM sys.configurations";
         }
     }
 
@@ -1148,7 +1177,9 @@ public class Db implements AutoCloseable {
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1181,12 +1212,19 @@ public class Db implements AutoCloseable {
             return sql.toString();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#replace(java.lang.String)
          */
         @Override
         public String replace(String sql) {
             return sql;
+        }
+
+        @Override
+        public String getVariablesSql() {
+            return "SELECT * FROM V$PARAMETER";
         }
     }
 
