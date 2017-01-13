@@ -44,32 +44,50 @@ public class Formatter {
     Deque<Integer> braces;
 
     /**
+     * result action
+     */
+    public enum Result {
+        /**
+         * Exit process
+         */
+        EXIT,
+        /**
+         * Skip process
+         */
+        SKIP,
+        /**
+         * Succeeded
+         */
+        NEXT,
+    }
+
+    /**
      * JavaScript用(行コメント、ブロックコメント、シングルクォート文字列を除外)
      *
      * @param p パーサ
-     * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
+     * @return 結果
      */
-    public static Boolean excludeForScript(Formatter p) {
+    public static Result excludeForScript(Formatter p) {
         if (p.eat("//")) {
             p.index = p.indexOf("\n");
             if (p.index < 0) {
-                return null;
+                return Result.EXIT;
             }
             p.index++;
-            return true;
+            return Result.SKIP;
         }
         if (p.eat("/*")) {
             p.index = p.indexOf("*/");
             if (p.index < 0) {
-                return null;
+                return Result.EXIT;
             }
             p.index += 2;
-            return true;
+            return Result.SKIP;
         }
         if (p.eat("'")) {
             for (;;) {
                 if (!p.skipUntil('\'')) {
-                    return null;
+                    return Result.EXIT;
                 }
                 p.index++;
                 if (!p.prev("\\'")) {
@@ -77,28 +95,28 @@ public class Formatter {
                 }
             }
         }
-        return false;
+        return Result.NEXT;
     }
 
     /**
      * css用(ブロックコメント、シングルクォート文字列を除外)
      *
      * @param p パーサ
-     * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
+     * @return 結果
      */
-    public static Boolean excludeForStyle(Formatter p) {
+    public static Result excludeForStyle(Formatter p) {
         if (p.eat("/*")) {
             p.index = p.indexOf("*/");
             if (p.index < 0) {
-                return null;
+                return Result.EXIT;
             }
             p.index += 2;
-            return true;
+            return Result.SKIP;
         }
         if (p.eat("'")) {
             for (;;) {
                 if (!p.skipUntil('\'')) {
-                    return null;
+                    return Result.EXIT;
                 }
                 p.index++;
                 if (!p.prev("\\'")) {
@@ -106,7 +124,7 @@ public class Formatter {
                 }
             }
         }
-        return false;
+        return Result.NEXT;
     }
 
     /**
@@ -115,19 +133,19 @@ public class Formatter {
      * @param p パーサ
      * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
      */
-    public static Boolean excludeForSql(Formatter p) {
+    public static Result excludeForSql(Formatter p) {
         if (p.eat("--")) {
             p.index = p.indexOf("\n");
             if (p.index < 0) {
-                return null;
+                return Result.EXIT;
             }
             p.index++;
-            return true;
+            return Result.SKIP;
         }
         if (p.eat("'")) {
             for (;;) {
                 if (!p.skipUntil('\'')) {
-                    return null;
+                    return Result.EXIT;
                 }
                 p.index++;
                 if (!p.prev("\\'")) {
@@ -135,7 +153,7 @@ public class Formatter {
                 }
             }
         }
-        return false;
+        return Result.NEXT;
     }
 
     /**
@@ -144,19 +162,19 @@ public class Formatter {
      * @param p パーサ
      * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
      */
-    public static Boolean excludeForHtml(Formatter p) {
+    public static Result excludeForHtml(Formatter p) {
         if (p.eat("!--") && !(p.prev("<!--") && p.index < p.lastIndex && p.source.charAt(p.index) == '{')) {
             p.index = p.indexOf("--");
             if (p.index < 0) {
-                return null;
+                return Result.EXIT;
             }
             p.index += 2;
-            return true;
+            return Result.SKIP;
         }
         if (p.eat("'")) {
             for (;;) {
                 if (!p.skipUntil('\'')) {
-                    return null;
+                    return Result.EXIT;
                 }
                 p.index++;
                 if (!p.prev("\\'")) {
@@ -164,7 +182,7 @@ public class Formatter {
                 }
             }
         }
-        return false;
+        return Result.NEXT;
     }
 
     /**
@@ -174,7 +192,7 @@ public class Formatter {
      * @param eval 置換処理
      * @param exclude 除外処理
      */
-    Formatter(String text, Function<String, String> eval, Function<Formatter, Boolean> exclude) {
+    Formatter(String text, Function<String, String> eval, Function<Formatter, Result> exclude) {
         source = new StringBuilder(text);
         index = 0;
         lastIndex = source.length();
@@ -182,11 +200,13 @@ public class Formatter {
         while (index < lastIndex) {
             skipSpaces();
             if (exclude != null && braces.isEmpty()) {
-                Boolean b = exclude.apply(this);
-                if (b == null)
+                Result b = exclude.apply(this);
+                if (b == Result.EXIT) {
                     return;
-                if (b)
+                }
+                if (b == Result.SKIP) {
                     continue;
+                }
             }
             if (eat("{")) {
                 int prefix = 1;
@@ -291,7 +311,6 @@ public class Formatter {
         return source.indexOf(word, index);
     }
 
-
     /**
      * 文字列にパラメータを埋め込み
      *
@@ -302,7 +321,7 @@ public class Formatter {
      * @param values パラメータ（{0}, {1}...に埋め込まれる）
      * @return 埋め込み後の文字列
      */
-    public static String format(Function<Formatter, Boolean> exclude, Function<Object, String> escape, String text, Map<String, Object> map, Object... values) {
+    public static String format(Function<Formatter, Result> exclude, Function<Object, String> escape, String text, Map<String, Object> map, Object... values) {
         ELProcessor[] el = { null };
         Map<String, String> cache = new HashMap<>();
         return new Formatter(text, expression -> {
@@ -338,13 +357,13 @@ public class Formatter {
                     try {
                         if (el[0] == null) {
                             el[0] = new ELProcessor();
-//                            el[0].defineFunction("F", "include", Tool.class.getMethod("include", String.class, Object.class, Object[].class));
-//                            el[0].defineFunction("F", "includeIf",
-//                                    Tool.class.getMethod("includeIf", boolean.class, String.class, Object.class, Object[].class));
-//                            el[0].defineFunction("F", "includeN", Tool.class.getMethod("includeN", int.class, String.class, Object.class, Object[].class));
-//                            el[0].defineFunction("F", "includeFor",
-//                                    Tool.class.getMethod("includeFor", Stream.class, String.class, Object.class, Object[].class));
-//                            el[0].defineFunction("F", "json", Tool.class.getMethod("json", Object.class, boolean.class));
+                            // el[0].defineFunction("F", "include", Tool.class.getMethod("include", String.class, Object.class, Object[].class));
+                            // el[0].defineFunction("F", "includeIf",
+                            // Tool.class.getMethod("includeIf", boolean.class, String.class, Object.class, Object[].class));
+                            // el[0].defineFunction("F", "includeN", Tool.class.getMethod("includeN", int.class, String.class, Object.class, Object[].class));
+                            // el[0].defineFunction("F", "includeFor",
+                            // Tool.class.getMethod("includeFor", Stream.class, String.class, Object.class, Object[].class));
+                            // el[0].defineFunction("F", "json", Tool.class.getMethod("json", Object.class, boolean.class));
                             el[0].defineBean("C", Config.properties);
                             el[0].defineBean("M", Message.messages);
                             el[0].defineBean("V", values == null ? new Object[] {} : values);

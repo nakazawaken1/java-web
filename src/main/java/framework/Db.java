@@ -43,6 +43,7 @@ import java.util.stream.StreamSupport;
 
 import javax.sql.DataSource;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
 
 /**
@@ -441,6 +442,7 @@ public class Db implements AutoCloseable {
      * @param values values({0}, {1}...)
      * @return ResultSet stream
      */
+    @SuppressFBWarnings("OBL_UNSATISFIED_OBLIGATION")
     public Stream<ResultSet> query(String sql, Map<String, Object> map, Object... values) {
         sql = sql(sql, map, values);
         logger.info(sql + ";");
@@ -766,12 +768,18 @@ public class Db implements AutoCloseable {
         for (Column column : columns) {
             names[i++] = column.name;
             sql.append(pad).append(column.name).append(" ").append(builder.type(column));
-            if (!column.nullable && builder.supportNullString)
+            if (!column.nullable && builder.supportNullString) {
                 sql.append(" NOT NULL");
+            }
+            if(!(column.value == null || (!Tool.string(column.value).isPresent() && !builder.supportNullString))) {
+                sql.append(" DEFAULT ").append(builder.escape(column.value));
+            }
+            Tool.string(column.display).map(j -> " COMMENT " + j).ifPresent(sql::append);
             pad = ", ";
         }
-        if (primary > 0)
+        if (primary > 0) {
             sql.append(join(", PRIMARY KEY(", Arrays.asList(names).subList(0, primary), ", ")).append(")");
+        }
         execute(sql.append(")").toString(), null);
         return names;
     }

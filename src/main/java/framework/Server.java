@@ -26,6 +26,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import app.controller.Main;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.annotation.Http;
 import framework.annotation.Only;
@@ -75,6 +76,7 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#init(javax.servlet.ServletConfig)
      */
     @Override
+    @SuppressFBWarnings("LI_LAZY_INIT_STATIC")
     public void init(ServletConfig config) throws ServletException {
         try {
             if (!"config".equals(Server.class.getMethod("init", ServletConfig.class).getParameters()[0].getName())) {
