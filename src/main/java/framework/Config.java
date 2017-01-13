@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -314,6 +315,13 @@ public enum Config {
      */
     public <T extends Enum<T>> T enumOf(Class<T> enumClass) {
         return (T) Enum.valueOf(enumClass, text());
+    }
+
+    /**
+     * @return true if text is true or 1 or yes or on(ignore case)
+     */
+    public boolean isTrue() {
+        return get().filter(i -> Arrays.asList("TRUE", "1", "YES", "ON").contains(i.toUpperCase())).isPresent();
     }
 
     /**
