@@ -71,15 +71,10 @@ public class Try {
     public static <T> Consumer<T> c(TryConsumer<T> consumer) {
         return new Consumer<T>() {
 
-            /*
-             * (non-Javadoc)
-             * 
-             * @see java.util.function.Consumer#accept(java.lang.Object)
-             */
             @Override
-            public void accept(T t) {
+            public void accept(T value) {
                 try {
-                    consumer.accept(t);
+                    consumer.accept(value);
                 } catch (RuntimeException e) {
                     throw e;
                 } catch (IOException e) {
@@ -161,6 +156,73 @@ public class Try {
             public void accept(T t, U u) {
                 try {
                     consumer.accept(t, u);
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                } catch (SQLException e) {
+                    throw new UncheckedSQLException(e);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+    }
+
+    /**
+     * throwable consumer
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     */
+    @FunctionalInterface
+    public static interface TriConsumer<T, U, V> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         */
+        void accept(T t, U u, V v);
+    }
+
+    /**
+     * throwable consumer
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     */
+    @FunctionalInterface
+    public static interface TryTriConsumer<T, U, V> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         * @throws Exception exception
+         */
+        void accept(T t, U u, V v) throws Exception;
+    }
+
+    /**
+     * @param consumer consumer
+     * @return consumer
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     */
+    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer) {
+        return new TriConsumer<T, U, V>() {
+
+            /*
+             * (non-Javadoc)
+             * 
+             * @see java.util.function.Consumer#accept(java.lang.Object)
+             */
+            @Override
+            public void accept(T t, U u, V v) {
+                try {
+                	consumer.accept(t, u, v);
                 } catch (RuntimeException e) {
                     throw e;
                 } catch (IOException e) {

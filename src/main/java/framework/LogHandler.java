@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.ErrorManager;
 import java.util.logging.Handler;
@@ -90,7 +91,7 @@ public class LogHandler extends Handler {
                 realFile = file.replace("ll", level.getName().toLowerCase());
             }
             String message = getFormatter().format(record);
-            String encoding = getEncoding();
+            Charset encoding = Optional.ofNullable(getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset());
             outMap.computeIfAbsent(level, i -> {
                 try {
                     Path path = Paths.get(folder, realFile);
@@ -103,7 +104,7 @@ public class LogHandler extends Handler {
                     reportError(null, e, ErrorManager.OPEN_FAILURE);
                     return null;
                 }
-            }).write(encoding == null ? message.getBytes(Charset.defaultCharset()) : message.getBytes(encoding));
+            }).write(message.getBytes(encoding));
         } catch (IOException e) {
             reportError(null, e, ErrorManager.WRITE_FAILURE);
             close();

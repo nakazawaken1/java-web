@@ -101,6 +101,16 @@ public enum Config {
      * template folder
      */
     app_template_folder("template/"),
+    
+    /**
+     * include file pattern to apply format
+     */
+    app_format_include_regex(".*\\.(html?|js|css)"),
+    
+    /**
+     * exclude file pattern to apply format
+     */
+    app_format_exclude_regex("jquery.*\\.js"),
 
     ;
 
@@ -352,7 +362,7 @@ public enum Config {
                     handler.setFormatter(new LogFormatter(log_format.text()));
                 }
                 root.addHandler(handler);
-                Logger.getGlobal().info("addHandler: " + handler);
+                Logger.getGlobal().config("addHandler: " + handler);
             }
         } catch (Throwable e) {
             Logger.getGlobal().log(Level.WARNING, e.getMessage(), e);
@@ -366,7 +376,7 @@ public enum Config {
         Logger root = Logger.getLogger("");
         for (Handler i : root.getHandlers()) {
             if (i instanceof LogHandler) {
-                Logger.getGlobal().info("removeHandler: " + i);
+                Logger.getGlobal().config("removeHandler: " + i);
                 i.close();
                 root.removeHandler(i);
             }

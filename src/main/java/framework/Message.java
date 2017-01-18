@@ -54,11 +54,11 @@ public enum Message {
      * @param id message id
      * @return message or id if missing
      */
-    public static String get(String id) {
+    public static Optional<String> find(String id) {
         try {
-            return messages.getString(id);
+            return Optional.of(messages.getString(id));
         } catch (MissingResourceException e) {
-            return id;
+            return Optional.empty();
         }
     }
     
@@ -74,6 +74,6 @@ public enum Message {
      */
     @Override
     public String toString() {
-        return get(id());
+        return find(id()).orElseGet(this::id);
     }
 }

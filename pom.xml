@@ -84,7 +84,13 @@
 			<groupId>com.google.code.findbugs</groupId>
 			<artifactId>findbugs-annotations</artifactId>
 			<version>3.0.1</version>
-			<scope>compile</scope>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.16.12</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 </project>

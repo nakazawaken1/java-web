@@ -390,6 +390,27 @@ public class Db implements AutoCloseable {
     public Connection getConnection() {
         return connection;
     }
+    
+    /**
+     * @return self
+     */
+    public Db withTransaction() {
+        Try.r(() -> connection.setAutoCommit(false)).run();
+        return this;
+    }
+    
+    /**
+     * rollback flag
+     */
+    boolean isRollback = false;
+    
+    /**
+     * @return self
+     */
+    public Db rollback() {
+        isRollback = true;
+        return this;
+    }
 
     /**
      * @return database type
@@ -416,6 +437,9 @@ public class Db implements AutoCloseable {
             if (resources != null) {
                 resources.forEach(ResultSetSpliterator::close);
             }
+            if(isRollback) {
+                connection.rollback();
+            }
             connection.close();
             logger.config("Connection dropped #" + connection.hashCode());
             connection = null;
@@ -433,7 +457,7 @@ public class Db implements AutoCloseable {
      * @return raw sql
      */
     public String sql(String sql, Map<String, Object> map, Object... values) {
-        return Formatter.format(Formatter::excludeForSql, builder::escape, sql, map, values);
+        return Formatter.format(sql, Formatter::excludeForSql, builder::escape, map, values);
     }
 
     /**
@@ -1800,5 +1824,46 @@ public class Db implements AutoCloseable {
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
+    }
+    
+    /**
+     * @param model find target
+     * @param targetFields condition fields
+     * @return found list
+     */
+    public <T> Stream<T> find(T model, String... targetFields) {
+        throw new UnsupportedOperationException();
+    }
+    
+    /**
+     * @param model insert target
+     * @param targetFields save fields(primary key is automatic inclusion)
+     */
+    public void insert(Object model, String... targetFields) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @param model update target
+     * @param targetFields save fields(primary key is automatic inclusion)
+     */
+    public void update(Object model, String... targetFields) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @param model save target
+     * @param targetFields save fields(primary key is automatic inclusion)
+     */
+    public void save(Object model, String... targetFields) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @param model delete target
+     * @param keyFields key fields
+     */
+    public void delete(Object model, String... keyFields) {
+        throw new UnsupportedOperationException();
     }
 }

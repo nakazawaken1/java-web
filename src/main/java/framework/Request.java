@@ -3,6 +3,7 @@ package framework;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.servlet.http.HttpServletRequest;
@@ -43,13 +44,10 @@ public class Request implements Attributes<Object> {
      */
     Request() {
         Try.r(() -> raw.setCharacterEncoding(StandardCharsets.UTF_8.name())).run();
-        logger.info("request uri: " + raw.getRequestURI());
-        logger.info("method: " + raw.getMethod());
-        logger.info("query string: " + raw.getQueryString());
         String uri = raw.getRequestURI();
         int rootLength = raw.getContextPath().length() + 1;
         path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
-        logger.info("path: " + path);
+        logger.info(() -> raw.getMethod() + " " + path + Tool.string(Stream.concat(Stream.of(Optional.ofNullable(raw.getQueryString()).orElse("").split("&")), Tool.stream(raw.getParameterNames()).map(name -> name + "=" + String.join(",", raw.getParameterValues(name)))).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse(""));
     }
     
     /**

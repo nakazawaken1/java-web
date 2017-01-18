@@ -1,10 +1,14 @@
 package framework;
 
 import framework.annotation.Only.User;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Value;
 
 /**
  * account info
  */
+@Value
 public class Account {
 
     /**
@@ -12,23 +16,19 @@ public class Account {
      */
     public static final Account GUEST = new Account("0", "(guest)");
 
-    @Override
-    public String toString() {
-        return Tool.dump(this);
-    }
-
     /**
      * id
      */
-    public String id;
+    String id;
     /**
      * name
      */
-    public String name;
+    String name;
     /**
      * role
      */
-    public Class<? extends User>[] roles;
+    @Getter(AccessLevel.NONE)
+    Class<? extends User>[] roles;
 
     /**
      * @param id id

@@ -29,6 +29,12 @@ public @interface Valid {
     }
 
     /**
+     * group for read
+     */
+    public interface Read extends All {
+    }
+
+    /**
      * group for update
      */
     public interface Update extends All {

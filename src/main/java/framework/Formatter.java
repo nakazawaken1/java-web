@@ -6,6 +6,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -14,7 +15,7 @@ import java.util.logging.Logger;
 import javax.el.ELProcessor;
 
 /**
- * ｛｝置換用パーサー
+ * formatter with el, config, message
  */
 public class Formatter {
 
@@ -24,24 +25,24 @@ public class Formatter {
     transient private static final Logger logger = Logger.getLogger(Formatter.class.getCanonicalName());
 
     /**
-     * 置換対象文字列
+     * target text
      */
-    StringBuilder source;
+    StringBuilder source = new StringBuilder();
 
     /**
-     * 現在位置
+     * current index
      */
     int index;
 
     /**
-     * 最終位置
+     * last index
      */
     int lastIndex;
 
     /**
-     * {の出現位置
+     * index of {
      */
-    Deque<Integer> braces;
+    Deque<Integer> braces = new LinkedList<>();
 
     /**
      * result action
@@ -62,35 +63,35 @@ public class Formatter {
     }
 
     /**
-     * JavaScript用(行コメント、ブロックコメント、シングルクォート文字列を除外)
+     * exclude for JavaScript(line comment, block comment, single quote)
      *
-     * @param p パーサ
-     * @return 結果
+     * @param formatter formatter
+     * @return result
      */
-    public static Result excludeForScript(Formatter p) {
-        if (p.eat("//")) {
-            p.index = p.indexOf("\n");
-            if (p.index < 0) {
+    public static Result excludeForScript(Formatter formatter) {
+        if (formatter.eat("//")) {
+            formatter.index = formatter.indexOf("\n");
+            if (formatter.index < 0) {
                 return Result.EXIT;
             }
-            p.index++;
+            formatter.index += "\n".length();
             return Result.SKIP;
         }
-        if (p.eat("/*")) {
-            p.index = p.indexOf("*/");
-            if (p.index < 0) {
+        if (formatter.eat("/*")) {
+            formatter.index = formatter.indexOf("*/");
+            if (formatter.index < 0) {
                 return Result.EXIT;
             }
-            p.index += 2;
+            formatter.index += "*/".length();
             return Result.SKIP;
         }
-        if (p.eat("'")) {
+        if (formatter.eat("'")) {
             for (;;) {
-                if (!p.skipUntil('\'')) {
+                if (!formatter.skipUntil('\'')) {
                     return Result.EXIT;
                 }
-                p.index++;
-                if (!p.prev("\\'")) {
+                formatter.index++;
+                if (!formatter.prev("\\'")) {
                     break;
                 }
             }
@@ -99,27 +100,27 @@ public class Formatter {
     }
 
     /**
-     * css用(ブロックコメント、シングルクォート文字列を除外)
+     * exclude for css(block comment, single quote)
      *
-     * @param p パーサ
-     * @return 結果
+     * @param formatter formatter
+     * @return result
      */
-    public static Result excludeForStyle(Formatter p) {
-        if (p.eat("/*")) {
-            p.index = p.indexOf("*/");
-            if (p.index < 0) {
+    public static Result excludeForStyle(Formatter formatter) {
+        if (formatter.eat("/*")) {
+            formatter.index = formatter.indexOf("*/");
+            if (formatter.index < 0) {
                 return Result.EXIT;
             }
-            p.index += 2;
+            formatter.index += "*/".length();
             return Result.SKIP;
         }
-        if (p.eat("'")) {
+        if (formatter.eat("'")) {
             for (;;) {
-                if (!p.skipUntil('\'')) {
+                if (!formatter.skipUntil('\'')) {
                     return Result.EXIT;
                 }
-                p.index++;
-                if (!p.prev("\\'")) {
+                formatter.index++;
+                if (!formatter.prev("\\'")) {
                     break;
                 }
             }
@@ -128,27 +129,27 @@ public class Formatter {
     }
 
     /**
-     * sql用(コメントを除外)
+     * exclude for sql(line comment, single quote)
      *
-     * @param p パーサ
-     * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
+     * @param formatter formatter
+     * @return result
      */
-    public static Result excludeForSql(Formatter p) {
-        if (p.eat("--")) {
-            p.index = p.indexOf("\n");
-            if (p.index < 0) {
+    public static Result excludeForSql(Formatter formatter) {
+        if (formatter.eat("--")) {
+            formatter.index = formatter.indexOf("\n");
+            if (formatter.index < 0) {
                 return Result.EXIT;
             }
-            p.index++;
+            formatter.index += "\n".length();
             return Result.SKIP;
         }
-        if (p.eat("'")) {
+        if (formatter.eat("'")) {
             for (;;) {
-                if (!p.skipUntil('\'')) {
+                if (!formatter.skipUntil('\'')) {
                     return Result.EXIT;
                 }
-                p.index++;
-                if (!p.prev("\\'")) {
+                formatter.index++;
+                if (!formatter.prev("\\'")) {
                     break;
                 }
             }
@@ -157,27 +158,27 @@ public class Formatter {
     }
 
     /**
-     * html用(コメント、シングルクォート文字列を除外)
+     * exclude for html(comment, single quote)
      *
-     * @param p パーサ
-     * @return 結果(nullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理)
+     * @param formatter formatter
+     * @return result
      */
-    public static Result excludeForHtml(Formatter p) {
-        if (p.eat("!--") && !(p.prev("<!--") && p.index < p.lastIndex && p.source.charAt(p.index) == '{')) {
-            p.index = p.indexOf("--");
-            if (p.index < 0) {
+    public static Result excludeForHtml(Formatter formatter) {
+        if (formatter.eat("<!--") && !(formatter.index < formatter.lastIndex && formatter.source.charAt(formatter.index) == '{')) {
+            formatter.index = formatter.indexOf("-->");
+            if (formatter.index < 0) {
                 return Result.EXIT;
             }
-            p.index += 2;
+            formatter.index += "-->".length();
             return Result.SKIP;
         }
-        if (p.eat("'")) {
+        if (formatter.eat("'")) {
             for (;;) {
-                if (!p.skipUntil('\'')) {
+                if (!formatter.skipUntil('\'')) {
                     return Result.EXIT;
                 }
-                p.index++;
-                if (!p.prev("\\'")) {
+                formatter.index++;
+                if (!formatter.prev("\\'")) {
                     break;
                 }
             }
@@ -186,23 +187,80 @@ public class Formatter {
     }
 
     /**
-     * コンストラクタ
+     * HTML escape(&amp;, &quot;, &lt;, &gt;, &#39;)
      *
-     * @param text ソース文字列
-     * @param eval 置換処理
-     * @param exclude 除外処理
+     * @param text target
+     * @return escaped text
      */
-    Formatter(String text, Function<String, String> eval, Function<Formatter, Result> exclude) {
-        source = new StringBuilder(text);
+    public static String htmlEscape(Object text) {
+        return Tool.string(text).map(i -> i.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;"))
+                .orElse(null);
+    }
+
+    /**
+     * javascript escape(\n -> \\n)
+     *
+     * @param text target
+     * @return escaped text
+     */
+    public static String scriptEscape(Object text) {
+        return Tool.string(text).map(i -> i.replace("\n", "\\n")).orElse(null);
+    }
+
+    /**
+     * exclude expression
+     */
+    Function<Formatter, Result> exclude;
+
+    /**
+     * escape text
+     */
+    Function<Object, String> escape;
+
+    /**
+     * map
+     */
+    Map<String, Object> map;
+
+    /**
+     * values
+     */
+    Object[] values;
+
+    /**
+     * constructor
+     *
+     * @param exclude exclude expression
+     * @param escape escape text
+     * @param map map
+     * @param values values
+     */
+    Formatter(Function<Formatter, Result> exclude, Function<Object, String> escape, Map<String, Object> map, Object... values) {
+        this.exclude = exclude;
+        this.escape = escape;
+        this.map = map;
+        this.values = values;
+    }
+
+    /**
+     * @param text target
+     * @return formatted text
+     */
+    public String format(String text) {
+        if (text == null) {
+            return null;
+        }
+        source.setLength(0);
+        source.append(text);
         index = 0;
         lastIndex = source.length();
-        braces = new LinkedList<>();
+        braces.clear();
         while (index < lastIndex) {
             skipSpaces();
             if (exclude != null && braces.isEmpty()) {
                 Result b = exclude.apply(this);
                 if (b == Result.EXIT) {
-                    return;
+                    return source.toString();
                 }
                 if (b == Result.SKIP) {
                     continue;
@@ -222,19 +280,30 @@ public class Formatter {
             }
             if (eat("}") && !braces.isEmpty()) {
                 int start = braces.pop();
-                switch (source.charAt(start)) {
+                int first = source.charAt(start);
+                int prefix = first == '$' || first == '#' ? 2 : 1;
+                int suffix = 1;
+                switch (first) {
                 case '<':
                     eat("-->");
+                    prefix = "<!--{".length();
+                    suffix = "}-->".length();
                     break;
                 case '/':
                     eat("*/");
+                    prefix = "/*{".length();
+                    suffix = "}*/".length();
                     break;
                 default:
+                    if (source.charAt(start + 1) == '/') {
+                        prefix = "{/*".length();
+                        suffix = "*/}".length();
+                    }
                     break;
                 }
                 int end = index;
                 String before = source.substring(start, end);
-                String after = Tool.string(eval.apply(before)).orElse("");
+                String after = Tool.string(eval(before, prefix, suffix)).orElse("");
                 source.replace(start, end, after);
                 lastIndex = source.length();
                 index = end + after.length() - before.length();
@@ -242,10 +311,11 @@ public class Formatter {
             }
             index++;
         }
+        return source.toString();
     }
 
     /**
-     * 空白文字を読み飛ばす
+     * skip spaces
      */
     void skipSpaces() {
         for (; index < lastIndex; index++) {
@@ -261,10 +331,10 @@ public class Formatter {
     }
 
     /**
-     * 指定文字まで読み飛ばす
+     * skip until a letter
      *
-     * @param letter 指定文字
-     * @return true:指定文字が見つかった, false:見つからなかった
+     * @param letter a letter
+     * @return true:found a letter, false:not found
      */
     boolean skipUntil(int letter) {
         for (; index < lastIndex; index++) {
@@ -276,10 +346,10 @@ public class Formatter {
     }
 
     /**
-     * 指定文字列を読む
+     * eat a word
      *
-     * @param word 指定文字列
-     * @return true:指定文字列を読めた, false:読めなかった
+     * @param word word
+     * @return true:ate a word, false:not ate
      */
     boolean eat(String word) {
         int length = word.length();
@@ -291,10 +361,10 @@ public class Formatter {
     }
 
     /**
-     * 直前が指定文字列かどうかを調べる
+     * prev word check
      *
-     * @param word 指定文字列
-     * @return true:指定文字列と一致した, false:一致しなかった
+     * @param word word
+     * @return true:equals prev word, false:not equals
      */
     boolean prev(String word) {
         int length = word.length();
@@ -302,105 +372,118 @@ public class Formatter {
     }
 
     /**
-     * 現在位置以降の指定文字列を位置を取得
+     * index of word from current index
      *
-     * @param word 指定文字列
-     * @return 指定文字列の開始位置, -1:指定文字列が見つからなかった
+     * @param word word
+     * @return index of word, -1:not found
      */
     int indexOf(String word) {
         return source.indexOf(word, index);
     }
 
     /**
-     * 文字列にパラメータを埋め込み
-     *
-     * @param exclude 除外処理(戻り値がnullの場合は処理終了、trueの場合は次の処理、falseの場合は通常処理, 通常Parser::excludeFor~を指定)
-     * @param escape エスケープ処理(#{}以外に使用, 通常Tool::htmlEscapeを指定)
-     * @param text 文字列({key}にメッセージ, ${expression}でEL式, #{expression}でエスケープなしEL式結果を埋め込む)
-     * @param map 名前付きパラメータ（${key}にvalueが埋め込まれる）
-     * @param values パラメータ（{0}, {1}...に埋め込まれる）
-     * @return 埋め込み後の文字列
+     * el processor
      */
-    public static String format(Function<Formatter, Result> exclude, Function<Object, String> escape, String text, Map<String, Object> map, Object... values) {
-        ELProcessor[] el = { null };
-        Map<String, String> cache = new HashMap<>();
-        return new Formatter(text, expression -> {
-            return cache.computeIfAbsent(expression, s -> {
-                boolean isEl = !s.startsWith("{");
-                boolean[] isEscape = { !isEl || s.charAt(0) == '$' };
-                int prefix = isEl ? 2 : 1;
-                int suffix = 1;
-                if (s.startsWith("{/*") || s.startsWith("/*{")) {
-                    isEl = true;
-                    prefix = suffix = 3;
-                    isEscape[0] = false;
-                } else if (s.startsWith("<!--{")) {
-                    prefix = 5;
-                    suffix = 4;
-                    isEscape[0] = false;
+    ELProcessor el = null;
+    /**
+     * evaluate cache
+     */
+    Map<String, String> cache = new HashMap<>();
+
+    /**
+     * format
+     *
+     * @param text target({key} replace messages, ${expression} replace el value with escape, #{expression} replace el value with no escape)
+     * @param exclude exclude
+     * @param escape escape
+     * @param map ${key} replace to value
+     * @param values {0}, {1}... replace to value
+     * @return result text
+     */
+    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Map<String, Object> map, Object... values) {
+        return new Formatter(exclude, escape, map, values).format(text);
+    }
+
+    /**
+     * @param expression expression
+     * @param prefix prefix length
+     * @param suffix suffix length
+     * @return result
+     */
+    String eval(String expression, int prefix, int suffix) {
+        return cache.computeIfAbsent(expression, s -> {
+            boolean isEl = s.charAt(0) != '{' || prefix > 1;
+            boolean[] isEscape = { !isEl || (s.startsWith("${") && prefix == 2) };
+            BiFunction<Object, String, String> getResult = (result, type) -> {
+                if (escape != null && isEscape[0]) {
+                    String escaped = escape.apply(result);
+                    logger.config(() -> "[" + type + "] " + s + " -> " + escaped);
+                    return escaped;
                 }
-                BiFunction<Object, String, String> getResult = (result, type) -> {
-                    if (escape != null && isEscape[0]) {
-                        String escaped = escape.apply(result);
-                        logger.config(() -> "[" + type + "] " + s + " -> " + escaped);
-                        return escaped;
-                    }
-                    String string = Tool.string(result).orElse(null);
-                    logger.config(() -> "[raw " + type + "] " + s + " -> " + string);
-                    return string;
-                };
-                String key = s.substring(prefix, s.length() - suffix);
-                if (isEl) {
-                    if (map != null && map.containsKey(key)) {
-                        return getResult.apply(map.get(key), "map");
-                    }
-                    try {
-                        if (el[0] == null) {
-                            el[0] = new ELProcessor();
-                            // el[0].defineFunction("F", "include", Tool.class.getMethod("include", String.class, Object.class, Object[].class));
-                            // el[0].defineFunction("F", "includeIf",
-                            // Tool.class.getMethod("includeIf", boolean.class, String.class, Object.class, Object[].class));
-                            // el[0].defineFunction("F", "includeN", Tool.class.getMethod("includeN", int.class, String.class, Object.class, Object[].class));
-                            // el[0].defineFunction("F", "includeFor",
-                            // Tool.class.getMethod("includeFor", Stream.class, String.class, Object.class, Object[].class));
-                            // el[0].defineFunction("F", "json", Tool.class.getMethod("json", Object.class, boolean.class));
-                            el[0].defineBean("C", Config.properties);
-                            el[0].defineBean("M", Message.messages);
-                            el[0].defineBean("V", values == null ? new Object[] {} : values);
-                            el[0].defineBean("A", Server.application);
-                            el[0].defineBean("S", new Session());
-                            el[0].defineBean("R", new Request());
-                            if (map != null) {
-                                map.entrySet().stream().forEach(p -> el[0].defineBean(p.getKey(), p.getValue()));
-                            }
+                String string = Tool.string(result).orElse(null);
+                logger.config(() -> "[raw " + type + "] " + s + " -> " + string);
+                return string;
+            };
+            String key = s.substring(prefix, s.length() - suffix);
+            if (isEl) {
+                if (map != null && map.containsKey(key)) {
+                    return getResult.apply(map.get(key), "map");
+                }
+                try {
+                    if (el == null) {
+                        el = new ELProcessor();
+                        // el[0].defineFunction("F", "include",
+                        // Tool.class.getMethod("include", String.class,
+                        // Object.class, Object[].class));
+                        // el[0].defineFunction("F", "includeIf",
+                        // Tool.class.getMethod("includeIf", boolean.class,
+                        // String.class, Object.class, Object[].class));
+                        // el[0].defineFunction("F", "includeN",
+                        // Tool.class.getMethod("includeN", int.class,
+                        // String.class, Object.class, Object[].class));
+                        // el[0].defineFunction("F", "includeFor",
+                        // Tool.class.getMethod("includeFor", Stream.class,
+                        // String.class, Object.class, Object[].class));
+                        // el[0].defineFunction("F", "json",
+                        // Tool.class.getMethod("json", Object.class,
+                        // boolean.class));
+                        el.defineBean("C", Config.properties);
+                        el.defineBean("M", Message.messages);
+                        el.defineBean("V", values == null ? new Object[] {} : values);
+                        el.defineBean("A", Server.application);
+                        el.defineBean("S", new Session());
+                        el.defineBean("R", new Request());
+                        if (map != null) {
+                            map.forEach(el::defineBean);
                         }
-                        return getResult.apply(Tool.string(el[0].eval(key)).orElse(""), "el");
-                    } catch (Exception e) {
-                        logger.log(Level.WARNING, "el error", e);
-                        return s;
                     }
+                    return getResult.apply(Tool.string(el.eval(key)).orElse(""), "el");
+                } catch (Exception e) {
+                    logger.log(Level.WARNING, "el error", e);
+                    return s;
                 }
-                if (key.matches("^[0-9]+$")) {
-                    int i = Integer.parseInt(key);
-                    if (values != null && i < values.length) {
-                        return getResult.apply(values[i] == null ? null : values[i].toString(), "values");
-                    } else {
-                        return s;
-                    }
+            }
+            if (key.matches("^[0-9]+$")) {
+                int i = Integer.parseInt(key);
+                if (values != null && i < values.length) {
+                    return getResult.apply(values[i] == null ? null : values[i].toString(), "values");
+                } else {
+                    return s;
                 }
-                if (key.indexOf('\n') < 0) {
-                    String[] keys = key.split("\\s*:\\s*");
-                    boolean hasParameter = keys.length > 1;
-                    if (hasParameter) {
-                        key = keys[0];
-                        keys = Arrays.copyOfRange(keys, 1, keys.length);
-                    }
-                    if (Message.messages.containsKey(key)) {
-                        return getResult.apply(hasParameter ? new MessageFormat(Message.get(key)).format(keys) : Message.get(key), "message");
-                    }
+            }
+            if (key.indexOf('\n') < 0) {
+                String[] keys = key.split("\\s*:\\s*");
+                boolean hasParameter = keys.length > 1;
+                if (hasParameter) {
+                    key = keys[0];
                 }
-                return s;
-            });
-        }, exclude).source.toString();
+                Optional<String> message = Message.find(key);
+                if (message.isPresent()) {
+                    return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
+                            "message");
+                }
+            }
+            return s;
+        });
     }
 }

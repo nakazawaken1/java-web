@@ -61,8 +61,15 @@ public class Session implements Attributes<Object> {
     /**
      * @return account
      */
-    public Optional<Account> account() {
-        return getAttr("account");
+    public Account getAccount() {
+        return this.<Account>getAttr("account").orElse(Account.GUEST);
+    }
+    
+    /**
+     * @return is logged in
+     */
+    public boolean isLoggedIn() {
+    	return getAttr("account").isPresent();
     }
     
     /**
@@ -82,7 +89,7 @@ public class Session implements Attributes<Object> {
      * @return login id
      */
     public String logout() {
-        String result = account().orElse(Account.GUEST).id;
+        String result = getAccount().getId();
         raw.invalidate();
         return result;
     }

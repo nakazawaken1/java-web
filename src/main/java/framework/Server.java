@@ -132,7 +132,6 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
-        Tool.stream(req.getParameterNames()).forEach(logger::info);
         if(first.compareAndSet(true, false)) {
             Db.setup(Config.db_setup.enumOf(Setup.class));
         }
@@ -155,16 +154,17 @@ public class Server implements Servlet {
             Method method = table.get(request.path);
             if (method != null) {
                 Only only = method.getAnnotation(Only.class);
-                boolean forbidden = only != null && !session.account().isPresent();
+                boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
-                    forbidden = !session.account().get().hasAnyRole(only.value());
+                    forbidden = !session.getAccount().hasAnyRole(only.value());
                 }
                 if (forbidden) {
                     session.setAttr("flush", "アクセス権限がありません。権限のあるアカウントでログインしてください");
                     Response.redirect(application.contextPath()).flush();
                     return;
                 }
-                try {
+                try(Closer<Db> db = new Closer<>()) {
+                    try{
                     ((Response) method.invoke(controller.newInstance(), Stream.of(method.getParameters()).map(p -> {
                         Class<?> type = p.getType();
                         if (Request.class.isAssignableFrom(type)) {
@@ -175,6 +175,9 @@ public class Server implements Servlet {
                         }
                         if (Application.class.isAssignableFrom(type)) {
                             return application;
+                        }
+                        if (Db.class.isAssignableFrom(type)) {
+                            return db.set(Db.connect());
                         }
                         if (p.getAnnotation(Query.class) != null) {
                             String value = request.raw.getParameter(p.getName());
@@ -191,6 +194,9 @@ public class Server implements Servlet {
                     throw new RuntimeException(t);
                 } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
                     throw new RuntimeException(e);
+                } catch(RuntimeException e) {
+                    throw e;
+                }
                 }
             }
             throw new FileNotFoundException(request.path);

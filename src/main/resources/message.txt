@@ -1,1 +1,4 @@
-text.hello = こんにちは
+title = タイトル
+login = ログイン
+logout = ログアウト
+error = 何か間違っていませんか？

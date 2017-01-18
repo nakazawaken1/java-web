@@ -33,7 +33,7 @@ import org.codehaus.jackson.annotate.JsonMethod;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig.Feature;
 
-import framework.Try.TryBiConsumer;
+import framework.Try.TryTriConsumer;
 
 /**
  * utility
@@ -179,10 +179,10 @@ public class Tool {
     /**
      * @param writer writer
      * @param text text
-     * @param replacer replacer
+     * @param replacer replacer(writer, expression, prefix)
      * @param closures closures
      */
-    public static void printFormat(PrintWriter writer, String text, TryBiConsumer<PrintWriter, String> replacer, String... closures) {
+    public static void printFormat(PrintWriter writer, String text, TryTriConsumer<PrintWriter, String, String> replacer, String... closures) {
         for (boolean loop = true; loop;) {
             loop = false;
             for (int i = 0; i < closures.length; i += 2) {
@@ -198,8 +198,8 @@ public class Tool {
                 }
                 writer.print(text.substring(0, begin));
                 if (replacer != null) {
-                    String tag = text.substring(begin + prefix.length(), end);
-                    Try.c(replacer).accept(writer, tag);
+                    String tag = text.substring(begin + prefix.length(), end).trim();
+                    Try.c(replacer).accept(writer, tag, prefix);
                 }
                 text = text.substring(end + suffix.length());
                 loop = true;
