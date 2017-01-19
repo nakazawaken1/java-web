@@ -15,6 +15,7 @@ import java.lang.annotation.Target;
  * <li>{@code @Job("3 10:00")} run 10:00 on every month 3rd</li>
  * <li>{@code @Job("2/3 10:00")} run 10:00 on February 3rd</li>
  * <li>{@code @Job("12:00, 13:00")} run 12:00 and 13:00 on every day</li>
+ * <li>{@code @Job("job.daily")} run at config.txt setting value</li>
  * </ul>
  */
 @Target({ ElementType.METHOD })

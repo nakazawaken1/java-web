@@ -425,8 +425,10 @@ public class Tool {
                     }
                 }
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
+                ChronoUnit[] units = {ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS};
+                ChronoField[] last = {null};
                 Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
-                ZonedDateTime calc = Tool.zip(fields.stream(), values).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
+                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
                 if(next.isAfter(calc)) {
                     next = calc.plus(1, ChronoUnit.DAYS);
                 } else {

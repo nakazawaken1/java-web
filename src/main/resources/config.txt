@@ -14,3 +14,5 @@ db.url.postgres=jdbc:postgresql://localhost:5432/postgres?user=postgres&password
 
 db.datasource.class.sqlserver=com.microsoft.sqlserver.jdbc.SQLServerDataSource
 db.url.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?
+
+job.daily=03:00

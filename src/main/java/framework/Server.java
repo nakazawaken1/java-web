@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -118,26 +119,27 @@ public class Server implements Servlet {
         }
 
         /* job schedule */
-        jobList.forEach(i -> {
-            Stream.of(i.getAnnotation(Job.class).value().split("\\s*,\\s*")).filter(Tool.notEmpty).forEach(text -> {
-                if (scheduler.get() == null) {
-                    int n = Config.app_job_threads.integer();
-                    scheduler.set(Executors.newScheduledThreadPool(n));
-                    logger.info(n + " job threads created");
-                }
-                scheduler.get().schedule(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        try {
-                            i.invoke(null);
-                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                            logger.log(Level.WARNING, "job error", e);
+        jobList.forEach(method -> {
+            Stream.of(method.getAnnotation(Job.class).value().split("\\s*,\\s*")).filter(Tool.notEmpty)
+                    .map(j -> j.startsWith("job.") ? Config.find(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
+                        if (scheduler.get() == null) {
+                            int n = Config.app_job_threads.integer();
+                            scheduler.set(Executors.newScheduledThreadPool(n));
+                            logger.info(n + " job threads created");
                         }
-                        scheduler.get().schedule(this, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
-                    }
-                }, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
-            });
+                        scheduler.get().schedule(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                try {
+                                    method.invoke(Modifier.isStatic(method.getModifiers()) ? null : job.newInstance());
+                                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | InstantiationException e) {
+                                    logger.log(Level.WARNING, "job error", e);
+                                }
+                                scheduler.get().schedule(this, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
+                            }
+                        }, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
+                    });
         });
     }
 
@@ -216,26 +218,27 @@ public class Server implements Servlet {
                 }
                 try (Closer<Db> db = new Closer<>()) {
                     try {
-                        ((Response) method.invoke(controller.newInstance(), Stream.of(method.getParameters()).map(p -> {
-                            Class<?> type = p.getType();
-                            if (Request.class.isAssignableFrom(type)) {
-                                return request;
-                            }
-                            if (Session.class.isAssignableFrom(type)) {
-                                return session;
-                            }
-                            if (Application.class.isAssignableFrom(type)) {
-                                return application;
-                            }
-                            if (Db.class.isAssignableFrom(type)) {
-                                return db.set(Db.connect());
-                            }
-                            if (p.getAnnotation(Query.class) != null) {
-                                String value = request.raw.getParameter(p.getName());
-                                return convert(type, p, value);
-                            }
-                            return null;
-                        }).toArray())).flush();
+                        ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : job.newInstance(),
+                                Stream.of(method.getParameters()).map(p -> {
+                                    Class<?> type = p.getType();
+                                    if (Request.class.isAssignableFrom(type)) {
+                                        return request;
+                                    }
+                                    if (Session.class.isAssignableFrom(type)) {
+                                        return session;
+                                    }
+                                    if (Application.class.isAssignableFrom(type)) {
+                                        return application;
+                                    }
+                                    if (Db.class.isAssignableFrom(type)) {
+                                        return db.set(Db.connect());
+                                    }
+                                    if (p.getAnnotation(Query.class) != null) {
+                                        String value = request.raw.getParameter(p.getName());
+                                        return convert(type, p, value);
+                                    }
+                                    return null;
+                                }).toArray())).flush();
                         return;
                     } catch (InvocationTargetException e) {
                         Throwable t = e.getCause();

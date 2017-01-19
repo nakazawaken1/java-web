@@ -150,8 +150,8 @@ public class Main {
     /**
      * daily job
      */
-    @Job("1d")
-    static void daily() {
+    @Job("job.daily")
+    void daily() {
         Logger.getGlobal().info("daily");
     }
 }
