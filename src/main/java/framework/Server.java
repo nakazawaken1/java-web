@@ -8,9 +8,14 @@ import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.sql.DriverManager;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -29,6 +34,7 @@ import app.controller.Main;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.annotation.Http;
+import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Query;
 
@@ -58,18 +64,34 @@ public class Server implements Servlet {
      */
     transient static final Class<?> controller = Main.class;
 
+    /**
+     * job list
+     */
+    transient private static final List<Method> jobList;
+
+    /**
+     * scheduled job
+     */
+    transient static final Class<?> job = Main.class;
+
+    /**
+     * job scheduler
+     */
+    static final AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>();
+
     static {
         table = Stream.of(controller.getDeclaredMethods()).filter(i -> i.getAnnotation(Http.class) != null).collect(Collectors.toMap(Method::getName, m -> {
             m.setAccessible(true);
             return m;
         }));
+        jobList = Stream.of(job.getDeclaredMethods()).filter(i -> i.getAnnotation(Job.class) != null).collect(Collectors.toList());
     }
-    
+
     /**
      * for initialize
      */
     private static final AtomicBoolean first = new AtomicBoolean(true);
-    
+
     /*
      * (non-Javadoc)
      * 
@@ -78,16 +100,45 @@ public class Server implements Servlet {
     @Override
     @SuppressFBWarnings("LI_LAZY_INIT_STATIC")
     public void init(ServletConfig config) throws ServletException {
+
+        /* check to enabled method parameters name */
         try {
             if (!"config".equals(Server.class.getMethod("init", ServletConfig.class).getParameters()[0].getName())) {
                 throw new ServletException("must to enable compile option `-parameters`");
             }
         } catch (NoSuchMethodException | SecurityException e) {
         }
+
+        /* log setup */
         Config.startupLog();
+
+        /* create application scope object */
         if (application == null) {
             application = new Application(config.getServletContext());
         }
+
+        /* job schedule */
+        jobList.forEach(i -> {
+            Stream.of(i.getAnnotation(Job.class).value().split("\\s*,\\s*")).filter(Tool.notEmpty).forEach(text -> {
+                if (scheduler.get() == null) {
+                    int n = Config.app_job_threads.integer();
+                    scheduler.set(Executors.newScheduledThreadPool(n));
+                    logger.info(n + " job threads created");
+                }
+                scheduler.get().schedule(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        try {
+                            i.invoke(null);
+                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                            logger.log(Level.WARNING, "job error", e);
+                        }
+                        scheduler.get().schedule(this, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
+                    }
+                }, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
+            });
+        });
     }
 
     /*
@@ -132,7 +183,7 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
-        if(first.compareAndSet(true, false)) {
+        if (first.compareAndSet(true, false)) {
             Db.setup(Config.db_setup.enumOf(Setup.class));
         }
         Request.request.set((HttpServletRequest) req);
@@ -163,40 +214,40 @@ public class Server implements Servlet {
                     Response.redirect(application.contextPath()).flush();
                     return;
                 }
-                try(Closer<Db> db = new Closer<>()) {
-                    try{
-                    ((Response) method.invoke(controller.newInstance(), Stream.of(method.getParameters()).map(p -> {
-                        Class<?> type = p.getType();
-                        if (Request.class.isAssignableFrom(type)) {
-                            return request;
+                try (Closer<Db> db = new Closer<>()) {
+                    try {
+                        ((Response) method.invoke(controller.newInstance(), Stream.of(method.getParameters()).map(p -> {
+                            Class<?> type = p.getType();
+                            if (Request.class.isAssignableFrom(type)) {
+                                return request;
+                            }
+                            if (Session.class.isAssignableFrom(type)) {
+                                return session;
+                            }
+                            if (Application.class.isAssignableFrom(type)) {
+                                return application;
+                            }
+                            if (Db.class.isAssignableFrom(type)) {
+                                return db.set(Db.connect());
+                            }
+                            if (p.getAnnotation(Query.class) != null) {
+                                String value = request.raw.getParameter(p.getName());
+                                return convert(type, p, value);
+                            }
+                            return null;
+                        }).toArray())).flush();
+                        return;
+                    } catch (InvocationTargetException e) {
+                        Throwable t = e.getCause();
+                        if (t instanceof RuntimeException) {
+                            throw (RuntimeException) t;
                         }
-                        if (Session.class.isAssignableFrom(type)) {
-                            return session;
-                        }
-                        if (Application.class.isAssignableFrom(type)) {
-                            return application;
-                        }
-                        if (Db.class.isAssignableFrom(type)) {
-                            return db.set(Db.connect());
-                        }
-                        if (p.getAnnotation(Query.class) != null) {
-                            String value = request.raw.getParameter(p.getName());
-                            return convert(type, p, value);
-                        }
-                        return null;
-                    }).toArray())).flush();
-                    return;
-                } catch (InvocationTargetException e) {
-                    Throwable t = e.getCause();
-                    if (t instanceof RuntimeException) {
-                        throw (RuntimeException) t;
+                        throw new RuntimeException(t);
+                    } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
+                        throw new RuntimeException(e);
+                    } catch (RuntimeException e) {
+                        throw e;
                     }
-                    throw new RuntimeException(t);
-                } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
-                    throw new RuntimeException(e);
-                } catch(RuntimeException e) {
-                    throw e;
-                }
                 }
             }
             throw new FileNotFoundException(request.path);

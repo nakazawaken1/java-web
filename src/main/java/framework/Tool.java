@@ -8,18 +8,27 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
 import java.util.AbstractMap;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -332,7 +341,7 @@ public class Tool {
         }
         return map;
     }
-    
+
     /**
      * @param o object
      * @return json
@@ -346,5 +355,107 @@ public class Tool {
         } catch (IOException e) {
             return Objects.toString(o);
         }
+    }
+
+    /**
+     * @param left first stream
+     * @param right second stream
+     * @return zipped stream
+     */
+    public static <T, U> Stream<Map.Entry<T, U>> zip(Stream<T> left, Stream<U> right) {
+        Iterator<T> l = left.iterator();
+        Iterator<U> r = right.iterator();
+        Iterator<Map.Entry<T, U>> iterator = new Iterator<Map.Entry<T, U>>() {
+            @Override
+            public boolean hasNext() {
+                return l.hasNext() && r.hasNext();
+            }
+
+            @Override
+            public Map.Entry<T, U> next() {
+                return pair(l.next(), r.next());
+            }
+        };
+
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.NONNULL | Spliterator.ORDERED), false);
+    }
+
+    /**
+     * @param left first stream
+     * @param right second stream
+     * @return zipped stream
+     */
+    public static <T, U> Stream<Map.Entry<T, U>> zipLong(Stream<T> left, Stream<U> right) {
+        Iterator<T> l = left.iterator();
+        Iterator<U> r = right.iterator();
+        Iterator<Map.Entry<T, U>> iterator = new Iterator<Map.Entry<T, U>>() {
+            @Override
+            public boolean hasNext() {
+                return l.hasNext() || r.hasNext();
+            }
+
+            @Override
+            public Map.Entry<T, U> next() {
+                return pair(l.hasNext() ? l.next() : null, r.hasNext() ? r.next() : null);
+            }
+        };
+
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.NONNULL | Spliterator.ORDERED), false);
+    }
+
+    /**
+     * get next time
+     * @param text text
+     * @return milliseconds
+     */
+    public static long nextMillis(String text) {
+        String value = text.trim().toUpperCase();
+        if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
+            Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
+            Logger.getGlobal().info("interval: " + interval + ", next: " + ZonedDateTime.now().plus(interval));
+            return interval.toMillis();
+        } else {
+            ZonedDateTime next = ZonedDateTime.now();
+            int timeIndex = value.indexOf(':');
+            if (timeIndex >= 0) { /* has time */
+                while (timeIndex > 0) {
+                    timeIndex--;
+                    if ("0123456789".indexOf(value.charAt(timeIndex)) < 0) {
+                        break;
+                    }
+                }
+                List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
+                Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
+                ZonedDateTime calc = Tool.zip(fields.stream(), values).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
+                if(next.isAfter(calc)) {
+                    next = calc.plus(1, ChronoUnit.DAYS);
+                } else {
+                    next = calc;
+                }
+                value = value.substring(0, timeIndex);
+            }
+            if(!value.isEmpty()) {
+                List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
+                ChronoField[] last = {null};
+                ChronoUnit[] units = {ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
+                Stream<Long> values = Stream.of(value.split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
+                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
+                if(last[0] != null && next.isAfter(calc)) {
+                    next = calc.plus(1, units[fields.indexOf(last[0])]);
+                } else {
+                    next = calc;
+                }
+            }
+            Logger.getGlobal().info("next: " + next);
+            return ChronoUnit.MILLIS.between(ZonedDateTime.now(), next);
+        }
+    }
+    
+    /**
+     * test
+     * @param args text
+     */
+    public static void main(String[] args) {
+        Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(Tool::nextMillis);
     }
 }

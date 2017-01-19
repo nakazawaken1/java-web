@@ -111,6 +111,11 @@ public enum Config {
      * exclude file pattern to apply format
      */
     app_format_exclude_regex("jquery.*\\.js"),
+    
+    /**
+     * scheduled job thread count
+     */
+    app_job_threads(1),
 
     ;
 

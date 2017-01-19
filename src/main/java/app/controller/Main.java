@@ -4,6 +4,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
 import app.model.Person;
@@ -14,6 +15,7 @@ import framework.Tool;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Http;
+import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
 import framework.annotation.Query;
@@ -143,5 +145,13 @@ public class Main {
     Response delete(Db db, @Valid(Delete.class) Person person) {
         db.delete(person);
         return Response.json(Tool.pair("id", person.getId()));
+    }
+    
+    /**
+     * daily job
+     */
+    @Job("1d")
+    static void daily() {
+        Logger.getGlobal().info("daily");
     }
 }
