@@ -245,10 +245,10 @@ public enum Config {
 
             /* dump */
             startupLog();
-            Logger.getGlobal().info(Tool.print(ps -> {
-                ps.println("-- listing config --");
+            Logger.getGlobal().info(Tool.print(writer -> {
+                writer.println("---- config ----");
                 properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey()))
-                        .forEach(i -> ps.println(i.getKey() + "=" + i.getValue()));
+                        .forEach(i -> writer.println(i.getKey() + "=" + i.getValue()));
             }));
         } catch (IOException e) {
             Logger.getGlobal().warning(() -> e.toString());

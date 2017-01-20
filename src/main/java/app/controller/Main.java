@@ -27,6 +27,7 @@ import framework.annotation.Valid.Save;
 /**
  * main controller
  */
+@Http
 public class Main {
 
     /**

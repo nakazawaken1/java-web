@@ -31,12 +31,12 @@ public class LogHandler extends Handler {
     /**
      * output map
      */
-    protected ConcurrentHashMap<Level, OutputStream> outMap;
+    protected final ConcurrentHashMap<Level, OutputStream> outMap;
 
     /**
      * output folder
      */
-    protected String folder;
+    protected final String folder;
 
     /**
      * current output file
@@ -46,7 +46,7 @@ public class LogHandler extends Handler {
     /**
      * formatter
      */
-    protected DateTimeFormatter formatter;
+    protected final DateTimeFormatter formatter;
 
     /**
      * constructor
@@ -57,11 +57,14 @@ public class LogHandler extends Handler {
     public LogHandler(String folder, String filePattern) {
         outMap = new ConcurrentHashMap<>();
         this.folder = folder;
+        DateTimeFormatter formatter;
         try {
-            this.formatter = DateTimeFormatter.ofPattern(filePattern);
+            formatter = DateTimeFormatter.ofPattern(filePattern);
         } catch (Exception e) {
             reportError(null, e, ErrorManager.FORMAT_FAILURE);
+            formatter = DateTimeFormatter.ofPattern("yyyy-MM-ddTHH:mm:ss.SSS");
         }
+        this.formatter = formatter;
     }
 
     /*

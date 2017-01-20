@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * publish to web
  */
-@Target(ElementType.METHOD)
+@Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Http {
 
@@ -16,6 +16,11 @@ public @interface Http {
      * @return allowed method(not check if empty)
      */
     Method[] value() default {};
+    
+    /**
+     * @return path
+     */
+    String path() default "";
 
     /**
      * http method

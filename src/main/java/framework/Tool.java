@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
-import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -270,12 +269,22 @@ public class Tool {
     }
 
     /**
-     * @param key key
-     * @param value value
-     * @return entry
+     * @param a first value
+     * @param b second value
+     * @return pair tuple
      */
-    public static <K, V> Map.Entry<K, V> pair(K key, V value) {
-        return new AbstractMap.SimpleEntry<K, V>(key, value);
+    public static <K, V> Pair<K, V> pair(K a, V b) {
+        return new Pair<>(a, b);
+    }
+
+    /**
+     * @param a first value
+     * @param b second value
+     * @param c third value
+     * @return trio tuple
+     */
+    public static <T, U, V> Trio<T, U, V> trio(T a, U b, V c) {
+        return new Trio<>(a, b, c);
     }
 
     /**
@@ -285,6 +294,20 @@ public class Tool {
      */
     public static <T> T at(T[] array, int i) {
         return array[i < 0 ? array.length + i : i];
+    }
+
+    /**
+     * list classes from package
+     *
+     * @param packageName package name
+     * @return class stream(must to close)
+     */
+    public static Stream<Class<?>> getClasses(String packageName) {
+        String prefix = Tool.string(packageName).map(i -> i + '.').orElse("");
+        return Config.toURL(packageName.replace('.', '/')).map(Try.f(i -> {
+            File file = new File(i.toURI());
+            return (file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file)).map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
+        })).orElse(Stream.empty());
     }
 
     /**
@@ -362,17 +385,17 @@ public class Tool {
      * @param right second stream
      * @return zipped stream
      */
-    public static <T, U> Stream<Map.Entry<T, U>> zip(Stream<T> left, Stream<U> right) {
+    public static <T, U> Stream<Pair<T, U>> zip(Stream<T> left, Stream<U> right) {
         Iterator<T> l = left.iterator();
         Iterator<U> r = right.iterator();
-        Iterator<Map.Entry<T, U>> iterator = new Iterator<Map.Entry<T, U>>() {
+        Iterator<Pair<T, U>> iterator = new Iterator<Pair<T, U>>() {
             @Override
             public boolean hasNext() {
                 return l.hasNext() && r.hasNext();
             }
 
             @Override
-            public Map.Entry<T, U> next() {
+            public Pair<T, U> next() {
                 return pair(l.next(), r.next());
             }
         };
@@ -385,17 +408,17 @@ public class Tool {
      * @param right second stream
      * @return zipped stream
      */
-    public static <T, U> Stream<Map.Entry<T, U>> zipLong(Stream<T> left, Stream<U> right) {
+    public static <T, U> Stream<Pair<T, U>> zipLong(Stream<T> left, Stream<U> right) {
         Iterator<T> l = left.iterator();
         Iterator<U> r = right.iterator();
-        Iterator<Map.Entry<T, U>> iterator = new Iterator<Map.Entry<T, U>>() {
+        Iterator<Pair<T, U>> iterator = new Iterator<Pair<T, U>>() {
             @Override
             public boolean hasNext() {
                 return l.hasNext() || r.hasNext();
             }
 
             @Override
-            public Map.Entry<T, U> next() {
+            public Pair<T, U> next() {
                 return pair(l.hasNext() ? l.next() : null, r.hasNext() ? r.next() : null);
             }
         };
@@ -406,16 +429,17 @@ public class Tool {
     /**
      * get next time
      * @param text text
+     * @param from start point
      * @return milliseconds
      */
-    public static long nextMillis(String text) {
+    public static long nextMillis(String text, ZonedDateTime from) {
         String value = text.trim().toUpperCase();
         if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
             Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
-            Logger.getGlobal().info("interval: " + interval + ", next: " + ZonedDateTime.now().plus(interval));
+            Logger.getGlobal().info("interval: " + interval + ", next: " + from.plus(interval));
             return interval.toMillis();
         } else {
-            ZonedDateTime next = ZonedDateTime.now();
+            ZonedDateTime next = from;
             int timeIndex = value.indexOf(':');
             if (timeIndex >= 0) { /* has time */
                 while (timeIndex > 0) {
@@ -429,7 +453,7 @@ public class Tool {
                 ChronoField[] last = {null};
                 Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
                 ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
-                if(next.isAfter(calc)) {
+                if(from.isAfter(calc)) {
                     next = calc.plus(1, ChronoUnit.DAYS);
                 } else {
                     next = calc;
@@ -449,7 +473,7 @@ public class Tool {
                 }
             }
             Logger.getGlobal().info("next: " + next);
-            return ChronoUnit.MILLIS.between(ZonedDateTime.now(), next);
+            return ChronoUnit.MILLIS.between(from, next);
         }
     }
     
@@ -458,6 +482,6 @@ public class Tool {
      * @param args text
      */
     public static void main(String[] args) {
-        Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(Tool::nextMillis);
+        Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text, ZonedDateTime.now()));
     }
 }

@@ -9,14 +9,8 @@ import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.sql.DriverManager;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -31,7 +25,6 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import app.controller.Main;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.annotation.Http;
@@ -46,52 +39,19 @@ import framework.annotation.Query;
 public class Server implements Servlet {
 
     /**
-     * application scope object
-     */
-    transient static Application application;
-
-    /**
      * logger
      */
     transient private static final Logger logger = Logger.getLogger(Server.class.getCanonicalName());
 
     /**
-     * routing table
+     * application scope object
      */
-    transient private static final Map<String, Method> table;
+    transient static Application application;
 
     /**
-     * controller
+     * routing table<path, <class, method>>
      */
-    transient static final Class<?> controller = Main.class;
-
-    /**
-     * job list
-     */
-    transient private static final List<Method> jobList;
-
-    /**
-     * scheduled job
-     */
-    transient static final Class<?> job = Main.class;
-
-    /**
-     * job scheduler
-     */
-    static final AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>();
-
-    static {
-        table = Stream.of(controller.getDeclaredMethods()).filter(i -> i.getAnnotation(Http.class) != null).collect(Collectors.toMap(Method::getName, m -> {
-            m.setAccessible(true);
-            return m;
-        }));
-        jobList = Stream.of(job.getDeclaredMethods()).filter(i -> i.getAnnotation(Job.class) != null).collect(Collectors.toList());
-    }
-
-    /**
-     * for initialize
-     */
-    private static final AtomicBoolean first = new AtomicBoolean(true);
+    transient static Map<String, Pair<Class<?>, Method>> table;
 
     /*
      * (non-Javadoc)
@@ -99,10 +59,10 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#init(javax.servlet.ServletConfig)
      */
     @Override
-    @SuppressFBWarnings("LI_LAZY_INIT_STATIC")
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC", "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" })
     public void init(ServletConfig config) throws ServletException {
 
-        /* check to enabled method parameters name */
+        /* check to enabled of method parameters name */
         try {
             if (!"config".equals(Server.class.getMethod("init", ServletConfig.class).getParameters()[0].getName())) {
                 throw new ServletException("must to enable compile option `-parameters`");
@@ -118,29 +78,32 @@ public class Server implements Servlet {
             application = new Application(config.getServletContext());
         }
 
-        /* job schedule */
-        jobList.forEach(method -> {
-            Stream.of(method.getAnnotation(Job.class).value().split("\\s*,\\s*")).filter(Tool.notEmpty)
-                    .map(j -> j.startsWith("job.") ? Config.find(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
-                        if (scheduler.get() == null) {
-                            int n = Config.app_job_threads.integer();
-                            scheduler.set(Executors.newScheduledThreadPool(n));
-                            logger.info(n + " job threads created");
-                        }
-                        scheduler.get().schedule(new Runnable() {
+        /* setup routing */
+        if (table == null) {
+            table = Tool.getClasses("app.controller").flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tool.pair(m, m.getAnnotation(Http.class)))
+                    .filter(pair -> pair.b != null).map(pair -> Tool.trio(c, pair.a, pair.b))).collect(Collectors.toMap(trio -> {
+                        Class<?> c = trio.a;
+                        Method m = trio.b;
+                        String left = Optional.ofNullable(c.getAnnotation(Http.class))
+                                .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
+                        String right = Tool.string(trio.c.path()).orElse(m.getName());
+                        return left + right;
+                    }, trio -> {
+                        Method m = trio.b;
+                        m.setAccessible(true);
+                        return Tool.pair(trio.a, m);
+                    }));
+            logger.info(Tool.print(writer -> {
+                writer.println("---- routing ----");
+                table.forEach((path, pair) -> writer.println(path + " -> " + pair.a.getName() + "." + pair.b.getName()));
+            }));
+        }
 
-                            @Override
-                            public void run() {
-                                try {
-                                    method.invoke(Modifier.isStatic(method.getModifiers()) ? null : job.newInstance());
-                                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | InstantiationException e) {
-                                    logger.log(Level.WARNING, "job error", e);
-                                }
-                                scheduler.get().schedule(this, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
-                            }
-                        }, Tool.nextMillis(text), TimeUnit.MILLISECONDS);
-                    });
-        });
+        /* database setup */
+        Db.setup(Config.db_setup.enumOf(Setup.class));
+
+        /* job schedule */
+        Job.Scheduler.setup(Tool.getClasses("app.controller").toArray(Class<?>[]::new));
     }
 
     /*
@@ -185,9 +148,6 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
-        if (first.compareAndSet(true, false)) {
-            Db.setup(Config.db_setup.enumOf(Setup.class));
-        }
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
         Request request = new Request();
@@ -204,8 +164,9 @@ public class Server implements Servlet {
                 Response.file(request.path).flush();
                 return;
             }
-            Method method = table.get(request.path);
-            if (method != null) {
+            Pair<Class<?>, Method> pair = table.get(request.path);
+            if (pair != null) {
+                Method method = pair.b;
                 Only only = method.getAnnotation(Only.class);
                 boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
@@ -218,7 +179,7 @@ public class Server implements Servlet {
                 }
                 try (Closer<Db> db = new Closer<>()) {
                     try {
-                        ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : job.newInstance(),
+                        ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : pair.a.newInstance(),
                                 Stream.of(method.getParameters()).map(p -> {
                                     Class<?> type = p.getType();
                                     if (Request.class.isAssignableFrom(type)) {
@@ -234,8 +195,7 @@ public class Server implements Servlet {
                                         return db.set(Db.connect());
                                     }
                                     if (p.getAnnotation(Query.class) != null) {
-                                        String value = request.raw.getParameter(p.getName());
-                                        return convert(type, p, value);
+                                        return parseValue(type, p, request.raw.getParameter(p.getName()));
                                     }
                                     return null;
                                 }).toArray())).flush();
@@ -266,13 +226,13 @@ public class Server implements Servlet {
      * @param value string value
      * @return value
      */
-    private Object convert(Type type, Parameter p, String value) {
+    private Object parseValue(Type type, Parameter p, String value) {
         if (type == int.class || type == Integer.class) {
             return Tool.integer(value).orElse(0);
         }
         if (type == Optional.class) {
             Type valueType = ((ParameterizedType) p.getParameterizedType()).getActualTypeArguments()[0];
-            return Optional.ofNullable(valueType == String.class ? value : convert(valueType, null, value))
+            return Optional.ofNullable(valueType == String.class ? value : parseValue(valueType, null, value))
                     .filter(i -> !(i instanceof String) || !((String) i).isEmpty());
         }
         return value;

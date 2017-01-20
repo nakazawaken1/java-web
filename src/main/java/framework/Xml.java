@@ -12,12 +12,12 @@ import java.util.stream.Stream;
  * XML builder
  */
 public class Xml {
-    
+
     /**
      * indent
      */
     public static final String indent = "  ";
-    
+
     /**
      * newline
      */
@@ -27,22 +27,22 @@ public class Xml {
      * tag name (exclude <, >)
      */
     protected String tag;
-    
+
     /**
      * parent node
      */
     protected Xml parent;
-    
+
     /**
      * child node
      */
     protected List<Xml> children;
-    
+
     /**
      * text node
      */
     protected Object text;
-    
+
     /**
      * attributes
      */
@@ -57,7 +57,7 @@ public class Xml {
     public String toString() {
         return root().toStringLower("");
     }
-    
+
     /**
      * @return root node
      */
@@ -68,7 +68,7 @@ public class Xml {
         }
         return root;
     }
-    
+
     /**
      * @return parent node
      */
@@ -88,7 +88,7 @@ public class Xml {
             noText = true;
         }
         StringBuilder s = new StringBuilder();
-        if(parent != null) {
+        if (parent != null) {
             s.append(newline);
         }
         s.append(indent).append('<').append(tag);
@@ -251,8 +251,8 @@ public class Xml {
      * @param stream name-value pair
      * @return self
      */
-    public Xml attr(Stream<Map.Entry<String, String>> stream) {
-        stream.forEach(i -> attr(i.getKey(), i.getValue()));
+    public Xml attr(Stream<Pair<String, String>> stream) {
+        stream.forEach(i -> attr(i.a, i.b));
         return this;
     }
 
@@ -261,21 +261,16 @@ public class Xml {
      * 
      * @param args no use
      */
-    @SuppressWarnings("serial")
     public static void main(String[] args) {
         System.out.println(new Xml("br").attr("style", "clear:both").attr("id", "test"));
-        System.out.println(new Xml("br").attr(new LinkedHashMap<String, String>() {
-            {
-                put("style", "clear:both");
-                put("id", "test");
-            }
-        }.entrySet().stream()));
+        System.out.println(new Xml("br").attr(Stream.of(Tool.pair("style", "clear:both"), Tool.pair("id", "test"))));
         System.out.println(new Xml("span").text("abc"));
         System.out.println(new Xml("span", "abc"));
         System.out.println(new Xml("ol").child("li").text("1").sibling("li").text("2"));
         System.out.println(new Xml("ol").child("li", "1").sibling("li", "2"));
         System.out.println(new Xml("ol").child("li", Stream.of("1", "2")));
         System.out.println(new Xml("ol").child(IntStream.rangeClosed(1, 2).mapToObj(i -> new Xml("li", i))));
-        System.out.println(new Xml("table").child("thead").child("tr").child("th", Stream.of("a", "b")).root().child("tbody").child("tr").child("th", Stream.of(1, 2)).parent().sibling("tr").child("th", Stream.of(3, 4)));
+        System.out.println(new Xml("table").child("thead").child("tr").child("th", Stream.of("a", "b")).root().child("tbody").child("tr")
+                .child("th", Stream.of(1, 2)).parent().sibling("tr").child("th", Stream.of(3, 4)));
     }
 }
