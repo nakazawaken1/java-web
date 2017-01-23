@@ -9,6 +9,7 @@ import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.sql.DriverManager;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -102,7 +103,7 @@ public class Server implements Servlet {
         /* database setup */
         Db.setup(Config.db_setup.enumOf(Setup.class));
 
-        /* job schedule */
+        /* job scheduler setup */
         Job.Scheduler.setup(Tool.getClasses("app.controller").toArray(Class<?>[]::new));
     }
 
@@ -167,6 +168,11 @@ public class Server implements Servlet {
             Pair<Class<?>, Method> pair = table.get(request.path);
             if (pair != null) {
                 Method method = pair.b;
+                Http http = method.getAnnotation(Http.class);
+                if(http == null || (http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod()))) {
+                    Response.error(400).flush();
+                    return;
+                }
                 Only only = method.getAnnotation(Only.class);
                 boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {

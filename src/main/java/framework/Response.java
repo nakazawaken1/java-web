@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import javax.servlet.http.HttpServletResponse;
@@ -23,6 +24,11 @@ import framework.Try.TryTriConsumer;
  * Response
  */
 public class Response {
+
+    /**
+     * logger
+     */
+    transient private static final Logger logger = Logger.getLogger(Response.class.getCanonicalName());
 
     /**
      * response consumer
@@ -193,6 +199,7 @@ public class Response {
         response.setCharacterEncoding(charset.name());
         Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
         Try.c(consumer).accept(response);
+        logger.info(Request.request.get().hashCode() + "-> " + response.getStatus() + " " + response.getContentType());
     }
 
     /**
@@ -203,6 +210,16 @@ public class Response {
         return new Response(r -> {
             r.setContentType("application/json;charset=" + charset);
             r.getWriter().print(Tool.json(o));
+        });
+    }
+
+    /**
+     * @param status HTTP status code
+     * @return response
+     */
+    public static Response error(int status) {
+        return new Response(r -> {
+            r.setStatus(status);
         });
     }
 }

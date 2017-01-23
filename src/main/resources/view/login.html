@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<link rel="stylesheet" href="css/common.css" type="text/css" media="all" />
+</head>
+<body>
+	<h1>{title}</h1>
+	<div data-load="flush"></div>
+	<form action="login" method="post">
+		<dl>
+			<dt>{loginId}</dt>
+			<dd>
+				<input name="loginId" type="text" maxlength="20" />
+			</dd>
+			<dt>{password}</dt>
+			<dd>
+				<input name="password" type="password" maxlength="20" />
+			</dd>
+		</dl>
+		<button type="submit">{login}</button>
+		<button type="button" class="quit">{quit}</button>
+	</form>
+	<script src="js/jquery-3.1.1.min.js"></script>
+	<script src="js/common.js"></script>
+</body>
+</html>

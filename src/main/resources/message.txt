@@ -2,3 +2,6 @@ title = タイトル
 login = ログイン
 logout = ログアウト
 error = 何か間違っていませんか？
+loginId = ログインID
+password = パスワード
+quit = 終了

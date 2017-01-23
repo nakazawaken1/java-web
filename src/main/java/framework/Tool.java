@@ -482,6 +482,59 @@ public class Tool {
      * @param args text
      */
     public static void main(String[] args) {
-        Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text, ZonedDateTime.now()));
+        Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
+        Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
+        //Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text, ZonedDateTime.now()));
+    }
+    
+    /**
+     * @param text camel case text
+     * @return snake case text
+     */
+    public static String camelToSnake(String text) {
+        if(text == null) {
+            return null;
+        }
+        int length = text.length();
+        StringBuilder result = new StringBuilder(length + length);
+        for(int i = 0; i < length; i++) {
+            char c = text.charAt(i);
+            if(Character.isUpperCase(c)) {
+                if(i > 0 && (i + 1 >= length || !Character.isUpperCase(text.charAt(i + 1)))) {
+                    result.append("_");
+                }
+                result.append(Character.toLowerCase(c));
+                continue;
+            }
+            result.append(c);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * @param text snake case text
+     * @return camel case text
+     */
+    public static String snakeToCamel(String text) {
+        if(text == null) {
+            return null;
+        }
+        int length = text.length();
+        StringBuilder result = new StringBuilder(length + length);
+        for(int i = 0; i < length; i++) {
+            char c = text.charAt(i);
+            if(c == '_') {
+                if(i + 1 < length) {
+                    i++;
+                    c = text.charAt(i);
+                    if(c != '_') {
+                        result.append(Character.toUpperCase(c));
+                    }
+                }
+                continue;
+            }
+            result.append(c);
+        }
+        return result.toString();
     }
 }

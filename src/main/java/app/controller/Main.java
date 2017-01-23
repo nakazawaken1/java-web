@@ -15,6 +15,7 @@ import framework.Tool;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Http;
+import framework.annotation.Http.Method;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
@@ -27,7 +28,6 @@ import framework.annotation.Valid.Save;
 /**
  * main controller
  */
-@Http
 public class Main {
 
     /**
@@ -82,10 +82,14 @@ public class Main {
      * @param password password
      * @return response
      */
-    @Http
+    @Http(Method.POST)
     Response login(Session session, @Query Optional<String> loginId, @Query Optional<String> password) {
-        session.login(loginId.orElse("guest"), password.orElse(""));
-        return Response.redirect("index.html");
+        if(session.login(loginId.orElse("guest"), password.orElse(""))) {
+            return Response.redirect("index.html");
+        } else {
+            session.setAttr("flush", "ログインIDまたはパスワードが違います。");
+            return Response.redirect("login.html");
+        }
     }
 
     /**
