@@ -60,7 +60,7 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#init(javax.servlet.ServletConfig)
      */
     @Override
-    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC", "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" })
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC", "LI_LAZY_INIT_UPDATE_STATIC", "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" })
     public void init(ServletConfig config) throws ServletException {
 
         /* check to enabled of method parameters name */
@@ -77,6 +77,7 @@ public class Server implements Servlet {
         /* create application scope object */
         if (application == null) {
             application = new Application(config.getServletContext());
+            logger.info(application.toString());
         }
 
         /* setup routing */
@@ -152,6 +153,7 @@ public class Server implements Servlet {
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
         Request request = new Request();
+        logger.info(request.toString());
         if (request.path == null) { /* no slash folder access */
             new Response(r -> {
                 r.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);

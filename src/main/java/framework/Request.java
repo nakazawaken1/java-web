@@ -2,7 +2,6 @@ package framework;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,10 +15,14 @@ import framework.annotation.Http;
  */
 public class Request implements Attributes<Object> {
 
-    /**
-     * logger
-     */
-    transient private static final Logger logger = Logger.getLogger(Request.class.getCanonicalName());
+    @Override
+    public String toString() {
+        return raw.hashCode() + "<- " + raw.getMethod() + " " + path
+                + Tool.string(Stream
+                        .concat(Stream.of(Optional.ofNullable(raw.getQueryString()).orElse("").split("&")),
+                                Tool.stream(raw.getParameterNames()).map(name -> name + "=" + String.join(",", raw.getParameterValues(name))))
+                        .collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+    }
 
     /**
      * http request
@@ -49,11 +52,6 @@ public class Request implements Attributes<Object> {
         String uri = raw.getRequestURI();
         int rootLength = raw.getContextPath().length() + 1;
         path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
-        logger.info(() -> raw.hashCode() + "<- " + raw.getMethod() + " " + path
-                + Tool.string(Stream
-                        .concat(Stream.of(Optional.ofNullable(raw.getQueryString()).orElse("").split("&")),
-                                Tool.stream(raw.getParameterNames()).map(name -> name + "=" + String.join(",", raw.getParameterValues(name))))
-                        .collect(Collectors.joining("&"))).map(s -> '?' + s).orElse(""));
     }
 
     /**

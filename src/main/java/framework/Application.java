@@ -1,7 +1,6 @@
 package framework;
 
 import java.util.Optional;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import javax.servlet.ServletContext;
@@ -10,28 +9,30 @@ import javax.servlet.ServletContext;
  * application scoped object
  */
 public class Application implements Attributes<Object> {
-    
-    /**
-     * logger
-     */
-    transient private static final Logger logger = Logger.getLogger(Request.class.getCanonicalName());
+
+    @Override
+    public String toString() {
+        return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
+
+    }
 
     /**
      * application scope object
      */
     transient final ServletContext raw;
-    
+
     /**
      * constructor
+     * 
      * @param raw application scope object
      */
     Application(ServletContext raw) {
-        logger.info("real path: " + raw.getRealPath(""));
-        logger.info("context path: " + raw.getContextPath());
         this.raw = raw;
     }
-    
-    /* (non-Javadoc)
+
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#names()
      */
     @Override
@@ -39,16 +40,20 @@ public class Application implements Attributes<Object> {
         return Tool.stream(raw.getAttributeNames());
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#getAttr(java.lang.String)
      */
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getAttr(String name) {
-        return Optional.ofNullable((T)raw.getAttribute(name));
+        return Optional.ofNullable((T) raw.getAttribute(name));
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
      */
     @Override
@@ -56,7 +61,9 @@ public class Application implements Attributes<Object> {
         raw.setAttribute(name, value);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#removeAttr(java.lang.String)
      */
     @Override

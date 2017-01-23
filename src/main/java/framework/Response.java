@@ -34,12 +34,12 @@ public class Response {
      * response consumer
      */
     final TryConsumer<HttpServletResponse> consumer;
-    
+
     /**
      * encoding
      */
     static Charset charset = StandardCharsets.UTF_8;
-    
+
     /**
      * 属性
      */
@@ -47,6 +47,7 @@ public class Response {
 
     /**
      * constructor
+     * 
      * @param consumer response action
      */
     Response(TryConsumer<HttpServletResponse> consumer) {
@@ -58,59 +59,60 @@ public class Response {
      * @param values values
      * @return response
      */
-    public static Response file(String file, Object...values) {
+    public static Response file(String file, Object... values) {
         Objects.requireNonNull(file);
         Map<String, Object> map = new HashMap<>();
         return new Response(r -> {
             r.setContentType(Tool.getContentType(file));
-        	Path path = Paths.get(Config.toURL(Config.app_view_folder.text(), file).get().toURI());
-        	if(Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-        		try(Stream<String> lines = Files.lines(path); PrintWriter writer = r.getWriter()) {
-        			Function<Formatter, Formatter.Result> exclude;
-        			Function<Object, String> escape;
-        			if(file.endsWith(".js")) {
-        				exclude = Formatter::excludeForScript;
-        				escape = Formatter::scriptEscape;
-        			} else if(file.endsWith(".css")) {
-        				exclude = Formatter::excludeForStyle;
-        				escape = null;
-        			} else {
-        				exclude = Formatter::excludeForHtml;
-        				escape = Formatter::htmlEscape;
-        			}
-        			Formatter formatter = new Formatter(exclude, escape, map, values);
-        			lines.forEach(line -> writer.println(formatter.format(line)));
-        		}
-        	} else {
-        		r.getOutputStream().write(Files.readAllBytes(path));
-        	}
+            Path path = Paths.get(Config.toURL(Config.app_view_folder.text(), file).get().toURI());
+            if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
+                try (Stream<String> lines = Files.lines(path); PrintWriter writer = r.getWriter()) {
+                    Function<Formatter, Formatter.Result> exclude;
+                    Function<Object, String> escape;
+                    if (file.endsWith(".js")) {
+                        exclude = Formatter::excludeForScript;
+                        escape = Formatter::scriptEscape;
+                    } else if (file.endsWith(".css")) {
+                        exclude = Formatter::excludeForStyle;
+                        escape = null;
+                    } else {
+                        exclude = Formatter::excludeForHtml;
+                        escape = Formatter::htmlEscape;
+                    }
+                    try (Formatter formatter = new Formatter(exclude, escape, map, values)) {
+                        lines.forEach(line -> writer.println(formatter.format(line)));
+                    }
+                }
+            } else {
+                r.getOutputStream().write(Files.readAllBytes(path));
+            }
         }).bind(map);
     }
-    
+
     /**
      * @param key key
      * @param value value
      * @return self
      */
     public Response bind(String key, Object value) {
-    	if(map == null) {
-    		map = new HashMap<>();
-    	}
-    	map.put(key, value);
-    	return this;
+        if (map == null) {
+            map = new HashMap<>();
+        }
+        map.put(key, value);
+        return this;
     }
-    
+
     /**
      * @param map map
      * @return self
      */
     public Response bind(Map<String, Object> map) {
-    	if(this.map == null) {
-    		this.map = map;
-    	} else {
-    		this.map.putAll(map);
-    	}
-    	return this;
+        if (this.map == null) {
+            this.map = map;
+        } else {
+            this.map.putAll(map);
+        }
+        return this;
     }
 
     /**
@@ -137,14 +139,14 @@ public class Response {
      * @param values values
      * @return response
      */
-    public static Response template(String name, Object...values) {
+    public static Response template(String name, Object... values) {
         Objects.requireNonNull(name);
         Map<String, Object> map = new HashMap<>();
         return new Response(r -> {
             r.setContentType("text/html;charset=" + charset);
             try (PrintWriter writer = r.getWriter();
-                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()))) {
-            	Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, map, values);
+                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                    Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, map, values)) {
                 lines.forEach(line -> writer.println(formatter.format(line)));
             }
         }).bind(map);
@@ -172,6 +174,7 @@ public class Response {
 
     /**
      * 302
+     * 
      * @param location location
      * @return response
      */
