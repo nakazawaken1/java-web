@@ -116,6 +116,16 @@ public enum Config {
      * scheduled job thread count
      */
     app_job_threads(1),
+    
+    /**
+     * account class
+     */
+    app_account_class("framework.Account"),
+    
+    /**
+     * account info(loginId:password:roles,...)
+     */
+    app_accounts(),
 
     ;
 

@@ -8,6 +8,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.Map;
@@ -34,7 +35,7 @@ import framework.annotation.Only;
 import framework.annotation.Query;
 
 /**
- * Servlet implementation class Main
+ * Servlet implementation class
  */
 @WebServlet("/")
 public class Server implements Servlet {
@@ -152,26 +153,27 @@ public class Server implements Servlet {
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
         Request.request.set((HttpServletRequest) req);
         Request.response.set((HttpServletResponse) res);
-        Request request = new Request();
-        logger.info(request.toString());
-        if (request.path == null) { /* no slash folder access */
-            new Response(r -> {
-                r.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
-                r.setHeader("Location", application.contextPath());
-            }).flush();
-            return;
-        }
-        Session session = new Session();
         try {
-            if (Config.toURL(Config.app_view_folder.text(), request.path).isPresent()) { /* exists */
-                Response.file(request.path).flush();
+            Request request = new Request();
+            logger.info(request.toString());
+            
+            /* no slash root access */
+            if (request.path == null) {
+                new Response(r -> {
+                    r.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+                    r.setHeader("Location", application.getContextPath());
+                }).flush();
                 return;
             }
+            Session session = new Session();
+            session.raw.setMaxInactiveInterval(Config.app_session_timeout_seconds.integer());
+
+            /* action */
             Pair<Class<?>, Method> pair = table.get(request.path);
             if (pair != null) {
                 Method method = pair.b;
                 Http http = method.getAnnotation(Http.class);
-                if(http == null || (http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod()))) {
+                if (http == null || (http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod()))) {
                     Response.error(400).flush();
                     return;
                 }
@@ -181,10 +183,11 @@ public class Server implements Servlet {
                     forbidden = !session.getAccount().hasAnyRole(only.value());
                 }
                 if (forbidden) {
-                    session.setAttr("flush", "アクセス権限がありません。権限のあるアカウントでログインしてください");
-                    Response.redirect(application.contextPath()).flush();
+                    session.setAttr("alert", "アクセス権限がありません。権限のあるアカウントでログインしてください");
+                    Response.redirect(application.getContextPath()).flush();
                     return;
                 }
+                request.raw.setCharacterEncoding(StandardCharsets.UTF_8.name());
                 try (Closer<Db> db = new Closer<>()) {
                     try {
                         ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : pair.a.newInstance(),
@@ -221,6 +224,13 @@ public class Server implements Servlet {
                     }
                 }
             }
+            
+            /* static file */
+            if (Config.toURL(Config.app_view_folder.text(), request.path).isPresent()) {
+                Response.file(request.path).flush();
+                return;
+            }
+
             throw new FileNotFoundException(request.path);
         } finally {
             Request.request.remove();

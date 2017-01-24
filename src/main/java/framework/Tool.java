@@ -306,7 +306,8 @@ public class Tool {
         String prefix = Tool.string(packageName).map(i -> i + '.').orElse("");
         return Config.toURL(packageName.replace('.', '/')).map(Try.f(i -> {
             File file = new File(i.toURI());
-            return (file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file)).map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
+            return (file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file))
+                    .map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
         })).orElse(Stream.empty());
     }
 
@@ -428,6 +429,7 @@ public class Tool {
 
     /**
      * get next time
+     * 
      * @param text text
      * @param from start point
      * @return milliseconds
@@ -449,24 +451,26 @@ public class Tool {
                     }
                 }
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
-                ChronoUnit[] units = {ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS};
-                ChronoField[] last = {null};
+                ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
+                ChronoField[] last = { null };
                 Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
-                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
-                if(from.isAfter(calc)) {
+                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey())
+                        .reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
+                if (from.isAfter(calc)) {
                     next = calc.plus(1, ChronoUnit.DAYS);
                 } else {
                     next = calc;
                 }
                 value = value.substring(0, timeIndex);
             }
-            if(!value.isEmpty()) {
+            if (!value.isEmpty()) {
                 List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
-                ChronoField[] last = {null};
-                ChronoUnit[] units = {ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
+                ChronoField[] last = { null };
+                ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
                 Stream<Long> values = Stream.of(value.split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
-                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
-                if(last[0] != null && next.isAfter(calc)) {
+                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
+                        (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
+                if (last[0] != null && next.isAfter(calc)) {
                     next = calc.plus(1, units[fields.indexOf(last[0])]);
                 } else {
                     next = calc;
@@ -476,31 +480,33 @@ public class Tool {
             return ChronoUnit.MILLIS.between(from, next);
         }
     }
-    
+
     /**
      * test
+     * 
      * @param args text
      */
     public static void main(String[] args) {
         Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
         Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
-        //Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text, ZonedDateTime.now()));
+        // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
+        // ZonedDateTime.now()));
     }
-    
+
     /**
      * @param text camel case text
      * @return snake case text
      */
     public static String camelToSnake(String text) {
-        if(text == null) {
+        if (text == null) {
             return null;
         }
         int length = text.length();
         StringBuilder result = new StringBuilder(length + length);
-        for(int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
-            if(Character.isUpperCase(c)) {
-                if(i > 0 && (i + 1 >= length || !Character.isUpperCase(text.charAt(i + 1)))) {
+            if (Character.isUpperCase(c)) {
+                if (i > 0 && (i + 1 >= length || !Character.isUpperCase(text.charAt(i + 1)))) {
                     result.append("_");
                 }
                 result.append(Character.toLowerCase(c));
@@ -510,24 +516,24 @@ public class Tool {
         }
         return result.toString();
     }
-    
+
     /**
      * @param text snake case text
      * @return camel case text
      */
     public static String snakeToCamel(String text) {
-        if(text == null) {
+        if (text == null) {
             return null;
         }
         int length = text.length();
         StringBuilder result = new StringBuilder(length + length);
-        for(int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
-            if(c == '_') {
-                if(i + 1 < length) {
+            if (c == '_') {
+                if (i + 1 < length) {
                     i++;
                     c = text.charAt(i);
-                    if(c != '_') {
+                    if (c != '_') {
                         result.append(Character.toUpperCase(c));
                     }
                 }

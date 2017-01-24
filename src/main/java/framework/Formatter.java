@@ -238,7 +238,7 @@ public class Formatter implements AutoCloseable {
      * values
      */
     Object[] values;
-
+    
     /**
      * constructor
      *
@@ -537,7 +537,7 @@ public class Formatter implements AutoCloseable {
 
     @Override
     public void close() {
-        if (current.get() != null) {
+        if (current.get() == this) {
             current.remove();
             current.set(null);
         }

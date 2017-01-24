@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -125,8 +126,9 @@ public class Response {
         return new Response(r -> {
             r.setContentType("text/html;charset=" + charset);
             try (PrintWriter writer = r.getWriter();
-                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()))) {
-                lines.forEach(line -> {
+                    Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                    Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
+                lines.map(formatter::format).forEach(line -> {
                     Tool.printFormat(writer, line, replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                     writer.println();
                 });
@@ -184,13 +186,13 @@ public class Response {
     }
 
     /**
-     * @param text text
+     * @param o object
      * @return response
      */
-    public static Response text(String text) {
+    public static Response text(Object o) {
         return new Response(r -> {
             r.setContentType("text/plain;charset=" + charset);
-            r.getWriter().print(text);
+            r.getWriter().print(o);
         });
     }
 
@@ -202,7 +204,12 @@ public class Response {
         response.setCharacterEncoding(charset.name());
         Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
         Try.c(consumer).accept(response);
-        logger.info(Request.request.get().hashCode() + "-> " + response.getStatus() + " " + response.getContentType());
+        logger.info(toString());
+    }
+
+    @Override
+    public String toString() {
+        return Request.request.get().hashCode() + Optional.of(Request.response.get()).map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse("");
     }
 
     /**

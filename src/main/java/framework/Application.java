@@ -82,7 +82,7 @@ public class Application implements Attributes<Object> {
     /**
      * @return context path
      */
-    public String contextPath() {
+    public String getContextPath() {
         return Tool.suffix(raw.getContextPath(), "/");
     }
 }

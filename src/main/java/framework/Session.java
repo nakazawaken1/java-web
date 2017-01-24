@@ -1,11 +1,10 @@
 package framework;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import javax.servlet.http.HttpSession;
-
-import framework.annotation.Only.Administrator;
 
 /**
  * session scoped object
@@ -16,16 +15,27 @@ public class Session implements Attributes<Object> {
      * current session
      */
     transient final HttpSession raw;
-    
+
+    /**
+     * session key of account
+     */
+    public static final String sessionKey = "\naccount\n";
+
+    /**
+     * getters
+     */
+    static final Getters getters = new Getters(Session.class);
+
     /**
      * constructor
      */
     Session() {
         raw = Request.request.get().getSession();
-        raw.setMaxInactiveInterval(Config.app_session_timeout_seconds.integer());
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#names()
      */
     @Override
@@ -33,16 +43,20 @@ public class Session implements Attributes<Object> {
         return Tool.stream(raw.getAttributeNames());
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#getAttr(java.lang.String)
      */
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getAttr(String name) {
-        return Optional.ofNullable((T)raw.getAttribute(name));
+        return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> raw.getAttribute(name)));
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
      */
     @Override
@@ -50,7 +64,9 @@ public class Session implements Attributes<Object> {
         raw.setAttribute(name, value);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see framework.Attributes#removeAttr(java.lang.String)
      */
     @Override
@@ -62,29 +78,31 @@ public class Session implements Attributes<Object> {
      * @return account
      */
     public Account getAccount() {
-        return this.<Account>getAttr("account").orElse(Account.GUEST);
+        return this.<Account>getAttr(sessionKey).orElse(Account.GUEST);
     }
-    
+
     /**
      * @return is logged in
      */
     public boolean isLoggedIn() {
-    	return getAttr("account").isPresent();
+        return getAttr(sessionKey).isPresent();
     }
-    
+
     /**
      * @param loginId login id
      * @param password password
      * @return true if success, else failure
      */
     public boolean login(String loginId, String password) {
-        if("admin".equals(loginId)) {
-            setAttr("account", new Account(loginId, loginId, Administrator.class));
+        try {
+            setAttr(sessionKey, Class.forName(Config.app_account_class.text()).getConstructor(String.class, String.class).newInstance(loginId, password));
             return true;
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                | NoSuchMethodException | SecurityException e) {
+            return false;
         }
-        return false;
     }
-    
+
     /**
      * @return login id
      */
