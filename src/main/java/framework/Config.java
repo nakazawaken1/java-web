@@ -126,6 +126,11 @@ public enum Config {
      * account info(loginId:password:roles,...)
      */
     app_accounts(),
+    
+    /**
+     * file extension of text type contents
+     */
+    app_text_extensions(".txt|.htm|.html|.js|.json|.css|.csv|.tsv|.xml|.ini|.yml|.properties|.php|.java|.jsp|.xhtml", "\\s*\\|\\s*"),
 
     ;
 
@@ -186,7 +191,7 @@ public enum Config {
      * @param defaultValue default value
      */
     private Config(Object defaultValue) {
-        this(defaultValue, ",");
+        this(defaultValue, "\\s*,\\s*");
     }
 
     /**

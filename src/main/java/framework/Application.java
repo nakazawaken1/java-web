@@ -1,5 +1,7 @@
 package framework;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -8,81 +10,157 @@ import javax.servlet.ServletContext;
 /**
  * application scoped object
  */
-public class Application implements Attributes<Object> {
+public interface Application extends Attributes<Object> {
 
-    @Override
-    public String toString() {
-        return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
+    /**
+     * For Servlet
+     */
+    static class ForServlet implements Application {
+        @Override
+        public String toString() {
+            return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
 
+        }
+
+        /**
+         * application scope object
+         */
+        transient final ServletContext raw;
+
+        /**
+         * constructor
+         * 
+         * @param raw application scope object
+         */
+        ForServlet(ServletContext raw) {
+            this.raw = raw;
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Attributes#names()
+         */
+        @Override
+        public Stream<String> names() {
+            return Tool.stream(raw.getAttributeNames());
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Attributes#getAttr(java.lang.String)
+         */
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> Optional<T> getAttr(String name) {
+            return Optional.ofNullable((T) raw.getAttribute(name));
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
+         */
+        @Override
+        public void setAttr(String name, Object value) {
+            raw.setAttribute(name, value);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Attributes#removeAttr(java.lang.String)
+         */
+        @Override
+        public void removeAttr(String name) {
+            raw.removeAttribute(name);
+        }
+
+        /**
+         * @param relativePath relative path from htdocs
+         * @return full path
+         */
+        @Override
+        public String toRealPath(String relativePath) {
+            return raw.getRealPath(relativePath);
+        }
+
+        /**
+         * @return context path
+         */
+        @Override
+        public String getContextPath() {
+            return Tool.suffix(raw.getContextPath(), "/");
+        }
     }
 
     /**
-     * application scope object
+     * For Server
      */
-    transient final ServletContext raw;
+    static class ForServer implements Application {
+        /**
+         * Context path
+         */
+        String contextPath;
+        /**
+         * Attributes
+         */
+        Map<String, Object> attributes = new LinkedHashMap<>();
 
-    /**
-     * constructor
-     * 
-     * @param raw application scope object
-     */
-    Application(ServletContext raw) {
-        this.raw = raw;
-    }
+        /**
+         * @param contextPath context path
+         */
+        ForServer(String contextPath) {
+            this.contextPath = contextPath;
+        }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see framework.Attributes#names()
-     */
-    @Override
-    public Stream<String> names() {
-        return Tool.stream(raw.getAttributeNames());
-    }
+        @Override
+        public String toString() {
+            return "real path: " + toRealPath("") + ", context path: " + getContextPath();
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see framework.Attributes#getAttr(java.lang.String)
-     */
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> Optional<T> getAttr(String name) {
-        return Optional.ofNullable((T) raw.getAttribute(name));
-    }
+        }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
-     */
-    @Override
-    public void setAttr(String name, Object value) {
-        raw.setAttribute(name, value);
-    }
+        @Override
+        public Stream<String> names() {
+            return attributes.keySet().stream();
+        }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see framework.Attributes#removeAttr(java.lang.String)
-     */
-    @Override
-    public void removeAttr(String name) {
-        raw.removeAttribute(name);
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> Optional<T> getAttr(String name) {
+            return Optional.ofNullable((T)attributes.get(name));
+        }
+
+        @Override
+        public void setAttr(String name, Object value) {
+            attributes.put(name, value);
+        }
+
+        @Override
+        public void removeAttr(String name) {
+            attributes.remove(name);
+        }
+
+        @Override
+        public String toRealPath(String relativePath) {
+            return Config.toURL(relativePath).toString();
+        }
+
+        @Override
+        public String getContextPath() {
+            return contextPath;
+        }
     }
 
     /**
      * @param relativePath relative path from htdocs
      * @return full path
      */
-    public String toRealPath(String relativePath) {
-        return raw.getRealPath(relativePath);
-    }
+    String toRealPath(String relativePath);
 
     /**
      * @return context path
      */
-    public String getContextPath() {
-        return Tool.suffix(raw.getContextPath(), "/");
-    }
+    String getContextPath();
 }

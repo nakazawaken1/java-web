@@ -1,13 +1,10 @@
 package framework;
 
 import framework.annotation.Only.User;
-import lombok.AccessLevel;
-import lombok.Getter;
 
 /**
  * account info
  */
-@Getter
 public class Account {
 
     /**
@@ -26,7 +23,6 @@ public class Account {
     /**
      * role
      */
-    @Getter(AccessLevel.NONE)
     final Class<? extends User>[] roles;
 
     /**
@@ -69,5 +65,12 @@ public class Account {
             }
         }
         return false;
+    }
+
+    /**
+     * @return id
+     */
+    public String getId() {
+        return id;
     }
 }

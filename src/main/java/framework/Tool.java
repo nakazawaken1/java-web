@@ -49,6 +49,21 @@ import framework.Try.TryTriConsumer;
 public class Tool {
 
     /**
+     * Carriage Return
+     */
+    public static final String CR = "\r";
+
+    /**
+     * Line Feed
+     */
+    public static final String LF = "\n";
+
+    /**
+     * Carriage Return & Line Feed
+     */
+    public static final String CRLF = CR + LF;
+    
+    /**
      * not empty string
      */
     public static final Predicate<String> notEmpty = ((Predicate<String>) String::isEmpty).negate();
@@ -257,6 +272,24 @@ public class Tool {
      */
     public static String getContentType(String file) {
         return MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(file);
+    }
+    
+    /**
+     * @param file file
+     * @return true if text contents file
+     */
+    public static boolean isTextContent(String file) {
+        String lower = file.toLowerCase();
+        return Config.app_text_extensions.stream().anyMatch(lower::endsWith);
+    }
+
+    /**
+     * @param text text
+     * @param prefix prefix
+     * @return text
+     */
+    public static String prefix(String text, String prefix) {
+        return text.startsWith(prefix) ? text : prefix + text;
     }
 
     /**

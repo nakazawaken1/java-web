@@ -89,6 +89,27 @@ public class Try {
     }
 
     /**
+     * @param consumer throwable consumer
+     * @param fail action if throw exception
+     * @return consumer
+     */
+    public static <T> Consumer<T> c(TryConsumer<T> consumer, Consumer<Exception> fail) {
+        return new Consumer<T>() {
+
+            @Override
+            public void accept(T value) {
+                try {
+                    consumer.accept(value);
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    fail.accept(e);
+                }
+            }
+        };
+    }
+
+    /**
      * throwable consumer
      */
     @FunctionalInterface

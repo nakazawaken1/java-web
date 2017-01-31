@@ -13,12 +13,10 @@ import framework.annotation.Time.Unit;
 import framework.annotation.Valid.Delete;
 import framework.annotation.Valid.Save;
 import framework.annotation.Valid.Update;
-import lombok.Data;
 
 /**
  * data
  */
-@Data
 public class Person {
     /**
      * primary key
@@ -93,5 +91,12 @@ public class Person {
      */
     public Optional<Long> getAge() {
         return birthday.map(i -> ChronoUnit.YEARS.between(i, LocalDate.now()));
+    }
+    
+    /**
+     * @return id
+     */
+    public Integer getId() {
+        return id;
     }
 }
