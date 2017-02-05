@@ -1,5 +1,12 @@
 package framework;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Deque;
@@ -17,12 +24,17 @@ import javax.el.ELProcessor;
 /**
  * formatter with el, config, message
  */
-public class Formatter {
+public class Formatter implements AutoCloseable {
 
     /**
      * logger
      */
     transient private static final Logger logger = Logger.getLogger(Formatter.class.getCanonicalName());
+
+    /**
+     * current formatter
+     */
+    static final ThreadLocal<Formatter> current = new ThreadLocal<>();
 
     /**
      * target text
@@ -226,7 +238,7 @@ public class Formatter {
      * values
      */
     Object[] values;
-
+    
     /**
      * constructor
      *
@@ -240,6 +252,19 @@ public class Formatter {
         this.escape = escape;
         this.map = map;
         this.values = values;
+        if (current.get() == null) {
+            current.set(this);
+        }
+    }
+    
+    /**
+     * @return formatter
+     */
+    Formatter copy() {
+        Formatter result = new Formatter(exclude, escape, map, values);
+        result.el = el;
+        result.cache = cache;
+        return result;
     }
 
     /**
@@ -401,7 +426,24 @@ public class Formatter {
      * @return result text
      */
     public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Map<String, Object> map, Object... values) {
-        return new Formatter(exclude, escape, map, values).format(text);
+        try (Formatter formatter = new Formatter(exclude, escape, map, values)) {
+            return formatter.format(text);
+        }
+    }
+
+    /**
+     * @param path include file path
+     * @return content
+     */
+    public static String include(String path) {
+        try {
+            return current.get().copy().format(
+                    new String(Files.readAllBytes(Paths.get(Config.toURL(path).orElseThrow(FileNotFoundException::new).toURI())), StandardCharsets.UTF_8));
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
@@ -412,47 +454,49 @@ public class Formatter {
      */
     String eval(String expression, int prefix, int suffix) {
         return cache.computeIfAbsent(expression, s -> {
-            boolean isEl = s.charAt(0) != '{' || prefix > 1;
-            boolean[] isEscape = { !isEl || (s.startsWith("${") && prefix == 2) };
+            boolean isEl = !(s.startsWith("{") && prefix == 1);
+            boolean isEscape = !isEl || (s.startsWith("${") && prefix == 2);
             BiFunction<Object, String, String> getResult = (result, type) -> {
-                if (escape != null && isEscape[0]) {
-                    String escaped = escape.apply(result);
-                    logger.config(() -> "[" + type + "] " + s + " -> " + escaped);
-                    return escaped;
+                String value;
+                if (escape != null && isEscape) {
+                    value = escape.apply(result);
+                } else {
+                    value = Tool.string(result).orElse(null);
+                    type = "raw " + type;
                 }
-                String string = Tool.string(result).orElse(null);
-                logger.config(() -> "[raw " + type + "] " + s + " -> " + string);
-                return string;
+                logger.config("[" + type + "] " + s + " -> " + value);
+                return value;
             };
             String key = s.substring(prefix, s.length() - suffix);
             if (isEl) {
+                /* bind map */
                 if (map != null && map.containsKey(key)) {
                     return getResult.apply(map.get(key), "map");
                 }
+
+                /* bind el */
                 try {
                     if (el == null) {
                         el = new ELProcessor();
-                        // el[0].defineFunction("F", "include",
-                        // Tool.class.getMethod("include", String.class,
-                        // Object.class, Object[].class));
-                        // el[0].defineFunction("F", "includeIf",
+                        el.defineFunction("F", "include", getClass().getMethod("include", String.class));
+                        // el.defineFunction("F", "includeIf",
                         // Tool.class.getMethod("includeIf", boolean.class,
                         // String.class, Object.class, Object[].class));
-                        // el[0].defineFunction("F", "includeN",
+                        // el.defineFunction("F", "includeN",
                         // Tool.class.getMethod("includeN", int.class,
                         // String.class, Object.class, Object[].class));
-                        // el[0].defineFunction("F", "includeFor",
+                        // el.defineFunction("F", "includeFor",
                         // Tool.class.getMethod("includeFor", Stream.class,
                         // String.class, Object.class, Object[].class));
-                        // el[0].defineFunction("F", "json",
+                        // el.defineFunction("F", "json",
                         // Tool.class.getMethod("json", Object.class,
                         // boolean.class));
                         el.defineBean("C", Config.properties);
                         el.defineBean("M", Message.messages);
                         el.defineBean("V", values == null ? new Object[] {} : values);
-                        el.defineBean("A", Server.application);
-                        el.defineBean("S", new Session());
-                        el.defineBean("R", new Request());
+                        el.defineBean("A", Application.current.get());
+                        el.defineBean("S", Session.current.get());
+                        el.defineBean("R", Request.current.get());
                         if (map != null) {
                             map.forEach(el::defineBean);
                         }
@@ -463,6 +507,8 @@ public class Formatter {
                     return s;
                 }
             }
+
+            /* bind values {0}... */
             if (key.matches("^[0-9]+$")) {
                 int i = Integer.parseInt(key);
                 if (values != null && i < values.length) {
@@ -471,6 +517,8 @@ public class Formatter {
                     return s;
                 }
             }
+
+            /* bind messages {message.id:parameter1:...} */
             if (key.indexOf('\n') < 0) {
                 String[] keys = key.split("\\s*:\\s*");
                 boolean hasParameter = keys.length > 1;
@@ -485,5 +533,13 @@ public class Formatter {
             }
             return s;
         });
+    }
+
+    @Override
+    public void close() {
+        if (current.get() == this) {
+            current.remove();
+            current.set(null);
+        }
     }
 }

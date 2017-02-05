@@ -52,18 +52,18 @@
 			<version>1.4.192</version>
 			<scope>runtime</scope>
 		</dependency>
-		<dependency><!-- Oracle -->
+		<!--<dependency> Oracle 
 			<groupId>com.oracle.jdbc</groupId>
 			<artifactId>ojdbc7</artifactId>
 			<version>12.1.0.2</version>
 			<scope>runtime</scope>
 		</dependency>
-		<dependency><!-- SQLServer -->
+		<dependency> SQLServer
 			<groupId>com.microsoft.sqlserver</groupId>
 			<artifactId>sqljdbc</artifactId>
 			<version>4.2</version>
 			<scope>runtime</scope>
-		</dependency>
+		</dependency> -->
 		<dependency><!-- json -->
 			<groupId>org.codehaus.jackson</groupId>
 			<artifactId>jackson-mapper-asl</artifactId>

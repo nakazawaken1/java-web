@@ -1,0 +1,18 @@
+#{F:include('parts/simple_header.html')}
+	<h1>{title}</h1>
+    <div data-load="alert"></div>
+	<form action="login" method="post">
+		<dl>
+			<dt>{loginId}</dt>
+			<dd>
+				<input name="loginId" type="text" maxlength="20" />
+			</dd>
+			<dt>{password}</dt>
+			<dd>
+				<input name="password" type="password" maxlength="20" />
+			</dd>
+		</dl>
+		<button type="submit">{login}</button>
+		<button type="button" class="quit">{quit}</button>
+	</form>
+#{F:include('parts/footer.html')}

@@ -73,9 +73,19 @@ public enum Config {
     db_setup(Db.Setup.UPDATE),
 
     /**
+     * database suffix for session
+     */
+    db_suffix_session,
+
+    /**
+     * session cookie name
+     */
+    app_session_name("JavaWebSession"),
+    
+    /**
      * session timeout(seconds, indefinite if negative value)
      */
-    app_session_timeout_seconds(60 * 30),
+    app_session_timeout_minutes(30),
 
     /**
      * upload folder
@@ -116,6 +126,21 @@ public enum Config {
      * scheduled job thread count
      */
     app_job_threads(1),
+    
+    /**
+     * account class
+     */
+    app_account_class("framework.Account"),
+    
+    /**
+     * account info(loginId:password:roles,...)
+     */
+    app_accounts(),
+    
+    /**
+     * file extension of text type contents
+     */
+    app_text_extensions(".txt|.htm|.html|.js|.json|.css|.csv|.tsv|.xml|.ini|.yml|.properties|.php|.java|.jsp|.xhtml", "\\s*\\|\\s*"),
 
     ;
 
@@ -176,7 +201,7 @@ public enum Config {
      * @param defaultValue default value
      */
     private Config(Object defaultValue) {
-        this(defaultValue, ",");
+        this(defaultValue, "\\s*,\\s*");
     }
 
     /**
@@ -329,7 +354,7 @@ public enum Config {
      * @return enum
      */
     public <T extends Enum<T>> T enumOf(Class<T> enumClass) {
-        return (T) Enum.valueOf(enumClass, text());
+        return (T) Enum.valueOf(enumClass, text().toUpperCase());
     }
 
     /**

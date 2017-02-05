@@ -8,7 +8,8 @@ nav span {
     display: table-cell;
 }
 
-nav span[data-load=info] {
+nav form {
+    display: table-cell;
     text-align: right;
 }
 
@@ -23,4 +24,8 @@ table {
 th, td {
   border: 1px solid black;
   padding: 2px;
+}
+
+[data-load=alert] {
+  color: red;
 }

@@ -16,3 +16,9 @@ db.datasource.class.sqlserver=com.microsoft.sqlserver.jdbc.SQLServerDataSource
 db.url.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?
 
 job.daily=03:00
+
+app.accounts=admin:Adm1n:framework.annotation.Only$Administrator,user:U5er:framework.annotation.Only$User
+
+log.level=INFO
+
+db.setup=create

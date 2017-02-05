@@ -1,21 +1,6 @@
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>{title}</title>
-<link rel="stylesheet" href="css/common.css" type="text/css" media="all"/>
-</head>
-<body>
-<nav>
-  <span>{title}</span>
-  <span data-load="info"></span>
-</nav>
-<div data-load="flush"></div>
+#{F:include('parts/header.html')}
 <ul>
 <li><a href="db">DB</a></li>
 <li><form action="add"><input type="text" name="a" size="3"/> + <input type="text" name="b" size="3"/> <input type="submit" value="="/></form></li>
 </ul>
-<script src="js/jquery-3.1.1.min.js"></script>
-<script src="js/common.js"></script>
-</body>
-</html>
+#{F:include('parts/footer.html')}

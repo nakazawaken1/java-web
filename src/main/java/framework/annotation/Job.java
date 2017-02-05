@@ -50,6 +50,7 @@ public @interface Job {
         static final AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>();
 
         /**
+         * setup
          * @param classes target class
          */
         public static void setup(Class<?>... classes) {
@@ -84,6 +85,13 @@ public @interface Job {
                                     });
                         });
             }
+        }
+        
+        /**
+         * shutdown
+         */
+        public static void shutdown() {
+            scheduler.get().shutdown();
         }
     }
 }

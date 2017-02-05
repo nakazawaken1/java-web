@@ -9,6 +9,7 @@ import java.util.stream.Stream;
 
 /**
  * session scoped object
+ * 
  * @param <ValueType> value type
  */
 public interface Attributes<ValueType> extends Map<String, ValueType> {
@@ -158,4 +159,15 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
         return names().map(i -> Tool.pair(i, getAttr(i).orElse(null))).collect(Collectors.toSet());
     }
 
+    /**
+     * get and remove value from session
+     * 
+     * @param key session key
+     * @return text
+     */
+    default String flash(String key) {
+        String value = Tool.string(get(key)).orElse("");
+        removeAttr(key);
+        return value;
+    }
 }

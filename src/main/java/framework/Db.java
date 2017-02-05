@@ -45,6 +45,7 @@ import javax.sql.DataSource;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
+import framework.Try.TryFunction;
 
 /**
  * database
@@ -390,7 +391,7 @@ public class Db implements AutoCloseable {
     public Connection getConnection() {
         return connection;
     }
-    
+
     /**
      * @return self
      */
@@ -398,12 +399,12 @@ public class Db implements AutoCloseable {
         Try.r(() -> connection.setAutoCommit(false)).run();
         return this;
     }
-    
+
     /**
      * rollback flag
      */
     boolean isRollback = false;
-    
+
     /**
      * @return self
      */
@@ -437,7 +438,7 @@ public class Db implements AutoCloseable {
             if (resources != null) {
                 resources.forEach(ResultSetSpliterator::close);
             }
-            if(isRollback) {
+            if (isRollback) {
                 connection.rollback();
             }
             connection.close();
@@ -869,20 +870,21 @@ public class Db implements AutoCloseable {
             return;
         }
 
-        /* get all sql files(table.*.sql or data.*.sql) */
+        /* get all sql files(object.*.sql or data.*.sql) */
         String folder = Config.app_sql_folder.text();
+        String tablePrefix = "object.";
+        String dataPrefix = "data.";
         String suffix = ".sql";
         List<String> all;
         try (Stream<String> files = Tool.getResources(folder)) {
-            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith("table.") || file.startsWith("data."))).peek(logger::info)
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(logger::info)
                     .collect(Collectors.toList());
         }
 
         try (Db db = Db.connect()) {
-            db.getSQL("setup.sql").map(sql -> db.execute(sql, null));
+            db.getSQL("setup" + suffix).map(sql -> db.execute(sql, null));
 
             /* get table creation sql */
-            String tablePrefix = "table.";
             List<String> tables = all.stream().filter(file -> file.startsWith(tablePrefix)).collect(Collectors.toList());
 
             /* get exists tables */
@@ -909,7 +911,6 @@ public class Db implements AutoCloseable {
             }
 
             /* data load */
-            String dataPrefix = "data.";
             Function<String, String> dataName = file -> file.substring(dataPrefix.length(), file.length() - suffix.length());
             all.stream().filter(file -> file.startsWith(dataPrefix)).filter(file -> reloadTables.contains(dataName.apply(file)))
                     .peek(file -> db.truncate(dataName.apply(file))).forEach(file -> db.executeFile(file, null));
@@ -953,9 +954,24 @@ public class Db implements AutoCloseable {
                     long limit = q.limit <= 0 ? Integer.MAX_VALUE : q.limit;
                     sql.append(" LIMIT ").append(q.offset).append(", ").append(limit);
                 }
-                if (q.forUpdate)
+                if (q.forUpdate) {
                     sql.append(" FOR UPDATE");
+                }
             }
+            return sql.toString();
+        }
+
+        /**
+         * build SQL
+         * 
+         * @param q Query
+         * @return SQL
+         */
+        public String deleteSql(Query q) {
+            StringBuilder sql = new StringBuilder();
+            sql.append("DELETE");
+            sql.append(" FROM ").append(q.table);
+            sql.append(join(" WHERE ", q.wheres, " AND "));
             return sql.toString();
         }
 
@@ -1809,6 +1825,19 @@ public class Db implements AutoCloseable {
                 return rows.peek(Try.c(fetcher)).count();
             }
         }
+
+        /**
+         * execute deletion
+         */
+        public void delete() {
+            String sql = db.builder.deleteSql(this);
+            logger.info(sql + ";");
+            try (PreparedStatement ps = db.connection.prepareStatement(sql)) {
+                ps.execute();
+            } catch (SQLException e) {
+                throw new UncheckedSQLException(e);
+            }
+        }
     }
 
     /**
@@ -1817,15 +1846,17 @@ public class Db implements AutoCloseable {
      * @param sql SQL
      * @param prepared after prepared action
      */
-    public void prepare(String sql, TryConsumer<PreparedStatement> prepared) {
+    public void prepare(String sql, TryFunction<PreparedStatement, Object[]> prepared) {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            for(Object i : Try.f(prepared).apply(ps)) {
+                sql = sql.replaceFirst("\\?", builder.escape(i));
+            }
             logger.info(sql);
-            Try.c(prepared).accept(ps);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
     }
-    
+
     /**
      * @param model find target
      * @param targetFields condition fields
@@ -1834,7 +1865,7 @@ public class Db implements AutoCloseable {
     public <T> Stream<T> find(T model, String... targetFields) {
         throw new UnsupportedOperationException();
     }
-    
+
     /**
      * @param model insert target
      * @param targetFields save fields(primary key is automatic inclusion)
