@@ -9,6 +9,7 @@ import java.util.logging.Logger;
 /**
  * Instantiate when first reference
  *
+<<<<<<< HEAD
  * @param <T> target type
  */
 public class Lazy<T> implements AutoCloseable {

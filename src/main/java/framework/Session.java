@@ -29,7 +29,6 @@ import com.sun.net.httpserver.HttpExchange;
  */
 @SuppressWarnings("restriction")
 public abstract class Session implements Attributes<Object> {
-
     /**
      * current request
      */
