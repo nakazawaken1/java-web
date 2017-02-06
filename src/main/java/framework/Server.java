@@ -3,6 +3,7 @@ package framework;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -18,7 +19,6 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
@@ -161,8 +161,10 @@ public class Server implements Servlet {
         Config.startupLog();
 
         /* create application scope object */
-        Application.current.set(applicationGetter.get());
-        logger.info(Application.current.get().toString());
+        if(Application.current.get() == null) {
+            Application.current.set(applicationGetter.get());
+            logger.info(Application.current.get().toString());
+        }
 
         /* setup for response creator */
         if (Response.create == null) {
@@ -288,7 +290,11 @@ public class Server implements Servlet {
 
         /* static file */
         if (Config.toURL(Config.app_view_folder.text(), request.getPath()).isPresent()) {
+            try {
             Response.file(request.getPath()).flush();
+            } catch(UncheckedIOException e) {
+                Response.redirect(Tool.trim(null, application.getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
+            }
             return;
         }
 
@@ -315,19 +321,11 @@ public class Server implements Servlet {
 
     /**
      * @param args context-path http-port https-port .key .crt...
-     * @throws KeyStoreException
-     * @throws NoSuchAlgorithmException
-     * @throws IOException
-     * @throws InvalidKeySpecException
-     * @throws UnrecoverableKeyException
-     * @throws KeyManagementException
-     * @throws CertificateException
-     * @throws NoSuchProviderException
      */
     @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
     public static void main(String[] args) {
 
-        String contextPath = args.length > 0 ? args[0] : "/";
+        String contextPath = Tool.suffix(args.length > 0 ? args[0] : "", "/");
         int httpPort = args.length > 1 ? Integer.parseInt(args[1]) : 80;
         int httpsPort = args.length > 2 ? Integer.parseInt(args[2]) : 0;
         String keyPath = args.length > 3 ? args[3] : null;
@@ -368,10 +366,10 @@ public class Server implements Servlet {
                 https.start();
                 logger.info("https server started on port " + httpsPort);
             }
-            Runtime.getRuntime().addShutdownHook(new Thread(Server::shutdown));
         } catch (Exception e) {
             logger.log(Level.WARNING, "setup error", e);
         }
+        Runtime.getRuntime().addShutdownHook(new Thread(Server::shutdown));
     }
 
     /**

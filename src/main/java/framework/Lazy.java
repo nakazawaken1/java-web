@@ -9,7 +9,6 @@ import java.util.logging.Logger;
 /**
  * Instantiate when first reference
  *
-<<<<<<< HEAD
  * @param <T> target type
  */
 public class Lazy<T> implements AutoCloseable {
@@ -33,9 +32,9 @@ public class Lazy<T> implements AutoCloseable {
      * @return instance
      */
     public synchronized T get() {
-        T value = instance.orElseGet(supplier);
+        T value = instance.orElseGet(() -> supplier == null ? null : supplier.get());
         if(!instance.isPresent()) {
-            instance = Optional.of(value);
+            instance = Optional.ofNullable(value);
         }
         return value;
     }

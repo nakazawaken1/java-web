@@ -1852,6 +1852,7 @@ public class Db implements AutoCloseable {
                 sql = sql.replaceFirst("\\?", builder.escape(i));
             }
             logger.info(sql);
+            ps.executeUpdate();
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }

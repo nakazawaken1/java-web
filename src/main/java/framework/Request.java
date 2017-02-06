@@ -262,7 +262,7 @@ public abstract class Request implements Attributes<Object> {
          */
         ForServer(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
-            path = exchange.getRequestURI().getPath().substring(Tool.suffix(exchange.getHttpContext().getPath(), "/").length());
+            path = Tool.suffix(exchange.getRequestURI().getPath(), "/").substring(Tool.suffix(exchange.getHttpContext().getPath(), "/").length());
             requestHeaders = exchange.getRequestHeaders();
             String contentType = requestHeaders.getFirst("Content-Type");
             // query parameter
