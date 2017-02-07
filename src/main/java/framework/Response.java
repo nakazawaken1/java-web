@@ -299,7 +299,7 @@ public abstract class Response {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", "text/html;charset=" + charset);
                 r.sendResponseHeaders(200, 0);
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody()));
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset));
                         Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                     lines.map(formatter::format).forEach(line -> {
@@ -315,7 +315,7 @@ public abstract class Response {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", "text/html;charset=" + charset);
                 r.sendResponseHeaders(200, 0);
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody()));
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset));
                         Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, map, values)) {
                     lines.forEach(line -> writer.println(formatter.format(line)));
@@ -335,7 +335,7 @@ public abstract class Response {
         public Response ofWrite(Consumer<PrintWriter> write) {
             return new ForServer().set(r -> {
                 r.sendResponseHeaders(200, 0);
-                write.accept(new PrintWriter(new OutputStreamWriter(r.getResponseBody())));
+                write.accept(new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset)));
             });
         }
 
