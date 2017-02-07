@@ -85,7 +85,7 @@ public abstract class Request implements Attributes<Object> {
 
         /**
          * constructor
-         * 
+         *
          * @param request servlet request
          * @param response servlet response
          */
@@ -101,16 +101,6 @@ public abstract class Request implements Attributes<Object> {
         @Override
         public int hashCode() {
             return servletRequest.hashCode();
-        }
-
-        @Override
-        public String toString() {
-            return hashCode() + "<- " + servletRequest.getMethod() + " " + path
-                    + Tool.string(Stream
-                            .concat(Stream.of(Optional.ofNullable(servletRequest.getQueryString()).orElse("").split("&")),
-                                    Tool.stream(servletRequest.getParameterNames())
-                                            .map(name -> name + "=" + String.join(",", servletRequest.getParameterValues(name))))
-                            .collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
         }
 
         /**
@@ -231,30 +221,31 @@ public abstract class Request implements Attributes<Object> {
      * For server
      */
     static class ForServer extends Request {
+
         /**
          * exchange
          */
-        HttpExchange exchange;
+        final HttpExchange exchange;
         /**
          * request headers
          */
-        Headers requestHeaders;
+        final Headers requestHeaders;
         /**
          * parameters
          */
-        Map<String, List<String>> parameters = new LinkedHashMap<>(); // name, value
+        final Map<String, List<String>> parameters = new LinkedHashMap<>(); // name, value
         /**
          * files
          */
-        Map<String, Pair<byte[], File>> files = new LinkedHashMap<>(); // file name, file content
+        final Map<String, Pair<byte[], File>> files = new LinkedHashMap<>(); // file name, file content
         /**
          * attributes
          */
-        Map<String, Object> attributes = new LinkedHashMap<>(); // name, value
+        final Map<String, Object> attributes = new LinkedHashMap<>(); // name, value
         /**
          * path
          */
-        String path;
+        final String path;
 
         /**
          * @param exchange exchange
@@ -262,7 +253,9 @@ public abstract class Request implements Attributes<Object> {
          */
         ForServer(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
-            path = Tool.suffix(exchange.getRequestURI().getPath(), "/").substring(Tool.suffix(exchange.getHttpContext().getPath(), "/").length());
+            String p = exchange.getRequestURI().getPath();
+            String r = Application.current.get().getContextPath();
+            path = p.length() <= r.length() ? "/" : p.substring(r.length());
             requestHeaders = exchange.getRequestHeaders();
             String contentType = requestHeaders.getFirst("Content-Type");
             // query parameter
@@ -279,7 +272,8 @@ public abstract class Request implements Attributes<Object> {
                     final String boundary = "--" + new KeyValueAttr("Content-Type:" + contentType).attr.get("boundary");
                     try (InputStream in = exchange.getRequestBody()) {
                         readLine(in);// first boundary
-                        loop: for (;;) {
+                        loop:
+                        for (;;) {
                             String name = null;
                             String filename = null;
                             int length = 0;
@@ -297,13 +291,13 @@ public abstract class Request implements Attributes<Object> {
                                     continue;
                                 }
                                 switch (header.key) {
-                                case "content-disposition":
-                                    name = header.attr.get("name");
-                                    filename = header.attr.get("filename");
-                                    break;
-                                case "content-length":
-                                    length = Integer.parseInt(header.value);
-                                    break;
+                                    case "content-disposition":
+                                        name = header.attr.get("name");
+                                        filename = header.attr.get("filename");
+                                        break;
+                                    case "content-length":
+                                        length = Integer.parseInt(header.value);
+                                        break;
                                 }
                             }
                             if (name == null) {
@@ -462,6 +456,7 @@ public abstract class Request implements Attributes<Object> {
          * key & value & attributes
          */
         static class KeyValueAttr {
+
             /**
              * decode
              */
@@ -497,7 +492,7 @@ public abstract class Request implements Attributes<Object> {
 
             /**
              * constructor
-             * 
+             *
              * @param text text for parse
              */
             public KeyValueAttr(String text) {
@@ -624,6 +619,11 @@ public abstract class Request implements Attributes<Object> {
      */
     public abstract Http.Method getMethod();
 
+    @Override
+    public String toString() {
+        return hashCode() + "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + pair.getValue()).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+    }
+
     /**
      * @param args URL(https)
      * @throws NoSuchAlgorithmException
@@ -634,7 +634,7 @@ public abstract class Request implements Attributes<Object> {
     public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, MalformedURLException, IOException {
         String url = args.length > 0 ? args[0] : "https://localhost:8443";
         SSLContext context = SSLContext.getInstance("TLS");
-        context.init(null, new TrustManager[] { new X509TrustManager() {
+        context.init(null, new TrustManager[]{new X509TrustManager() {
 
             @Override
             public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
@@ -648,7 +648,7 @@ public abstract class Request implements Attributes<Object> {
             public X509Certificate[] getAcceptedIssuers() {
                 return null;
             }
-        } }, null);
+        }}, null);
         HttpsURLConnection.setDefaultSSLSocketFactory(context.getSocketFactory());
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();

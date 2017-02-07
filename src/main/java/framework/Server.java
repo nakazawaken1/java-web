@@ -64,6 +64,8 @@ import framework.annotation.Http;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Query;
+import java.io.File;
+import java.net.URL;
 
 /**
  * Servlet implementation class
@@ -222,7 +224,7 @@ public class Server implements Servlet {
      * @throws IOException
      */
     static void handle(Request request, Lazy<Session> session) throws ServletException, IOException {
-        logger.info(request.hashCode() + "<- " + request.getMethod() + " " + request.getPath() + " " + request.getHeaders().get("Content-Type"));
+        logger.info(request.toString());
 
         Application application = Application.current.get();
 
@@ -247,7 +249,7 @@ public class Server implements Servlet {
                 forbidden = !session.get().getAccount().hasAnyRole(only.value());
             }
             if (forbidden) {
-                session.get().setAttr("alert", "アクセス権限がありません。権限のあるアカウントでログインしてください");
+                session.get().setAttr("alert", Message.alert_forbidden);
                 Response.redirect(application.getContextPath()).flush();
                 return;
             }
@@ -289,11 +291,12 @@ public class Server implements Servlet {
         }
 
         /* static file */
-        if (Config.toURL(Config.app_view_folder.text(), request.getPath()).isPresent()) {
-            try {
-            Response.file(request.getPath()).flush();
-            } catch(UncheckedIOException e) {
+        Optional<URL> url = Config.toURL(Config.app_view_folder.text(), request.getPath());
+        if (url.isPresent()) {
+            if(url.filter(Try.p(i -> new File(i.toURI()).isDirectory())).isPresent()) {
                 Response.redirect(Tool.trim(null, application.getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
+            } else {
+                Response.file(request.getPath()).flush();
             }
             return;
         }

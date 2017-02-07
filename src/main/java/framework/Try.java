@@ -9,12 +9,30 @@ import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
  * support lambda exception
  */
 public class Try {
+    
+    /**
+     * Exception catcher
+     */
+    public static final Consumer<Exception> catcher = e -> {
+        if(e instanceof RuntimeException) {
+            throw (RuntimeException)e;
+        }
+        if(e instanceof IOException) {
+            throw new UncheckedIOException((IOException)e);
+        }
+        if(e instanceof SQLException) {
+            throw new UncheckedSQLException((SQLException)e);
+        }
+        throw new RuntimeException(e);
+    };
+
     /**
      * throwable runnable
      */
@@ -28,26 +46,21 @@ public class Try {
 
     /**
      * @param runnable throwable runnable
+     * @param error error action
      * @return runnable
      */
-    public static Runnable r(TryRunnable runnable) {
-        return new Runnable() {
-
-            @Override
-            public void run() {
+    public static Runnable r(TryRunnable runnable, Consumer<Exception> error) {
+        return () -> {
                 try {
                     runnable.run();
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    error.accept(e);
                 }
-            }
         };
+    }
+    
+    public static Runnable r(TryRunnable runnable) {
+        return r(runnable, catcher);
     }
 
     /**
@@ -65,48 +78,28 @@ public class Try {
     }
 
     /**
+     * @param <T> value type
      * @param consumer throwable consumer
+     * @param error error action
      * @return consumer
      */
-    public static <T> Consumer<T> c(TryConsumer<T> consumer) {
-        return new Consumer<T>() {
-
-            @Override
-            public void accept(T value) {
+    public static <T> Consumer<T> c(TryConsumer<T> consumer, Consumer<Exception> error) {
+        return value -> {
                 try {
                     consumer.accept(value);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    error.accept(e);
                 }
-            }
         };
     }
 
     /**
+     * @param <T> value type
      * @param consumer throwable consumer
-     * @param fail action if throw exception
      * @return consumer
      */
-    public static <T> Consumer<T> c(TryConsumer<T> consumer, Consumer<Exception> fail) {
-        return new Consumer<T>() {
-
-            @Override
-            public void accept(T value) {
-                try {
-                    consumer.accept(value);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    fail.accept(e);
-                }
-            }
-        };
+    public static <T> Consumer<T> c(TryConsumer<T> consumer) {
+        return c(consumer, catcher);
     }
 
     /**
@@ -123,71 +116,68 @@ public class Try {
 
     /**
      * @param consumer throwable consumer
+     * @param error error action
      * @return consumer
      */
-    public static IntConsumer intC(TryIntConsumer consumer) {
-        return new IntConsumer() {
-
-            @Override
-            public void accept(int t) {
-                try {
-                    consumer.accept(t);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+    public static IntConsumer intC(TryIntConsumer consumer, Consumer<Exception> error) {
+        return t -> {
+            try {
+                consumer.accept(t);
+            } catch (Exception e) {
+                error.accept(e);
             }
         };
-    }
-
-    /**
-     * throwable consumer
-     *
-     * @param <T> object type
-     * @param <U> another object type
-     */
-    @FunctionalInterface
-    public static interface TryBiConsumer<T, U> {
-        /**
-         * @param t object
-         * @param u another object
-         * @throws Exception exception
-         */
-        void accept(T t, U u) throws Exception;
     }
 
     /**
      * @param consumer throwable consumer
      * @return consumer
      */
-    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer) {
-        return new BiConsumer<T, U>() {
+    public static IntConsumer intC(TryIntConsumer consumer) {
+        return intC(consumer, catcher);
+    }
+    
+    /**
+     * throwable consumer
+     *
+     * @param <T> first object type
+     * @param <U> second object type
+     */
+    @FunctionalInterface
+    public static interface TryBiConsumer<T, U> {
+        /**
+         * @param t first object
+         * @param u second object
+         * @throws Exception exception
+         */
+        void accept(T t, U u) throws Exception;
+    }
 
-            /*
-             * (non-Javadoc)
-             * 
-             * @see java.util.function.Consumer#accept(java.lang.Object)
-             */
-            @Override
-            public void accept(T t, U u) {
-                try {
-                    consumer.accept(t, u);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+    /**
+     * @param <T> first object type
+     * @param <U> second object type
+     * @param consumer throwable consumer
+     * @param error error action
+     * @return consumer
+     */
+    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer, Consumer<Exception> error) {
+        return (t, u) -> {
+            try {
+                consumer.accept(t, u);
+            } catch (Exception e) {
+                error.accept(e);
             }
         };
+    }
+
+    /**
+     * @param <T> first object type
+     * @param <U> second object type
+     * @param consumer throwable consumer
+     * @return consumer
+     */
+    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer) {
+        return c(consumer, catcher);
     }
 
     /**
@@ -227,34 +217,31 @@ public class Try {
 
     /**
      * @param consumer consumer
+     * @param error error action
+     * @return consumer
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     */
+    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer, Consumer<Exception> error) {
+        return (t, u, v) -> {
+            try {
+                consumer.accept(t, u, v);
+            } catch (Exception e) {
+                error.accept(e);
+            }
+        };
+    }
+
+    /**
+     * @param consumer consumer
      * @return consumer
      * @param <T> object type
      * @param <U> other object type
      * @param <V> other object type
      */
     public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer) {
-        return new TriConsumer<T, U, V>() {
-
-            /*
-             * (non-Javadoc)
-             * 
-             * @see java.util.function.Consumer#accept(java.lang.Object)
-             */
-            @Override
-            public void accept(T t, U u, V v) {
-                try {
-                	consumer.accept(t, u, v);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
+        return c(consumer, catcher);
     }
 
     /**
@@ -273,32 +260,27 @@ public class Try {
     }
 
     /**
+     * @param <T> object type
+     * @param consumer throwable consumer
+     * @return consumer
+     */
+    public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer, Consumer<Exception> error) {
+        return (t, u) -> {
+            try {
+                consumer.accept(t, u);
+            } catch (Exception e) {
+                error.accept(e);
+            }
+        };
+    }
+
+    /**
+     * @param <T> object type
      * @param consumer throwable consumer
      * @return consumer
      */
     public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer) {
-        return new ObjIntConsumer<T>() {
-
-            /*
-             * (non-Javadoc)
-             * 
-             * @see java.util.function.Consumer#accept(java.lang.Object)
-             */
-            @Override
-            public void accept(T t, int u) {
-                try {
-                    consumer.accept(t, u);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
+        return intC(consumer, catcher);
     }
 
     /**
@@ -318,27 +300,31 @@ public class Try {
     }
 
     /**
+     * @param <A> argument type
+     * @param <R> return type
+     * @param function throwable function
+     * @param error error action
+     * @return function
+     */
+    public static <A, R> Function<A, R> f(TryFunction<A, R> function, Consumer<Exception> error) {
+        return argument -> {
+            try {
+                return function.apply(argument);
+            } catch (Exception e) {
+                error.accept(e);
+                return null;
+            }
+        };
+    }
+
+    /**
+     * @param <A> argument type
+     * @param <R> return type
      * @param function throwable function
      * @return function
      */
     public static <A, R> Function<A, R> f(TryFunction<A, R> function) {
-        return new Function<A, R>() {
-
-            @Override
-            public R apply(A t) {
-                try {
-                    return function.apply(t);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
+        return f(function, catcher);
     }
 
     /**
@@ -357,27 +343,29 @@ public class Try {
     }
 
     /**
+     * @param <R> return type
+     * @param function throwable function
+     * @param error error action
+     * @return function
+     */
+    public static <R> IntFunction<R> intF(TryIntFunction<R> function, Consumer<Exception> error) {
+        return t -> {
+            try {
+                return function.apply(t);
+            } catch (Exception e) {
+                error.accept(e);
+                return null;
+            }
+        };
+    }
+
+    /**
+     * @param <R> return type
      * @param function throwable function
      * @return function
      */
     public static <R> IntFunction<R> intF(TryIntFunction<R> function) {
-        return new IntFunction<R>() {
-
-            @Override
-            public R apply(int t) {
-                try {
-                    return function.apply(t);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
+        return intF(function, catcher);
     }
 
     /**
@@ -395,26 +383,69 @@ public class Try {
     }
 
     /**
+     * @param <R> return type
+     * @param function throwable function
+     * @param error error action
+     * @return function
+     */
+    public static <R> Supplier<R> s(TrySupplier<R> function, Consumer<Exception> error) {
+        return () -> {
+            try {
+                return function.get();
+            } catch (Exception e) {
+                error.accept(e);
+                return null;
+            }
+        };
+    }
+
+    /**
+     * @param <R> return type
      * @param function throwable function
      * @return function
      */
     public static <R> Supplier<R> s(TrySupplier<R> function) {
-        return new Supplier<R>() {
+        return s(function, catcher);
+    }
 
-            @Override
-            public R get() {
-                try {
-                    return function.get();
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                } catch (SQLException e) {
-                    throw new UncheckedSQLException(e);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+    /**
+     * throwable consumer
+     *
+     * @param <T> object type
+     */
+    @FunctionalInterface
+    public static interface TryPredicate<T> {
+        /**
+         * @param t object type
+         * @return result
+         * @throws Exception exception
+         */
+        boolean test(T t) throws Exception;
+    }
+
+    /**
+     * @param <T> object type
+     * @param predicate predicate
+     * @param error error action
+     * @return consumer
+     */
+    public static <T> Predicate<T> p(TryPredicate<T> predicate, Consumer<Exception> error) {
+        return t -> {
+            try {
+                return predicate.test(t);
+            } catch (Exception e) {
+                error.accept(e);
+                return false;
             }
         };
+    }
+
+    /**
+     * @param <T> object type
+     * @param predicate predicate
+     * @return consumer
+     */
+    public static <T> Predicate<T> p(TryPredicate<T> predicate) {
+        return p(predicate, catcher);
     }
 }

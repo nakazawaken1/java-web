@@ -5,3 +5,4 @@ error = 何か間違っていませんか？
 loginId = ログインID
 password = パスワード
 quit = 終了
+alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください

@@ -61,22 +61,18 @@ public class Db implements AutoCloseable {
          * H2
          */
         H2,
-
         /**
          * MySQL
          */
         MYSQL,
-
         /**
          * PostgreSQL
          */
         POSTGRESQL,
-
         /**
          * SQLServer
          */
         SQLSERVER,
-
         /**
          * Oracle
          */
@@ -95,11 +91,12 @@ public class Db implements AutoCloseable {
 
     /**
      * example
-     * 
+     *
      * @param args (unuse)
      */
     public static void main(String[] args) {
         class Example {
+
             public Example(Db db) {
                 String table = "test_table";
                 logger.info("[tables]");
@@ -198,7 +195,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect by config
-     * 
+     *
      * @return db
      */
     public static Db connect() {
@@ -207,7 +204,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect by config suffix
-     * 
+     *
      * @param suffix suffix
      * @return db
      */
@@ -223,7 +220,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect direct
-     * 
+     *
      * @param type database type
      * @param name schema
      * @return db
@@ -234,7 +231,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect direct
-     * 
+     *
      * @param type database type
      * @param name schema
      * @param user user name
@@ -247,7 +244,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect direct
-     * 
+     *
      * @param type database type
      * @param name schema
      * @param user user name
@@ -261,7 +258,7 @@ public class Db implements AutoCloseable {
 
     /**
      * connect direct
-     * 
+     *
      * @param type database type
      * @param name schema
      * @param user user name
@@ -275,27 +272,31 @@ public class Db implements AutoCloseable {
         String pad2 = "/";
         String url = null;
         switch (type) {
-        case H2:
-            url = name;
-            break;
-        case POSTGRESQL:
-            if (port <= 0)
-                port = 5432;
-            break;
-        case MYSQL:
-            if (port <= 0)
-                port = 3306;
-            break;
-        case ORACLE:
-            pad = "thin:@";
-            if (port <= 0)
-                port = 1521;
-            break;
-        case SQLSERVER:
-            pad2 = ";database=";
-            if (port <= 0)
-                port = 1433;
-            break;
+            case H2:
+                url = name;
+                break;
+            case POSTGRESQL:
+                if (port <= 0) {
+                    port = 5432;
+                }
+                break;
+            case MYSQL:
+                if (port <= 0) {
+                    port = 3306;
+                }
+                break;
+            case ORACLE:
+                pad = "thin:@";
+                if (port <= 0) {
+                    port = 1521;
+                }
+                break;
+            case SQLSERVER:
+                pad2 = ";database=";
+                if (port <= 0) {
+                    port = 1433;
+                }
+                break;
         }
         if (host == null) {
             host = "localhost";
@@ -313,7 +314,7 @@ public class Db implements AutoCloseable {
 
     /**
      * constructor
-     * 
+     *
      * @param connection connection
      * @param type database type
      */
@@ -322,42 +323,42 @@ public class Db implements AutoCloseable {
         this.type = type;
         logger.config(() -> "Connection created #" + connection.hashCode() + ", type = " + type);
         switch (type) {
-        case POSTGRESQL:
-            builder = new PostgresqlBuilder();
-            schema = "public";
-            break;
-        case ORACLE:
-            builder = new OracleBuilder();
-            schema = Try.s(connection::getSchema).get();
-            break;
-        case SQLSERVER:
-            builder = new SqlserverBuilder();
-            schema = "dbo";
-            break;
-        case H2:
-            builder = new Builder() {
+            case POSTGRESQL:
+                builder = new PostgresqlBuilder();
+                schema = "public";
+                break;
+            case ORACLE:
+                builder = new OracleBuilder();
+                schema = Try.s(connection::getSchema).get();
+                break;
+            case SQLSERVER:
+                builder = new SqlserverBuilder();
+                schema = "dbo";
+                break;
+            case H2:
+                builder = new Builder() {
 
-                @Override
-                public String getVariablesSql() {
-                    return "SELECT * FROM INFORMATION_SCHEMA.SETTINGS";
-                }
-            };
-            break;
-        case MYSQL:
-            builder = new Builder() {
+                    @Override
+                    public String getVariablesSql() {
+                        return "SELECT * FROM INFORMATION_SCHEMA.SETTINGS";
+                    }
+                };
+                break;
+            case MYSQL:
+                builder = new Builder() {
 
-                @Override
-                public String getVariablesSql() {
-                    return "SHOW VARIABLES";
-                }
-            };
-            break;
+                    @Override
+                    public String getVariablesSql() {
+                        return "SHOW VARIABLES";
+                    }
+                };
+                break;
         }
     }
 
     /**
-     * prepare data source
-     * 
+     * get data source
+     *
      * @param suffix Config.db_suffix
      * @return data source
      */
@@ -451,7 +452,7 @@ public class Db implements AutoCloseable {
 
     /**
      * raw sql
-     * 
+     *
      * @param sql SQL
      * @param map key value map(${key} to value)
      * @param values values(replace {0}, {1}... to value)
@@ -462,10 +463,10 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * query(single sql only)
-     * 
-     * {@code [example] db.query("SELECT name FROM account ORDER BY 1", null).map(rs -> rs.getString(1)).forEach(System.out::println);}
-     * 
+     * preparedQuery(single sql only)
+
+ {@code [example] db.preparedQuery("SELECT name FROM account ORDER BY 1", null).map(rs -> rs.getString(1)).forEach(System.out::println);}
+     *
      * @param sql SQL
      * @param map name value map({key} -> value)
      * @param values values({0}, {1}...)
@@ -483,8 +484,8 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * query form file(single sql only)
-     * 
+     * preparedQuery form file(single sql only)
+     *
      * @param name SQL file(with extension)
      * @param map name value map({key} -> value)
      * @param values values({0}, {1}...)
@@ -496,7 +497,7 @@ public class Db implements AutoCloseable {
 
     /**
      * execute(multi sql support)
-     * 
+     *
      * @param sql SQL
      * @param map name value map({key} -> value)
      * @param values values({0}, {1}...)
@@ -523,7 +524,7 @@ public class Db implements AutoCloseable {
 
     /**
      * execute from file(multi sql support)
-     * 
+     *
      * @param name SQL file(with extension)
      * @param map name value map({key} -> value)
      * @param values values({0}, {1}...)
@@ -535,7 +536,7 @@ public class Db implements AutoCloseable {
 
     /**
      * load sql from resource(database type considered)
-     * 
+     *
      * @param name SQL file(with extension)
      * @return SQL
      */
@@ -552,7 +553,7 @@ public class Db implements AutoCloseable {
 
     /**
      * update if exists row, else insert
-     * 
+     *
      * @param table table name
      * @param names row names(arrange primary key in left)
      * @param primary primary key columns
@@ -582,7 +583,7 @@ public class Db implements AutoCloseable {
 
     /**
      * update row
-     * 
+     *
      * @param table table name
      * @param names row names(arrange primary key in left)
      * @param primary primary key columns
@@ -607,7 +608,7 @@ public class Db implements AutoCloseable {
 
     /**
      * insert row
-     * 
+     *
      * @param table table name
      * @param names row names(arrange primary key in left)
      * @param primary primary key columns
@@ -630,7 +631,8 @@ public class Db implements AutoCloseable {
         boolean first = true;
         for (Object value : valueList) {
             sql.append(first ? ") VALUES(" : ", ");
-            if (first && primary == 1 && value == null) { /* auto id if primary key is single and null */
+            if (first && primary == 1 && value == null) {
+                /* auto id if primary key is single and null */
                 sql.append("(SELECT COALESCE(MAX(" + names[0] + "), 0) + 1 FROM " + table + ")");
             } else {
                 sql.append(builder.escape(value));
@@ -642,7 +644,7 @@ public class Db implements AutoCloseable {
 
     /**
      * delete row
-     * 
+     *
      * @param table table name
      * @param names row names(arrange primary key in left)
      * @param primary primary key columns
@@ -662,7 +664,7 @@ public class Db implements AutoCloseable {
 
     /**
      * delete all row
-     * 
+     *
      * @param table table name
      */
     public void truncate(String table) {
@@ -717,7 +719,7 @@ public class Db implements AutoCloseable {
      */
     public Stream<String> tables() {
         try {
-            return stream(connection.getMetaData().getTables(null, schema, null, new String[] { "TABLE" })).map(Try.f(rs -> rs.getString(3).toLowerCase()));
+            return stream(connection.getMetaData().getTables(null, schema, null, new String[]{"TABLE"})).map(Try.f(rs -> rs.getString(3).toLowerCase()));
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
@@ -725,7 +727,7 @@ public class Db implements AutoCloseable {
 
     /**
      * SQL function(database type considered)
-     * 
+     *
      * @param function NOW, YEAR, MONTH, DAY...
      * @param args arguments
      * @return native sql
@@ -736,7 +738,7 @@ public class Db implements AutoCloseable {
 
     /**
      * concatenate array
-     * 
+     *
      * @param <T> value type
      * @param prefix prefix(allow empty)
      * @param items values
@@ -758,7 +760,7 @@ public class Db implements AutoCloseable {
 
     /**
      * SELECT clause(add field with multiple call)
-     * 
+     *
      * @param fields fields
      * @return Query
      */
@@ -770,7 +772,7 @@ public class Db implements AutoCloseable {
 
     /**
      * FROM clause(can use without select)
-     * 
+     *
      * @param table table
      * @return Query
      */
@@ -782,7 +784,7 @@ public class Db implements AutoCloseable {
 
     /**
      * create table
-     * 
+     *
      * @param table table name
      * @param primary primary key columns
      * @param columns columns
@@ -815,7 +817,7 @@ public class Db implements AutoCloseable {
 
     /**
      * drop table
-     * 
+     *
      * @param table table name
      */
     public void drop(String table) {
@@ -830,44 +832,39 @@ public class Db implements AutoCloseable {
          * drop and create and insert
          */
         CREATE,
-
         /**
          * create and insert if not exists
          */
         UPDATE,
-
         /**
          * delete and insert if exists, create and insert if not exists
          */
         RELOAD,
-
         /**
          * no operation
          */
-        NONE,
-
-        ;
+        NONE,;
     }
 
     /**
      * setup database
-     * 
+     *
      * @param setup setup mode
      */
     public static void setup(Setup setup) {
         boolean create = false;
         boolean reload = false;
         switch (setup) {
-        case CREATE:
-            create = true;
-            break;
-        case UPDATE:
-            break;
-        case RELOAD:
-            reload = true;
-            break;
-        case NONE:
-            return;
+            case CREATE:
+                create = true;
+                break;
+            case UPDATE:
+                break;
+            case RELOAD:
+                reload = true;
+                break;
+            case NONE:
+                return;
         }
 
         /* get all sql files(object.*.sql or data.*.sql) */
@@ -919,7 +916,7 @@ public class Db implements AutoCloseable {
 
     /**
      * cleanup
-     * 
+     *
      * @throws Exception exception
      */
     public static void cleanup() throws Exception {
@@ -930,6 +927,7 @@ public class Db implements AutoCloseable {
      * sql builder for MySQL and H2
      */
     abstract public static class Builder {
+
         /**
          * differentiate NULL from empty
          */
@@ -937,7 +935,7 @@ public class Db implements AutoCloseable {
 
         /**
          * build SQL
-         * 
+         *
          * @param q Query
          * @return SQL
          */
@@ -963,7 +961,7 @@ public class Db implements AutoCloseable {
 
         /**
          * build SQL
-         * 
+         *
          * @param q Query
          * @return SQL
          */
@@ -977,7 +975,7 @@ public class Db implements AutoCloseable {
 
         /**
          * build count sql
-         * 
+         *
          * @param sql select SQL
          * @return count SQL
          */
@@ -987,7 +985,7 @@ public class Db implements AutoCloseable {
 
         /**
          * get function sql
-         * 
+         *
          * @param function function name
          * @param args arguments
          * @return native sql
@@ -998,7 +996,7 @@ public class Db implements AutoCloseable {
 
         /**
          * escape value
-         * 
+         *
          * @param value value
          * @return escaped value
          */
@@ -1023,7 +1021,7 @@ public class Db implements AutoCloseable {
 
         /**
          * column type for SQL
-         * 
+         *
          * @param column column
          * @return column type for SQL
          */
@@ -1042,7 +1040,7 @@ public class Db implements AutoCloseable {
 
         /**
          * replace common SQL to native sql
-         * 
+         *
          * @param sql common SQL
          * @return native SQL
          */
@@ -1060,6 +1058,7 @@ public class Db implements AutoCloseable {
      * sql builder for PostgreSQL
      */
     public static class PostgresqlBuilder extends Builder {
+
         /*
          * (non-Javadoc)
          * 
@@ -1074,12 +1073,15 @@ public class Db implements AutoCloseable {
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" ORDER BY ", q.orders, ", "));
-                if (q.limit > 0)
+                if (q.limit > 0) {
                     sql.append(" LIMIT ").append(q.limit);
-                if (q.offset > 0)
+                }
+                if (q.offset > 0) {
                     sql.append(" OFFSET ").append(q.offset);
-                if (q.forUpdate)
+                }
+                if (q.forUpdate) {
                     sql.append(" FOR UPDATE");
+                }
             }
             return sql.toString();
         }
@@ -1092,10 +1094,10 @@ public class Db implements AutoCloseable {
         @Override
         public String fn(String function, String... args) {
             switch (function.toUpperCase()) {
-            case "YEAR":
-            case "MONTH":
-            case "DAY":
-                return "DATE_PART('" + function + "'" + join(", ", Arrays.asList(args), ", ") + ")";
+                case "YEAR":
+                case "MONTH":
+                case "DAY":
+                    return "DATE_PART('" + function + "'" + join(", ", Arrays.asList(args), ", ") + ")";
             }
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
@@ -1110,6 +1112,7 @@ public class Db implements AutoCloseable {
      * sql builder for SQLServer
      */
     public static class SqlserverBuilder extends Builder {
+
         /*
          * (non-Javadoc)
          * 
@@ -1119,32 +1122,37 @@ public class Db implements AutoCloseable {
         public String sql(Query q) {
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ");
-            if (q.limit > 0 && q.offset <= 0)
+            if (q.limit > 0 && q.offset <= 0) {
                 sql.append("TOP ").append(q.limit).append(" ");
+            }
             sql.append(q.fields == null ? "*" : join("", q.fields, ", "));
             String orderBy = join(" ORDER BY ", q.orders, ", ");
             boolean range = q.offset > 0;
             if (range) {
                 String select = sql.toString();
-                if (orderBy.isEmpty())
+                if (orderBy.isEmpty()) {
                     orderBy = " ORDER BY " + (q.fields == null ? "id" : q.fields.get(0));
+                }
                 sql.append(" FROM (").append(select).append(", ROW_NUMBER()");
-                if (!orderBy.isEmpty())
+                if (!orderBy.isEmpty()) {
                     sql.append(" OVER(" + orderBy.substring(1) + ")");
+                }
                 sql.append(" N__");
             }
             if (q.table != null) {
                 sql.append(" FROM ").append(q.table);
-                if (q.forUpdate)
+                if (q.forUpdate) {
                     sql.append(" WITH (UPDLOCK)");
+                }
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 if (range) {
                     sql.append(") T__ WHERE N__");
-                    if (q.limit <= 0)
+                    if (q.limit <= 0) {
                         sql.append(" > ").append(q.offset);
-                    else
+                    } else {
                         sql.append(" BETWEEN ").append(q.offset + 1).append(" AND ").append(q.offset + q.limit);
+                    }
                     sql.append(" ORDER BY N__");
                 } else {
                     sql.append(orderBy);
@@ -1160,12 +1168,15 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String escape(Object value) {
-            if (value != null && value instanceof Date)
+            if (value != null && value instanceof Date) {
                 return "'" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value) + "'";
-            if (value instanceof LocalDateTime || value instanceof ZonedDateTime || value instanceof OffsetDateTime)
+            }
+            if (value instanceof LocalDateTime || value instanceof ZonedDateTime || value instanceof OffsetDateTime) {
                 return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format((TemporalAccessor) value) + "'";
-            if (value instanceof LocalDate)
+            }
+            if (value instanceof LocalDate) {
                 return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd").format((TemporalAccessor) value) + "'";
+            }
             return super.escape(value);
         }
 
@@ -1177,8 +1188,9 @@ public class Db implements AutoCloseable {
         @Override
         public String countSql(String sql) {
             int orderBy = sql.lastIndexOf("ORDER BY");
-            if (orderBy > 0 && sql.indexOf(" TOP ") < 0)
+            if (orderBy > 0 && sql.indexOf(" TOP ") < 0) {
                 sql = sql.substring(0, orderBy);
+            }
             return "SELECT COUNT(*) FROM (" + sql + ") T__";
         }
 
@@ -1192,6 +1204,7 @@ public class Db implements AutoCloseable {
      * sql builder for Oracle
      */
     public static class OracleBuilder extends Builder {
+
         /**
          * constructor
          */
@@ -1207,12 +1220,12 @@ public class Db implements AutoCloseable {
         @Override
         public String fn(String function, String... args) {
             switch (function.toUpperCase()) {
-            case "NOW":
-                return "SYSDATE";
-            case "YEAR":
-            case "MONTH":
-            case "DAY":
-                return "EXTRACT(" + function + " FROM " + join("", Arrays.asList(args), ", ") + ")";
+                case "NOW":
+                    return "SYSDATE";
+                case "YEAR":
+                case "MONTH":
+                case "DAY":
+                    return "EXTRACT(" + function + " FROM " + join("", Arrays.asList(args), ", ") + ")";
             }
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
@@ -1272,6 +1285,7 @@ public class Db implements AutoCloseable {
      * Column definition
      */
     public static class Column {
+
         /**
          * name
          */
@@ -1303,7 +1317,7 @@ public class Db implements AutoCloseable {
 
         /**
          * constructor
-         * 
+         *
          * @param name name
          */
         public Column(String name) {
@@ -1312,7 +1326,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set date type
-         * 
+         *
          * @return column
          */
         public Column date() {
@@ -1322,7 +1336,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set integer type
-         * 
+         *
          * @return column
          */
         public Column integer() {
@@ -1332,7 +1346,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set decimal type
-         * 
+         *
          * @param precision precision
          * @param scale scale
          * @return column
@@ -1346,7 +1360,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set text type
-         * 
+         *
          * @return column
          */
         public Column text() {
@@ -1356,7 +1370,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set text type and length
-         * 
+         *
          * @param length length
          * @return column
          */
@@ -1368,7 +1382,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set display name
-         * 
+         *
          * @param display display name
          * @return column
          */
@@ -1379,7 +1393,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set default value
-         * 
+         *
          * @param value default value
          * @return column
          */
@@ -1390,7 +1404,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set length
-         * 
+         *
          * @param length length
          * @return column
          */
@@ -1401,7 +1415,7 @@ public class Db implements AutoCloseable {
 
         /**
          * set nullable
-         * 
+         *
          * @return column
          */
         public Column nullable() {
@@ -1427,7 +1441,7 @@ public class Db implements AutoCloseable {
 
         /**
          * constructor
-         * 
+         *
          * @param rs result set
          */
         public ResultSetSpliterator(ResultSet rs) {
@@ -1437,7 +1451,7 @@ public class Db implements AutoCloseable {
 
         /**
          * constructor
-         * 
+         *
          * @param ps prepared statement
          */
         public ResultSetSpliterator(PreparedStatement ps) {
@@ -1530,9 +1544,10 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * SQL query builder
+     * SQL preparedQuery builder
      */
     public static class Query {
+
         /**
          * table
          */
@@ -1576,7 +1591,7 @@ public class Db implements AutoCloseable {
 
         /**
          * constructor
-         * 
+         *
          * @param db database
          */
         protected Query(Db db) {
@@ -1585,9 +1600,9 @@ public class Db implements AutoCloseable {
 
         /**
          * from
-         * 
+         *
          * @param table table
-         * @return query
+         * @return preparedQuery
          */
         public Query from(String table) {
             this.table = table;
@@ -1596,8 +1611,8 @@ public class Db implements AutoCloseable {
 
         /**
          * use row lock
-         * 
-         * @return query
+         *
+         * @return preparedQuery
          */
         public Query forUpdate() {
             forUpdate = true;
@@ -1606,9 +1621,9 @@ public class Db implements AutoCloseable {
 
         /**
          * grouping
-         * 
+         *
          * @param fields fields
-         * @return query
+         * @return preparedQuery
          */
         public Query groupBy(String... fields) {
             if (groups == null) {
@@ -1622,9 +1637,9 @@ public class Db implements AutoCloseable {
 
         /**
          * orders(ascending)
-         * 
+         *
          * @param fields fields
-         * @return query
+         * @return preparedQuery
          */
         public Query orderBy(String... fields) {
             if (orders == null) {
@@ -1638,9 +1653,9 @@ public class Db implements AutoCloseable {
 
         /**
          * condition after grouping
-         * 
+         *
          * @param condition condition
-         * @return query
+         * @return preparedQuery
          */
         public Query having(String condition) {
             if (havings == null) {
@@ -1652,9 +1667,9 @@ public class Db implements AutoCloseable {
 
         /**
          * orders(descending)
-         * 
+         *
          * @param fields fields
-         * @return query
+         * @return preparedQuery
          */
         public Query orderByDesc(String... fields) {
             if (orders == null) {
@@ -1668,9 +1683,9 @@ public class Db implements AutoCloseable {
 
         /**
          * condition
-         * 
+         *
          * @param condition condition
-         * @return query
+         * @return preparedQuery
          */
         public Query where(String condition) {
             if (wheres == null) {
@@ -1682,10 +1697,10 @@ public class Db implements AutoCloseable {
 
         /**
          * condition(equals)
-         * 
+         *
          * @param field field
          * @param value value
-         * @return query
+         * @return preparedQuery
          */
         public Query where(String field, Object value) {
             if (value == null) {
@@ -1696,11 +1711,11 @@ public class Db implements AutoCloseable {
 
         /**
          * condition(binary operation)
-         * 
+         *
          * @param field field
          * @param operator operator
          * @param value value
-         * @return query
+         * @return preparedQuery
          */
         public Query where(String field, String operator, Object value) {
             if (value == null) {
@@ -1711,9 +1726,9 @@ public class Db implements AutoCloseable {
 
         /**
          * set begin offset
-         * 
+         *
          * @param offset offset
-         * @return query
+         * @return preparedQuery
          */
         public Query offset(long offset) {
             this.offset = offset;
@@ -1722,9 +1737,9 @@ public class Db implements AutoCloseable {
 
         /**
          * set max fetch count
-         * 
+         *
          * @param limit max fetch count
-         * @return query
+         * @return preparedQuery
          */
         public Query limit(long limit) {
             this.limit = limit;
@@ -1733,7 +1748,7 @@ public class Db implements AutoCloseable {
 
         /**
          * build SQL
-         * 
+         *
          * @return SQL
          */
         public String sql() {
@@ -1742,7 +1757,7 @@ public class Db implements AutoCloseable {
 
         /**
          * check if row exists
-         * 
+         *
          * @return true: exists, false: not exists
          */
         public boolean exists() {
@@ -1755,7 +1770,7 @@ public class Db implements AutoCloseable {
 
         /**
          * get row count
-         * 
+         *
          * @return row count
          */
         public long count() {
@@ -1768,7 +1783,7 @@ public class Db implements AutoCloseable {
 
         /**
          * get one value
-         * 
+         *
          * @param <T> value type
          * @param fetcher function that ResultSet to value
          * @return value
@@ -1781,7 +1796,7 @@ public class Db implements AutoCloseable {
 
         /**
          * get first row
-         * 
+         *
          * @return Optional ResultSet
          */
         public Optional<ResultSet> row() {
@@ -1790,7 +1805,7 @@ public class Db implements AutoCloseable {
 
         /**
          * fetch first row
-         * 
+         *
          * @param fetcher fetcher
          * @return true: first row was existed, false: was not existed
          */
@@ -1805,7 +1820,7 @@ public class Db implements AutoCloseable {
 
         /**
          * get rows
-         * 
+         *
          * @return ResultSet stream
          */
         public Stream<ResultSet> rows() {
@@ -1816,7 +1831,7 @@ public class Db implements AutoCloseable {
 
         /**
          * fetch rows
-         * 
+         *
          * @param fetcher fetcher
          * @return row count
          */
@@ -1827,7 +1842,7 @@ public class Db implements AutoCloseable {
         }
 
         /**
-         * execute deletion
+         * delete
          */
         public void delete() {
             String sql = db.builder.deleteSql(this);
@@ -1841,18 +1856,50 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * use PreparedStatement
-     * 
+     * ? to value
      * @param sql SQL
-     * @param prepared after prepared action
+     * @param values values
+     * @return executable SQL
      */
-    public void prepare(String sql, TryFunction<PreparedStatement, Object[]> prepared) {
+    public String preparedSQL(String sql, Object... values) {
+        for (Object i : values) {
+            sql = sql.replaceFirst("\\?", builder.escape(i));
+        }
+        return sql;
+    }
+
+    /**
+     * use PreparedStatement and executeUpdate
+     *
+     * @param sql SQL
+     * @param prepare prepare parameters
+     */
+    public void preparedExecute(String sql, TryFunction<PreparedStatement, Object[]> prepare) {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            for(Object i : Try.f(prepared).apply(ps)) {
-                sql = sql.replaceFirst("\\?", builder.escape(i));
-            }
-            logger.info(sql);
+            Object[] values = Try.f(prepare).apply(ps);
+            logger.info(() -> preparedSQL(sql, values));
             ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new UncheckedSQLException(e);
+        }
+    }
+
+    /**
+     * use PreparedStatement and executeQuery
+     *
+     * @param sql SQL
+     * @param prepare prepare parameters
+     * @param fetch fetch row
+     */
+    public void preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            Object[] values = Try.f(prepare).apply(ps);
+            logger.info(() -> preparedSQL(sql, values));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Try.c(fetch).accept(rs);
+                }
+            }
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }

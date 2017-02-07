@@ -123,7 +123,7 @@ public abstract class Session implements Attributes<Object> {
         /**
          * session cookie name
          */
-        static final String name = Config.app_session_name.text();
+        static final String NAME = Config.app_session_name.text();
         
         /**
          * session id
@@ -146,7 +146,7 @@ public abstract class Session implements Attributes<Object> {
         @SuppressWarnings("unchecked")
         ForServer(HttpExchange exchange) {
             id = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
-                    .filter(a -> name.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
+                    .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
             if (id != null) {
                 try (Db db = Db.connect()) {
                     int timeout = Config.app_session_timeout_minutes.integer();
@@ -166,13 +166,13 @@ public abstract class Session implements Attributes<Object> {
                 }
             } else {
                 id = Tool.digest((id + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
-                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(name, id, null, -1, null, Application.current.get().getContextPath(), false, true));
+                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current.get().getContextPath(), false, true));
             }
             Timestamp now = Timestamp.valueOf(LocalDateTime.now());
             if (attributes == null) {
                 attributes = new LinkedHashMap<>();
                 closer = (db, in) -> {
-                    db.prepare("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
+                    db.preparedExecute("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
                         ps.setString(1, id);
                         ps.setBytes(2, in);
                         ps.setTimestamp(3, now);
@@ -181,7 +181,7 @@ public abstract class Session implements Attributes<Object> {
                 };
             } else {
                 closer = (db, in) -> {
-                    db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
+                    db.preparedExecute("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
                         ps.setBytes(1, in);
                         ps.setTimestamp(2, now);
                         ps.setString(3, id);

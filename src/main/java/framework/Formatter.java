@@ -327,11 +327,13 @@ public class Formatter implements AutoCloseable {
                     break;
                 }
                 int end = index;
-                String before = source.substring(start, end);
-                String after = Tool.string(eval(before, prefix, suffix)).orElse("");
-                source.replace(start, end, after);
-                lastIndex = source.length();
-                index = end + after.length() - before.length();
+                if(start + prefix < end - suffix) {
+                    String before = source.substring(start, end);
+                    String after = Tool.string(eval(before, prefix, suffix)).orElse("");
+                    source.replace(start, end, after);
+                    lastIndex = source.length();
+                    index = end + after.length() - before.length();
+                }
                 continue;
             }
             index++;

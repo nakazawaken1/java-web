@@ -525,6 +525,7 @@ public class Tool {
         Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
         // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
         // ZonedDateTime.now()));
+        getResources("app/controller").forEach(Logger.getGlobal()::info);
     }
 
     /**
