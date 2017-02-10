@@ -548,7 +548,8 @@ public class Db implements AutoCloseable {
         if (!url.isPresent()) {
             url = Config.toURL(commonPath);
         }
-        return url.map(Try.f(i -> builder.replace(new String(Files.readAllBytes(Paths.get(i.toURI())), StandardCharsets.UTF_8))));
+        url.ifPresent(i -> logger.info(i.toString()));
+        return url.map(Try.f(i -> builder.replace(Tool.loadText(i.openStream()))));
     }
 
     /**
@@ -893,7 +894,7 @@ public class Db implements AutoCloseable {
             Set<String> reloadTables;
             if (create) {
                 /* drop exists tables */
-                tables.stream().map(tableName).filter(table -> existTables.contains(table)).forEach(table -> db.drop(table));
+                tables.stream().map(tableName).filter(existTables::contains).forEach(db::drop);
                 /* create all tables and entry to load data */
                 reloadTables = tables.stream().peek(file -> db.executeFile(file, null)).map(tableName).collect(Collectors.toSet());
             } else if (reload) {

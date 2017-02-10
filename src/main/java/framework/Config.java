@@ -2,9 +2,8 @@ package framework;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -31,118 +30,95 @@ public enum Config {
      * log folder
      */
     log_folder("/temp/"),
-
     /**
      * log filename pattern(DateTimeFormatter format）
      */
     log_file_pattern("'ll_'yyyyMMdd'.log'"),
-
     /**
      * log line pattern
      */
     log_format("%1$tY/%1$tm/%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$s [%2$s] %5$s %6$s%n"),
-
     /**
      * log level
      */
     log_level(Level.CONFIG),
-
     /**
      * class of suppress log
      */
     log_exclude("", ","),
-
     /**
      * database suffix
      */
     db_suffix,
-
     /**
      * datasource generator class
      */
     db_datasource_class,
-
     /**
      * database connection string
      */
     db_url,
-
     /**
-     * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
+     * database auto config(create: drop and create, [update]: create if not
+     * exists, reload: delete and insert, none: no operation)
      */
     db_setup(Db.Setup.UPDATE),
-
     /**
      * database suffix for session
      */
     db_suffix_session,
-
     /**
      * session cookie name
      */
     app_session_name("JavaWebSession"),
-    
     /**
      * session timeout(seconds, indefinite if negative value)
      */
     app_session_timeout_minutes(30),
-
     /**
      * upload folder
      */
     app_upload_folder("/temp/"),
-
     /**
      * sql folder
      */
     app_sql_folder("sql/"),
-
     /**
      * add http response headers
      */
     app_headers("X-UA-Compatible: IE=edge|Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache", "\\s*\\|\\s*"),
-
     /**
      * htdocs folder
      */
     app_view_folder("view/"),
-
     /**
      * template folder
      */
     app_template_folder("template/"),
-    
     /**
      * include file pattern to apply format
      */
     app_format_include_regex(".*\\.(html?|js|css)"),
-    
     /**
      * exclude file pattern to apply format
      */
     app_format_exclude_regex("jquery.*\\.js"),
-    
     /**
      * scheduled job thread count
      */
     app_job_threads(1),
-    
     /**
      * account class
      */
     app_account_class("framework.Account"),
-    
     /**
      * account info(loginId:password:roles,...)
      */
     app_accounts(),
-    
     /**
      * file extension of text type contents
      */
-    app_text_extensions(".txt|.htm|.html|.js|.json|.css|.csv|.tsv|.xml|.ini|.yml|.properties|.php|.java|.jsp|.xhtml", "\\s*\\|\\s*"),
-
-    ;
+    app_text_extensions(".txt|.htm|.html|.js|.json|.css|.csv|.tsv|.xml|.ini|.yml|.properties|.php|.java|.jsp|.xhtml", "\\s*\\|\\s*"),;
 
     /**
      * logger
@@ -186,7 +162,7 @@ public enum Config {
 
     /**
      * Constructor
-     * 
+     *
      * @param defaultValue default value
      * @param separator separator
      */
@@ -197,7 +173,7 @@ public enum Config {
 
     /**
      * Constructor
-     * 
+     *
      * @param defaultValue default value
      */
     private Config(Object defaultValue) {
@@ -230,8 +206,7 @@ public enum Config {
             }
             properties.setProperty(key, i.text());
         }
-        try (InputStream in = toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream();
-                InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+        try (Reader reader = Tool.newReader(toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream())) {
             /* overwrite file properties */
             properties.load(reader);
 
@@ -254,7 +229,7 @@ public enum Config {
 
             /* resolve variables */
             for (;;) {
-                boolean[] loop = { false };
+                boolean[] loop = {false};
                 Set<String> missings = new LinkedHashSet<>();
                 properties.entrySet().forEach(pair -> {
                     resolve((String) pair.getValue(), properties, value -> {
@@ -292,7 +267,7 @@ public enum Config {
 
     /**
      * get config value
-     * 
+     *
      * @param id config id
      * @return config value
      */
@@ -311,7 +286,7 @@ public enum Config {
 
     /**
      * get config value
-     * 
+     *
      * @return config value
      */
     public Optional<String> get() {
@@ -320,7 +295,7 @@ public enum Config {
 
     /**
      * get text
-     * 
+     *
      * @return text
      */
     public String text() {
@@ -329,7 +304,7 @@ public enum Config {
 
     /**
      * get integer
-     * 
+     *
      * @return integer
      */
     public int integer() {
@@ -342,7 +317,7 @@ public enum Config {
 
     /**
      * get stream
-     * 
+     *
      * @return stream
      */
     public Stream<String> stream() {
@@ -424,7 +399,7 @@ public enum Config {
 
     /**
      * resolve variable
-     * 
+     *
      * @param value value
      * @param source variables
      * @param changed changed action

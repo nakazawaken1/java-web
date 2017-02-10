@@ -1,13 +1,24 @@
 package framework;
 
+import framework.Try.TryTriConsumer;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -28,21 +39,19 @@ import java.util.Spliterators;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-
 import javax.activation.MimetypesFileTypeMap;
-
+import javax.servlet.ServletOutputStream;
 import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
 import org.codehaus.jackson.annotate.JsonMethod;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig.Feature;
-
-import framework.Try.TryTriConsumer;
 
 /**
  * utility
@@ -63,7 +72,7 @@ public class Tool {
      * Carriage Return & Line Feed
      */
     public static final String CRLF = CR + LF;
-    
+
     /**
      * not empty string
      */
@@ -71,7 +80,7 @@ public class Tool {
 
     /**
      * PrintStream to String
-     * 
+     *
      * @param action write to PrintStream
      * @return wrote text
      */
@@ -86,7 +95,7 @@ public class Tool {
 
     /**
      * get first non-null value
-     * 
+     *
      * @param value value
      * @param suppliers value suppliers
      * @return value
@@ -104,7 +113,7 @@ public class Tool {
 
     /**
      * get non-empty and non-null string
-     * 
+     *
      * @param value value
      * @return String or empty if null or empty
      */
@@ -114,7 +123,7 @@ public class Tool {
 
     /**
      * get integer
-     * 
+     *
      * @param value value
      * @return integer
      */
@@ -274,7 +283,7 @@ public class Tool {
     public static String getContentType(String file) {
         return MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(file);
     }
-    
+
     /**
      * @param file file
      * @return true if text contents file
@@ -338,11 +347,7 @@ public class Tool {
      */
     public static Stream<Class<?>> getClasses(String packageName) {
         String prefix = Tool.string(packageName).map(i -> i + '.').orElse("");
-        return Config.toURL(packageName.replace('.', '/')).map(Try.f(i -> {
-            File file = new File(i.toURI());
-            return (file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file))
-                    .map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
-        })).orElse(Stream.empty());
+        return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class")).map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
     }
 
     /**
@@ -353,37 +358,109 @@ public class Tool {
      */
     public static Stream<String> getResources(String location) {
         return Config.toURL(location).map(Try.f(i -> {
-            File file = new File(i.toURI());
-            return file.isDirectory() ? getResourcesFromFolder(file) : getResourcesFromJar(file);
+            boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), e -> {
+            }).test(i);
+            if ("jar".equals(i.getProtocol())) {
+                Logger.getGlobal().info("jar inside");
+                return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
+            } else if (isDirectory) {
+                Logger.getGlobal().info("folder");
+                return getResourcesFromFolder(location, new File(i.getFile()));
+            } else {
+                Logger.getGlobal().info("jar file");
+                return getResourcesFromJar("", new JarFile(i.getFile()));
+            }
         })).orElse(Stream.empty());
     }
 
     /**
      * list files in jar
      *
+     * @param location location
      * @param jar jar file
      * @return file name stream(must to close)
      */
-    private static Stream<String> getResourcesFromJar(File jar) {
-        try (ZipFile zip = new ZipFile(jar)) {
-            return zip.stream().map(ZipEntry::getName);
+    private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
+        return jar.stream().onClose(Try.r(jar::close)).map(JarEntry::getName).filter(i -> i.startsWith(location)).map(i -> trim("/", i.substring(location.length()), null));
+    }
+
+    static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder().onUnmappableCharacter(CodingErrorAction.REPLACE).onMalformedInput(CodingErrorAction.REPLACE);
+
+    /**
+     * list files in folder
+     *
+     * @param location location
+     * @param folder folder
+     * @return file name stream(must to close)
+     */
+    private static Stream<String> getResourcesFromFolder(String location, File folder) {
+        try {
+            return Files.list(folder.toPath()).map(Path::getFileName).map(Object::toString);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /**
-     * list files in folder
+     * InputStream to text
      *
-     * @param folder folder
-     * @return file name stream(must to close)
+     * @param in input
+     * @return text
      */
-    private static Stream<String> getResourcesFromFolder(File folder) {
-        try {
-            return Files.list(folder.toPath()).map(path -> path.getFileName().toString());
+    public static String loadText(InputStream in) {
+        StringBuilder result = new StringBuilder();
+        try (Reader reader = newReader(in)) {
+            char[] buffer = new char[1024];
+            for (;;) {
+                int n = reader.read(buffer);
+                if (n <= 0) {
+                    break;
+                }
+                result.append(buffer);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        return result.toString();
+    }
+
+    static Stream<String> lines(InputStream in) {
+        BufferedReader reader = new BufferedReader(newReader(in));
+        return StreamSupport.stream(new Spliterator<String>() {
+            @Override
+            public boolean tryAdvance(Consumer<? super String> action) {
+                try {
+                    String line = reader.readLine();
+                    if (line == null) {
+                        return false;
+                    }
+                    action.accept(line);
+                    return true;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+            @Override
+            public Spliterator<String> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return Long.MAX_VALUE;
+            }
+
+            @Override
+            public int characteristics() {
+                return NONNULL | ORDERED;
+            }
+
+        }, false).onClose(Try.r(reader::close));
+    }
+
+    public static Reader newReader(InputStream in) {
+        return new InputStreamReader(in, utf8);
     }
 
     /**
@@ -463,7 +540,7 @@ public class Tool {
 
     /**
      * get next time
-     * 
+     *
      * @param text text
      * @param from start point
      * @return milliseconds
@@ -477,7 +554,8 @@ public class Tool {
         } else {
             ZonedDateTime next = from;
             int timeIndex = value.indexOf(':');
-            if (timeIndex >= 0) { /* has time */
+            if (timeIndex >= 0) {
+                /* has time */
                 while (timeIndex > 0) {
                     timeIndex--;
                     if ("0123456789".indexOf(value.charAt(timeIndex)) < 0) {
@@ -485,8 +563,8 @@ public class Tool {
                     }
                 }
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
-                ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
-                ChronoField[] last = { null };
+                ChronoUnit[] units = {ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS};
+                ChronoField[] last = {null};
                 Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
                 ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey())
                         .reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
@@ -499,8 +577,8 @@ public class Tool {
             }
             if (!value.isEmpty()) {
                 List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
-                ChronoField[] last = { null };
-                ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
+                ChronoField[] last = {null};
+                ChronoUnit[] units = {ChronoUnit.MONTHS, ChronoUnit.YEARS, null};
                 Stream<Long> values = Stream.of(value.split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
                 ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
                         (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
@@ -517,15 +595,20 @@ public class Tool {
 
     /**
      * test
-     * 
+     *
      * @param args text
      */
     public static void main(String[] args) {
-        Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
-        Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
-        // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
-        // ZonedDateTime.now()));
-        getResources("app/controller").forEach(Logger.getGlobal()::info);
+//        Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
+//        Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
+//        // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
+//        // ZonedDateTime.now()));
+//        try(Stream<String> list = getResources("app/controller")) {
+//            list.forEach(Logger.getGlobal()::info);
+//        }
+        try (Stream<Class<?>> list = getClasses("test")) {
+            list.forEach(c -> Logger.getGlobal().info(c.getCanonicalName()));
+        }
     }
 
     /**
@@ -578,7 +661,7 @@ public class Tool {
         }
         return result.toString();
     }
-    
+
     /**
      * @param bytes bytes
      * @param algorithm algorithm
@@ -588,9 +671,24 @@ public class Tool {
         MessageDigest digest = Try.s(() -> MessageDigest.getInstance(algorithm)).get();
         digest.update(bytes);
         StringBuilder result = new StringBuilder();
-        for(byte b : digest.digest()) {
+        for (byte b : digest.digest()) {
             result.append(String.format("%02x", b));
         }
         return result.toString();
+    }
+
+    static void copy(InputStream in, OutputStream out) {
+        byte[] buffer = new byte[1024];
+        for (;;) {
+            try {
+                int n = in.read(buffer);
+                if (n <= 0) {
+                    return;
+                }
+                out.write(buffer, 0, n);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 }

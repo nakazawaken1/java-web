@@ -165,7 +165,7 @@ public abstract class Session implements Attributes<Object> {
                     });
                 }
             } else {
-                id = Tool.digest((id + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
+                id = Tool.digest(("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
                 exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current.get().getContextPath(), false, true));
             }
             Timestamp now = Timestamp.valueOf(LocalDateTime.now());

@@ -90,7 +90,7 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#init(javax.servlet.ServletConfig)
      */
     @Override
-    @SuppressFBWarnings({ "LI_LAZY_INIT_UPDATE_STATIC", "LI_LAZY_INIT_STATIC" })
+    @SuppressFBWarnings({"LI_LAZY_INIT_UPDATE_STATIC", "LI_LAZY_INIT_STATIC"})
     public void init(ServletConfig config) throws ServletException {
         setup(new Lazy<>(() -> new Application.ForServlet(config.getServletContext())), Response.ForServlet::new);
     }
@@ -148,7 +148,7 @@ public class Server implements Servlet {
      * @param applicationGetter applicationGetter
      * @param responseCreator responseCreator
      */
-    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
+    @SuppressFBWarnings({"LI_LAZY_INIT_STATIC"})
     static void setup(Lazy<Application> applicationGetter, Supplier<ResponseCreator> responseCreator) {
 
         /* check to enabled of method parameters name */
@@ -163,7 +163,7 @@ public class Server implements Servlet {
         Config.startupLog();
 
         /* create application scope object */
-        if(Application.current.get() == null) {
+        if (Application.current.get() == null) {
             Application.current.set(applicationGetter.get());
             logger.info(Application.current.get().toString());
         }
@@ -175,19 +175,21 @@ public class Server implements Servlet {
 
         /* setup routing */
         if (table == null) {
-            table = Tool.getClasses("app.controller").flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tool.pair(m, m.getAnnotation(Http.class)))
-                    .filter(pair -> pair.b != null).map(pair -> Tool.trio(c, pair.a, pair.b))).collect(Collectors.toMap(trio -> {
-                        Class<?> c = trio.a;
-                        Method m = trio.b;
-                        String left = Optional.ofNullable(c.getAnnotation(Http.class))
-                                .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
-                        String right = Tool.string(trio.c.path()).orElse(m.getName());
-                        return left + right;
-                    }, trio -> {
-                        Method m = trio.b;
-                        m.setAccessible(true);
-                        return Tool.pair(trio.a, m);
-                    }));
+            try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
+                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tool.pair(m, m.getAnnotation(Http.class)))
+                        .filter(pair -> pair.b != null).map(pair -> Tool.trio(c, pair.a, pair.b))).collect(Collectors.toMap(trio -> {
+                    Class<?> c = trio.a;
+                    Method m = trio.b;
+                    String left = Optional.ofNullable(c.getAnnotation(Http.class))
+                            .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
+                    String right = Tool.string(trio.c.path()).orElse(m.getName());
+                    return left + right;
+                }, trio -> {
+                    Method m = trio.b;
+                    m.setAccessible(true);
+                    return Tool.pair(trio.a, m);
+                }));
+            }
             logger.info(Tool.print(writer -> {
                 writer.println("---- routing ----");
                 table.forEach((path, pair) -> writer.println(path + " -> " + pair.a.getName() + "." + pair.b.getName()));
@@ -198,7 +200,9 @@ public class Server implements Servlet {
         Db.setup(Config.db_setup.enumOf(Setup.class));
 
         /* job scheduler setup */
-        Job.Scheduler.setup(Tool.getClasses("app.controller").toArray(Class<?>[]::new));
+        try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
+            Job.Scheduler.setup(classes.toArray(Class<?>[]::new));
+        }
     }
 
     /**
@@ -293,7 +297,11 @@ public class Server implements Servlet {
         /* static file */
         Optional<URL> url = Config.toURL(Config.app_view_folder.text(), request.getPath());
         if (url.isPresent()) {
-            if(url.filter(Try.p(i -> new File(i.toURI()).isDirectory())).isPresent()) {
+            if (!url.filter(Try.p(i -> {
+                i.openStream().close();
+                return true;
+            }, e -> {
+            })).isPresent()) {
                 Response.redirect(Tool.trim(null, application.getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
             } else {
                 Response.file(request.getPath()).flush();
@@ -325,7 +333,7 @@ public class Server implements Servlet {
     /**
      * @param args context-path http-port https-port .key .crt...
      */
-    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
+    @SuppressFBWarnings({"LI_LAZY_INIT_STATIC"})
     public static void main(String[] args) {
 
         String contextPath = Tool.suffix(args.length > 0 ? args[0] : "", "/");

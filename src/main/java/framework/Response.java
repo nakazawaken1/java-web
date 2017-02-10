@@ -24,6 +24,7 @@ import com.sun.net.httpserver.HttpExchange;
 
 import framework.Try.TryConsumer;
 import framework.Try.TryTriConsumer;
+import java.io.InputStream;
 
 /**
  * Response
@@ -132,9 +133,9 @@ public abstract class Response {
         public Response ofFile(String file, Object... values) {
             return new ForServlet().set(r -> {
                 r.setContentType(Tool.getContentType(file));
-                Path path = Paths.get(Config.toURL(Config.app_view_folder.text(), file).get().toURI());
+                InputStream in = Config.toURL(Config.app_view_folder.text(), file).get().openStream();
                 if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                    try (Stream<String> lines = Files.lines(path); PrintWriter writer = r.getWriter()) {
+                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = r.getWriter()) {
                         Function<Formatter, Formatter.Result> exclude;
                         Function<Object, String> escape;
                         if (file.endsWith(".js")) {
@@ -152,7 +153,7 @@ public abstract class Response {
                         }
                     }
                 } else {
-                    r.getOutputStream().write(Files.readAllBytes(path));
+                    Tool.copy(in, r.getOutputStream());
                 }
             });
         }
@@ -162,7 +163,7 @@ public abstract class Response {
             return new ForServlet().set(r -> {
                 r.setContentType("text/html;charset=" + charset);
                 try (PrintWriter writer = r.getWriter();
-                        Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                        Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                     lines.map(formatter::format).forEach(line -> {
                         Tool.printFormat(writer, line, replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
@@ -177,7 +178,7 @@ public abstract class Response {
             return new ForServlet().set(r -> {
                 r.setContentType("text/html;charset=" + charset);
                 try (PrintWriter writer = r.getWriter();
-                        Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                        Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, map, values)) {
                     lines.forEach(line -> writer.println(formatter.format(line)));
                 }
@@ -269,9 +270,9 @@ public abstract class Response {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", Tool.getContentType(file));
                 r.sendResponseHeaders(200, 0);
-                Path path = Paths.get(Config.toURL(Config.app_view_folder.text(), file).get().toURI());
+                InputStream in = Config.toURL(Config.app_view_folder.text(), file).get().openStream();
                 if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                    try (Stream<String> lines = Files.lines(path); OutputStream out = r.getResponseBody()) {
+                    try (Stream<String> lines = Tool.lines(in); OutputStream out = r.getResponseBody()) {
                         Function<Formatter, Formatter.Result> exclude;
                         Function<Object, String> escape;
                         if (file.endsWith(".js")) {
@@ -289,7 +290,7 @@ public abstract class Response {
                         }
                     }
                 } else {
-                    r.getResponseBody().write(Files.readAllBytes(path));
+                    Tool.copy(in, r.getResponseBody());
                 }
             });
         }
@@ -300,7 +301,7 @@ public abstract class Response {
                 r.getResponseHeaders().set("Content-Type", "text/html;charset=" + charset);
                 r.sendResponseHeaders(200, 0);
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset));
-                        Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                        Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                     lines.map(formatter::format).forEach(line -> {
                         Tool.printFormat(writer, line, replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
@@ -316,7 +317,7 @@ public abstract class Response {
                 r.getResponseHeaders().set("Content-Type", "text/html;charset=" + charset);
                 r.sendResponseHeaders(200, 0);
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset));
-                        Stream<String> lines = Files.lines(Paths.get(Config.toURL(Config.app_template_folder.text(), name).get().toURI()));
+                        Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, map, values)) {
                     lines.forEach(line -> writer.println(formatter.format(line)));
                 }

@@ -3,10 +3,6 @@ package framework;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Deque;
@@ -18,7 +14,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.el.ELProcessor;
 
 /**
@@ -238,7 +233,7 @@ public class Formatter implements AutoCloseable {
      * values
      */
     Object[] values;
-    
+
     /**
      * constructor
      *
@@ -256,7 +251,7 @@ public class Formatter implements AutoCloseable {
             current.set(this);
         }
     }
-    
+
     /**
      * @return formatter
      */
@@ -309,25 +304,25 @@ public class Formatter implements AutoCloseable {
                 int prefix = first == '$' || first == '#' ? 2 : 1;
                 int suffix = 1;
                 switch (first) {
-                case '<':
-                    eat("-->");
-                    prefix = "<!--{".length();
-                    suffix = "}-->".length();
-                    break;
-                case '/':
-                    eat("*/");
-                    prefix = "/*{".length();
-                    suffix = "}*/".length();
-                    break;
-                default:
-                    if (source.charAt(start + 1) == '/') {
-                        prefix = "{/*".length();
-                        suffix = "*/}".length();
-                    }
-                    break;
+                    case '<':
+                        eat("-->");
+                        prefix = "<!--{".length();
+                        suffix = "}-->".length();
+                        break;
+                    case '/':
+                        eat("*/");
+                        prefix = "/*{".length();
+                        suffix = "}*/".length();
+                        break;
+                    default:
+                        if (source.charAt(start + 1) == '/') {
+                            prefix = "{/*".length();
+                            suffix = "*/}".length();
+                        }
+                        break;
                 }
                 int end = index;
-                if(start + prefix < end - suffix) {
+                if (start + prefix < end - suffix) {
                     String before = source.substring(start, end);
                     String after = Tool.string(eval(before, prefix, suffix)).orElse("");
                     source.replace(start, end, after);
@@ -347,11 +342,11 @@ public class Formatter implements AutoCloseable {
     void skipSpaces() {
         for (; index < lastIndex; index++) {
             switch (source.charAt(index)) {
-            case ' ':
-            case '\t':
-            case '\r':
-            case '\n':
-                continue;
+                case ' ':
+                case '\t':
+                case '\r':
+                case '\n':
+                    continue;
             }
             break;
         }
@@ -420,7 +415,8 @@ public class Formatter implements AutoCloseable {
     /**
      * format
      *
-     * @param text target({key} replace messages, ${expression} replace el value with escape, #{expression} replace el value with no escape)
+     * @param text target({key} replace messages, ${expression} replace el value
+     * with escape, #{expression} replace el value with no escape)
      * @param exclude exclude
      * @param escape escape
      * @param map ${key} replace to value
@@ -440,9 +436,7 @@ public class Formatter implements AutoCloseable {
     public static String include(String path) {
         try {
             return current.get().copy().format(
-                    new String(Files.readAllBytes(Paths.get(Config.toURL(path).orElseThrow(FileNotFoundException::new).toURI())), StandardCharsets.UTF_8));
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
+                    Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -495,7 +489,7 @@ public class Formatter implements AutoCloseable {
                         // boolean.class));
                         el.defineBean("C", Config.properties);
                         el.defineBean("M", Message.messages);
-                        el.defineBean("V", values == null ? new Object[] {} : values);
+                        el.defineBean("V", values == null ? new Object[]{} : values);
                         el.defineBean("A", Application.current.get());
                         el.defineBean("S", Session.current.get());
                         el.defineBean("R", Request.current.get());
