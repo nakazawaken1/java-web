@@ -205,7 +205,7 @@ public class Formatter implements AutoCloseable {
     }
 
     /**
-     * javascript escape(\n -> \\n)
+     * javascript escape(\n : \\n)
      *
      * @param text target
      * @return escaped text

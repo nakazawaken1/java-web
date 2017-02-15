@@ -24,7 +24,7 @@ public class Xml {
     public static final String newline = "\r\n";
 
     /**
-     * tag name (exclude <, >)
+     * tag name (exclude &lt;, &gt;)
      */
     protected String tag;
 

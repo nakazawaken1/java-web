@@ -81,7 +81,7 @@ public class Server implements Servlet {
     transient Logger logger = Tool.getLogger();
 
     /**
-     * routing table<path, <class, method>>
+     * routing table{path: {class: method}}
      */
     transient static Map<String, Pair<Class<?>, Method>> table;
 
@@ -226,8 +226,8 @@ public class Server implements Servlet {
      *
      * @param request request
      * @param session session
-     * @throws ServletException
-     * @throws IOException
+     * @throws ServletException server error
+     * @throws IOException IO errror
      */
     void handle(Request request, Lazy<Session> session) throws ServletException, IOException {
         logger.info(request.toString());
@@ -397,14 +397,14 @@ public class Server implements Servlet {
     /**
      * @param keyPath key file
      * @param certPaths cert files
-     * @return SSLContext
-     * @throws IOException
-     * @throws NoSuchAlgorithmException
-     * @throws InvalidKeySpecException
-     * @throws KeyStoreException
-     * @throws CertificateException
-     * @throws UnrecoverableKeyException
-     * @throws KeyManagementException
+     * @return SSLContext SSL error
+     * @throws IOException IO errror
+     * @throws NoSuchAlgorithmException algorithm error
+     * @throws InvalidKeySpecException key error
+     * @throws KeyStoreException key error
+     * @throws CertificateException cert error
+     * @throws UnrecoverableKeyException key error
+     * @throws KeyManagementException key error
      */
     static SSLContext createSSLContext(String keyPath, Stream<String> certPaths) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException,
             KeyStoreException, CertificateException, UnrecoverableKeyException, KeyManagementException {

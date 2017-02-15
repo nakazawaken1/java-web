@@ -262,6 +262,7 @@ public class Try {
     /**
      * @param <T> object type
      * @param consumer throwable consumer
+     * @param error error action
      * @return consumer
      */
     public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer, Consumer<Exception> error) {

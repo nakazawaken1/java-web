@@ -19,6 +19,7 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
     Stream<String> names();
 
     /**
+     * @param <T> value type
      * @param name attribute name
      * @return attribute value
      */

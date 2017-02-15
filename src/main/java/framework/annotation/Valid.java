@@ -47,7 +47,7 @@ public @interface Valid {
     }
 
     /**
-     * group for creation & update
+     * group for creation &amp; update
      */
     public interface Save extends Create, Update {
     }

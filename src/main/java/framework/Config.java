@@ -86,7 +86,7 @@ public enum Config {
     /**
      * add http response headers
      */
-    app_headers("X-UA-Compatible: IE=edge|Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache", "\\s*\\|\\s*"),
+    app_headers("X-UA-Compatible: IE=edge|X-Content-Type-Options: nosniff|X-Download-Options: noopen|Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache", "\\s*\\|\\s*"),
     /**
      * htdocs folder
      */
@@ -325,7 +325,8 @@ public enum Config {
     }
 
     /**
-     * @param enumClass enum class
+     * @param <T> enum type
+     * @param enumClass enum type
      * @return enum
      */
     public <T extends Enum<T>> T enumOf(Class<T> enumClass) {
@@ -441,6 +442,7 @@ public enum Config {
     }
 
     /**
+     * @param <E> exception type
      * @param id id
      * @param exception exception generator
      * @return value

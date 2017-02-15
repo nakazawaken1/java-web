@@ -471,7 +471,7 @@ public class Db implements AutoCloseable {
  {@code [example] db.preparedQuery("SELECT name FROM account ORDER BY 1", null).map(rs -> rs.getString(1)).forEach(System.out::println);}
      *
      * @param sql SQL
-     * @param map name value map({key} -> value)
+     * @param map name value map({key} : value)
      * @param values values({0}, {1}...)
      * @return ResultSet stream
      */
@@ -490,7 +490,7 @@ public class Db implements AutoCloseable {
      * preparedQuery form file(single sql only)
      *
      * @param name SQL file(with extension)
-     * @param map name value map({key} -> value)
+     * @param map name value map({key} : value)
      * @param values values({0}, {1}...)
      * @return ResultSet stream
      */
@@ -502,7 +502,7 @@ public class Db implements AutoCloseable {
      * execute(multi sql support)
      *
      * @param sql SQL
-     * @param map name value map({key} -> value)
+     * @param map name value map({key} : value)
      * @param values values({0}, {1}...)
      * @return affected rows
      */
@@ -529,7 +529,7 @@ public class Db implements AutoCloseable {
      * execute from file(multi sql support)
      *
      * @param name SQL file(with extension)
-     * @param map name value map({key} -> value)
+     * @param map name value map({key} : value)
      * @param values values({0}, {1}...)
      * @return affected rows
      */
@@ -1923,6 +1923,7 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * @param <T> model type
      * @param model find target
      * @param targetFields condition fields
      * @return found list

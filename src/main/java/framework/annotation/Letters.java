@@ -32,22 +32,22 @@ public @interface Letters {
     static final String DIGITS = "0123456789";
 
     /**
-     * 0 - 9 & sign
+     * 0 - 9 &amp; sign
      */
     static final String INTEGER = "0123456789+-";
 
     /**
-     * 0 - 9 & sign & period
+     * 0 - 9 &amp; sign &amp; period
      */
     static final String REAL = "0123456789+-.";
 
     /**
-     * katakana & middle point & space
+     * katakana &amp; middle point &amp; space
      */
     static final String KATAKANA = "アイウエオヴァィゥェォカキクケコガギグゲゴサシスセソザジズゼゾタチツテトダヂヅデドナニヌネノハヒフヘホバビブベボパピプペポマミムメモヤユヨャュョラリルレロワヲンヮー・　";
 
     /**
-     * hiragana & middle point & space
+     * hiragana &amp; middle point &amp; space
      */
     static final String HIRAGANA = "あいうえおぁぃぅぇぉかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよゃゅょらりるれろわをんゎー・　";
 }

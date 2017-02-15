@@ -69,7 +69,7 @@ public class Tool {
     public static final String LF = "\n";
 
     /**
-     * Carriage Return & Line Feed
+     * Carriage Return and Line Feed
      */
     public static final String CRLF = CR + LF;
 
@@ -96,6 +96,7 @@ public class Tool {
     /**
      * get first non-null value
      *
+     * @param <T> value type
      * @param value value
      * @param suppliers value suppliers
      * @return value
@@ -136,6 +137,7 @@ public class Tool {
     }
 
     /**
+     * @param <T> value types
      * @param values values
      * @return array
      */
@@ -312,6 +314,8 @@ public class Tool {
     }
 
     /**
+     * @param <K> first value type
+     * @param <V> second value type
      * @param a first value
      * @param b second value
      * @return pair tuple
@@ -321,6 +325,9 @@ public class Tool {
     }
 
     /**
+     * @param <T> first value type
+     * @param <U> second value type
+     * @param <V> third value type
      * @param a first value
      * @param b second value
      * @param c third value
@@ -331,6 +338,7 @@ public class Tool {
     }
 
     /**
+     * @param <T> value type
      * @param array array
      * @param i index(support negative value)
      * @return element
@@ -459,12 +467,17 @@ public class Tool {
         }, false).onClose(Try.r(reader::close));
     }
 
+    /**
+     * create reader
+     * @param in input
+     * @return reader
+     */
     public static Reader newReader(InputStream in) {
         return new InputStreamReader(in, utf8);
     }
 
     /**
-     * build map<String, Object>
+     * build map{String: Object}
      *
      * @param keyValues key, value, key, value...
      * @return map
@@ -493,6 +506,8 @@ public class Tool {
     }
 
     /**
+     * @param <T> first stream type
+     * @param <U> second stream type
      * @param left first stream
      * @param right second stream
      * @return zipped stream
@@ -516,6 +531,8 @@ public class Tool {
     }
 
     /**
+     * @param <T> first stream type
+     * @param <U> second stream type
      * @param left first stream
      * @param right second stream
      * @return zipped stream

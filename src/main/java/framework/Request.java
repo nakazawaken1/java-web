@@ -62,7 +62,7 @@ public abstract class Request implements Attributes<Object> {
      * current request
      */
     transient static final ThreadLocal<Request> CURRENT = new ThreadLocal<>();
-    
+
     public static Optional<Request> current() {
         return Optional.ofNullable(CURRENT.get());
     }
@@ -253,7 +253,7 @@ public abstract class Request implements Attributes<Object> {
 
         /**
          * @param exchange exchange
-         * @throws IOException
+         * @throws IOException IO error
          */
         ForServer(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
@@ -409,7 +409,7 @@ public abstract class Request implements Attributes<Object> {
          * @param in input
          * @param boundary boundary(include prefix --)
          * @return body(bytes or file)
-         * @throws IOException
+         * @throws IOException IO error
          */
         static Pair<byte[], File> readBody(InputStream in, String boundary) throws IOException {
             ByteArrayOutputStream lines = new ByteArrayOutputStream();
@@ -457,7 +457,7 @@ public abstract class Request implements Attributes<Object> {
         }
 
         /**
-         * key & value & attributes
+         * key &amp; value &amp; attributes
          */
         static class KeyValueAttr {
 
@@ -560,7 +560,7 @@ public abstract class Request implements Attributes<Object> {
         /**
          * @param in in
          * @return bytes
-         * @throws IOException
+         * @throws IOException IO error
          */
         public static byte[] readLine(InputStream in) throws IOException {
             ByteArrayOutputStream line = new ByteArrayOutputStream();
@@ -630,10 +630,10 @@ public abstract class Request implements Attributes<Object> {
 
     /**
      * @param args URL(https)
-     * @throws NoSuchAlgorithmException
-     * @throws KeyManagementException
-     * @throws IOException
-     * @throws MalformedURLException
+     * @throws NoSuchAlgorithmException algorithm error
+     * @throws KeyManagementException key error
+     * @throws IOException IO error
+     * @throws MalformedURLException url error
      */
     public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, MalformedURLException, IOException {
         String url = args.length > 0 ? args[0] : "https://localhost:8443";
