@@ -76,4 +76,11 @@ public class Account implements Serializable {
     public String getId() {
         return id;
     }
+
+    /**
+     * @return name
+     */
+    public String getName() {
+        return name;
+    }
 }

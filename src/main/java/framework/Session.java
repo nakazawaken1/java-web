@@ -28,10 +28,18 @@ import com.sun.net.httpserver.HttpExchange;
  */
 @SuppressWarnings("restriction")
 public abstract class Session implements Attributes<Object> {
+
     /**
-     * current request
+     * current session
      */
-    transient static final ThreadLocal<Session> current = new ThreadLocal<>();
+    transient static final ThreadLocal<Session> CURRENT = new ThreadLocal<>();
+    
+    /**
+     * @return current session
+     */
+    public static Optional<Session> current() {
+        return Optional.ofNullable(CURRENT.get());
+    }
 
     /**
      * session key of account
@@ -124,7 +132,7 @@ public abstract class Session implements Attributes<Object> {
          * session cookie name
          */
         static final String NAME = Config.app_session_name.text();
-        
+
         /**
          * session id
          */
@@ -147,47 +155,27 @@ public abstract class Session implements Attributes<Object> {
         ForServer(HttpExchange exchange) {
             id = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
                     .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
-            if (id != null) {
+            if (id == null) {
+                id = Tool.digest(("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
+                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
+            } else {
                 try (Db db = Db.connect()) {
                     int timeout = Config.app_session_timeout_minutes.integer();
-                    if(timeout > 0) {
+                    if (timeout > 0) {
                         db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
                     }
                     db.select("value").from("t_session").where("id", id).row(rs -> {
                         try (InputStream in = rs.getBinaryStream(1)) {
-                            if(in != null) {
+                            if (in != null) {
                                 ObjectInputStream o = new ObjectInputStream(in);
                                 attributes = (Map<String, Object>) o.readObject();
-                            } else {
-                                attributes = new LinkedHashMap<>();
                             }
                         }
                     });
                 }
-            } else {
-                id = Tool.digest(("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
-                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current.get().getContextPath(), false, true));
             }
-            Timestamp now = Timestamp.valueOf(LocalDateTime.now());
             if (attributes == null) {
                 attributes = new LinkedHashMap<>();
-                closer = (db, in) -> {
-                    db.preparedExecute("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
-                        ps.setString(1, id);
-                        ps.setBytes(2, in);
-                        ps.setTimestamp(3, now);
-                        return Tool.array(id, "(blob)", now);
-                    });
-                };
-            } else {
-                closer = (db, in) -> {
-                    db.preparedExecute("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
-                        ps.setBytes(1, in);
-                        ps.setTimestamp(2, now);
-                        ps.setString(3, id);
-                        return Tool.array("(blob)", now, id);
-                    });
-                };
             }
         }
 
@@ -250,7 +238,23 @@ public abstract class Session implements Attributes<Object> {
         public void close() throws Exception {
             try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream o = new ObjectOutputStream(out)) {
                 o.writeObject(attributes);
-                closer.accept(db, out.toByteArray());
+                Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? FOR UPDATE", ps -> {
+                    ps.setString(1, id);
+                    return Tool.array(id);
+                }, rs -> db.preparedExecute("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
+                    ps.setBytes(1, out.toByteArray());
+                    ps.setTimestamp(2, now);
+                    ps.setString(3, id);
+                    return Tool.array("(blob)", now, id);
+                })) <= 0) {
+                    db.preparedExecute("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
+                        ps.setString(1, id);
+                        ps.setBytes(2, out.toByteArray());
+                        ps.setTimestamp(3, now);
+                        return Tool.array(id, "(blob)", now);
+                    });
+                }
             } catch (IOException e) {
                 Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, e);
             }
@@ -261,7 +265,7 @@ public abstract class Session implements Attributes<Object> {
      * @return account
      */
     public Account getAccount() {
-        return this.<Account> getAttr(sessionKey).orElse(Account.GUEST);
+        return this.<Account>getAttr(sessionKey).orElse(Account.GUEST);
     }
 
     /**
@@ -279,6 +283,7 @@ public abstract class Session implements Attributes<Object> {
     public boolean login(String loginId, String password) {
         try {
             setAttr(sessionKey, Class.forName(Config.app_account_class.text()).getConstructor(String.class, String.class).newInstance(loginId, password));
+            Tool.getLogger().info("logged in : " + loginId);
             return true;
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
                 | NoSuchMethodException | SecurityException e) {

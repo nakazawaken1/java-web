@@ -5,9 +5,6 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -40,7 +37,7 @@ public abstract class Response {
     /**
      * logger
      */
-    transient private static final Logger logger = Logger.getLogger(Response.class.getCanonicalName());
+    transient final Logger logger = Tool.getLogger();
 
     /**
      * creator
@@ -82,7 +79,7 @@ public abstract class Response {
 
         /**
          * redirect
-         * 
+         *
          * @param location location
          * @param status status code
          * @return response
@@ -115,7 +112,7 @@ public abstract class Response {
 
         /**
          * constructor
-         * 
+         *
          * @param consumer response action
          * @return self
          */
@@ -230,7 +227,7 @@ public abstract class Response {
 
         @Override
         public void flush() {
-            HttpServletResponse response = ((Request.ForServlet) Request.current.get()).servletResponse;
+            HttpServletResponse response = ((Request.ForServlet) Request.current().get()).servletResponse;
             response.setCharacterEncoding(charset.name());
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
             Try.c(consumer).accept(response);
@@ -239,8 +236,8 @@ public abstract class Response {
 
         @Override
         public String toString() {
-            return Request.current.get().hashCode() + Optional.of(((Request.ForServlet) Request.current.get()).servletResponse)
-                    .map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse("");
+            return Request.current().map(i -> i.hashCode() + Optional.of(((Request.ForServlet) i).servletResponse)
+                    .map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse("")).orElse("");
         }
     }
 
@@ -251,7 +248,7 @@ public abstract class Response {
 
         /**
          * constructor
-         * 
+         *
          * @param consumer response action
          * @return self
          */
@@ -267,6 +264,7 @@ public abstract class Response {
 
         @Override
         public Response ofFile(String file, Object... values) {
+            logger.info("file: " + file);
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", Tool.getContentType(file));
                 r.sendResponseHeaders(200, 0);
@@ -374,7 +372,7 @@ public abstract class Response {
 
         @Override
         public void flush() {
-            HttpExchange exchange = ((Request.ForServer) Request.current.get()).exchange;
+            HttpExchange exchange = ((Request.ForServer) Request.current().get()).exchange;
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
             Try.c(consumer).accept(exchange);
             super.flush();
@@ -382,7 +380,7 @@ public abstract class Response {
 
         @Override
         public String toString() {
-            return Request.current.get().hashCode() + Optional.of(((Request.ForServer) Request.current.get()).exchange)
+            return Request.current().map(i -> ((Request.ForServer) i).exchange)
                     .map(r -> "-> " + r.getResponseCode() + " " + r.getResponseHeaders().get("Content-Type")).orElse("");
         }
     }
@@ -475,7 +473,7 @@ public abstract class Response {
 
     /**
      * 302
-     * 
+     *
      * @param location location
      * @return response
      */
@@ -485,7 +483,7 @@ public abstract class Response {
 
     /**
      * redirect
-     * 
+     *
      * @param location location
      * @param status status code
      * @return response

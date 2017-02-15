@@ -490,9 +490,9 @@ public class Formatter implements AutoCloseable {
                         el.defineBean("C", Config.properties);
                         el.defineBean("M", Message.messages);
                         el.defineBean("V", values == null ? new Object[]{} : values);
-                        el.defineBean("A", Application.current.get());
-                        el.defineBean("S", Session.current.get());
-                        el.defineBean("R", Request.current.get());
+                        el.defineBean("A", Application.current().orElse(null));
+                        el.defineBean("S", Session.current().orElse(null));
+                        el.defineBean("R", Request.current().orElse(null));
                         if (map != null) {
                             map.forEach(el::defineBean);
                         }

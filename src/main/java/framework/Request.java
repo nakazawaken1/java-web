@@ -61,7 +61,11 @@ public abstract class Request implements Attributes<Object> {
     /**
      * current request
      */
-    transient static final ThreadLocal<Request> current = new ThreadLocal<>();
+    transient static final ThreadLocal<Request> CURRENT = new ThreadLocal<>();
+    
+    public static Optional<Request> current() {
+        return Optional.ofNullable(CURRENT.get());
+    }
 
     /**
      * for servlet
@@ -254,7 +258,7 @@ public abstract class Request implements Attributes<Object> {
         ForServer(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
             String p = exchange.getRequestURI().getPath();
-            String r = Application.current.get().getContextPath();
+            String r = Application.current().map(Application::getContextPath).orElse("");
             path = p.length() <= r.length() ? "/" : p.substring(r.length());
             requestHeaders = exchange.getRequestHeaders();
             String contentType = requestHeaders.getFirst("Content-Type");
@@ -621,7 +625,7 @@ public abstract class Request implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return hashCode() + "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + pair.getValue()).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + pair.getValue()).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
     }
 
     /**

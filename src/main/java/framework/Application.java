@@ -15,7 +15,14 @@ public interface Application extends Attributes<Object> {
     /**
      * singleton
      */
-    public static Lazy<Application> current = new Lazy<>(null);
+    public static Lazy<Application> CURRENT = new Lazy<>(null);
+    
+    /**
+     * @return singleton
+     */
+    public static Optional<Application> current() {
+        return Optional.ofNullable(CURRENT.get());
+    }
 
     /**
      * For Servlet

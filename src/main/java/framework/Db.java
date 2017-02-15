@@ -46,6 +46,8 @@ import javax.sql.DataSource;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
+import static java.util.Spliterator.NONNULL;
+import static java.util.Spliterator.ORDERED;
 
 /**
  * database
@@ -99,6 +101,7 @@ public class Db implements AutoCloseable {
 
             public Example(Db db) {
                 String table = "test_table";
+                Logger logger = Tool.getLogger();
                 logger.info("[tables]");
                 db.tables().peek(logger::info).filter(table::equals).forEach(db::drop);
                 String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday").date(),
@@ -146,7 +149,7 @@ public class Db implements AutoCloseable {
     /**
      * logger
      */
-    transient private static Logger logger = Logger.getLogger(Db.class.getCanonicalName());
+    transient Logger logger = Tool.getLogger();
 
     /**
      * data sources
@@ -377,10 +380,10 @@ public class Db implements AutoCloseable {
                         }
                     }
                 }));
-                logger.info("DataSource created #" + ds);
+                Tool.getLogger().info("DataSource created #" + ds);
                 return ds;
             } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-                logger.log(Level.WARNING, "cannot get dataSource", e);
+                Tool.getLogger().log(Level.WARNING, "cannot get dataSource", e);
                 throw new RuntimeException(e);
             }
         });
@@ -875,7 +878,7 @@ public class Db implements AutoCloseable {
         String suffix = ".sql";
         List<String> all;
         try (Stream<String> files = Tool.getResources(folder)) {
-            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(logger::info)
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(Tool.getLogger()::info)
                     .collect(Collectors.toList());
         }
 
@@ -1439,6 +1442,11 @@ public class Db implements AutoCloseable {
          * result set
          */
         ResultSet rs;
+        
+        /**
+         * logger
+         */
+        Logger logger = Tool.getLogger();
 
         /**
          * constructor
@@ -1549,6 +1557,10 @@ public class Db implements AutoCloseable {
      */
     public static class Query {
 
+        /**
+         * logger
+         */
+        Logger logger = Tool.getLogger();
         /**
          * table
          */
@@ -1891,19 +1903,23 @@ public class Db implements AutoCloseable {
      * @param sql SQL
      * @param prepare prepare parameters
      * @param fetch fetch row
+     * @return count
      */
-    public void preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
+    public long preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
+        long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             Object[] values = Try.f(prepare).apply(ps);
             logger.info(() -> preparedSQL(sql, values));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+                    count++;
                     Try.c(fetch).accept(rs);
                 }
             }
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
+        return count;
     }
 
     /**

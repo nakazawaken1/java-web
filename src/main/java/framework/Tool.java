@@ -677,7 +677,12 @@ public class Tool {
         return result.toString();
     }
 
-    static void copy(InputStream in, OutputStream out) {
+    /**
+     * copy stream
+     * @param in input
+     * @param out output
+     */
+    public static void copy(InputStream in, OutputStream out) {
         byte[] buffer = new byte[1024];
         for (;;) {
             try {
@@ -690,5 +695,12 @@ public class Tool {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+    
+    /**
+     * @return logger
+     */
+    public static Logger getLogger() {
+        return Logger.getLogger(Request.current().map(i -> String.valueOf(i.hashCode())).orElse(""));
     }
 }
