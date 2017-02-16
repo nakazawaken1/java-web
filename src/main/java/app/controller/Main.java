@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
 import app.model.Person;
+import framework.Config;
 import framework.Db;
 import framework.Response;
 import framework.Session;
@@ -168,5 +169,15 @@ public class Main {
     @Job("job.daily")
     void daily() {
         Logger.getGlobal().info("daily");
+    }
+    
+    /**
+     * default config file
+     * @return response
+     */
+    @Http
+    @Only(Administrator.class)
+    Response config() {
+        return Response.write(Config::createFile);
     }
 }

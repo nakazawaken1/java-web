@@ -1,5 +1,6 @@
 package framework;
 
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -21,7 +22,6 @@ import com.sun.net.httpserver.HttpExchange;
 
 import framework.Try.TryConsumer;
 import framework.Try.TryTriConsumer;
-import java.io.InputStream;
 
 /**
  * Response
@@ -326,7 +326,9 @@ public abstract class Response {
         public Response ofOut(Consumer<OutputStream> out) {
             return new ForServer().set(r -> {
                 r.sendResponseHeaders(200, 0);
-                out.accept(r.getResponseBody());
+                try(OutputStream o = r.getResponseBody()) {
+                    out.accept(o);
+                }
             });
         }
 
@@ -334,7 +336,9 @@ public abstract class Response {
         public Response ofWrite(Consumer<PrintWriter> write) {
             return new ForServer().set(r -> {
                 r.sendResponseHeaders(200, 0);
-                write.accept(new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset)));
+                try(PrintWriter writer = new PrintWriter(new OutputStreamWriter(r.getResponseBody(), charset))) {
+                    write.accept(writer);
+                }
             });
         }
 
@@ -351,7 +355,9 @@ public abstract class Response {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", "text/plain;charset=" + charset);
                 r.sendResponseHeaders(200, 0);
-                r.getResponseBody().write(o.toString().getBytes(charset));
+                try(OutputStream out = r.getResponseBody()) {
+                    out.write(o.toString().getBytes(charset));
+                }
             });
         }
 
@@ -359,7 +365,9 @@ public abstract class Response {
         public Response ofJson(Object o) {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", "application/json;charset=" + charset);
-                r.getResponseBody().write(Tool.json(o).getBytes(charset));
+                try(OutputStream out = r.getResponseBody()) {
+                    out.write(Tool.json(o).getBytes(charset));
+                }
             });
         }
 
@@ -375,6 +383,7 @@ public abstract class Response {
             HttpExchange exchange = ((Request.ForServer) Request.current().get()).exchange;
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
             Try.c(consumer).accept(exchange);
+            exchange.close();
             super.flush();
         }
 

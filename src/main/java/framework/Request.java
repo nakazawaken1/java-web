@@ -328,7 +328,7 @@ public abstract class Request implements Attributes<Object> {
                                         int n = in.read(bytes);
                                         files.put(filename, Tool.pair(Arrays.copyOfRange(bytes, 0, n), null));
                                     } else {
-                                        File f = File.createTempFile("upload", "file");
+                                        File f = File.createTempFile("upload", "file", Config.app_upload_folder.get().map(File::new).orElse(null));
                                         f.deleteOnExit();
                                         try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
                                             to.transferFrom(Channels.newChannel(in), 0, length);
@@ -423,7 +423,7 @@ public abstract class Request implements Attributes<Object> {
                 File f = null;
                 for (;;) {
                     if (f == null && size >= fileSizeThreshold) {
-                        f = File.createTempFile("upload", "file");
+                        f = File.createTempFile("upload", "file", Config.app_upload_folder.get().map(File::new).orElse(null));
                         f.deleteOnExit();
                         out = new BufferedOutputStream(Files.newOutputStream(f.toPath()));
                         out.write(lines.toByteArray());

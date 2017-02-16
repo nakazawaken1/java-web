@@ -338,16 +338,16 @@ public class Server implements Servlet {
     }
 
     /**
-     * @param args context-path http-port https-port .key .crt...
+     * @param args not use
      */
     @SuppressFBWarnings({"LI_LAZY_INIT_STATIC"})
     public static void main(String[] args) {
 
-        String contextPath = Tool.suffix(args.length > 0 ? args[0] : "", "/");
-        int httpPort = args.length > 1 ? Integer.parseInt(args[1]) : 80;
-        int httpsPort = args.length > 2 ? Integer.parseInt(args[2]) : 0;
-        String keyPath = args.length > 3 ? args[3] : null;
-        Stream<String> certPaths = args.length > 4 ? Stream.of(args).skip(4) : Stream.empty();
+        String contextPath = Config.app_context_path.text();
+        int httpPort = Config.app_http_port.integer();
+        int httpsPort = Config.app_https_port.integer();
+        String keyPath = Config.app_https_key_file.get().orElse(null);
+        Stream<String> certPaths = Config.app_https_cert_files.stream();
 
         Server server = new Server();
         

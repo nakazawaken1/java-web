@@ -22,3 +22,6 @@ app.accounts=admin:Adm1n:framework.annotation.Only$Administrator,user:U5er:frame
 log.level=INFO
 
 db.setup=create
+
+app.http.port=8880
+app.https.port = -1
