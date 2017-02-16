@@ -63,6 +63,9 @@ public abstract class Request implements Attributes<Object> {
      */
     transient static final ThreadLocal<Request> CURRENT = new ThreadLocal<>();
 
+    /**
+     * @return current request
+     */
     public static Optional<Request> current() {
         return Optional.ofNullable(CURRENT.get());
     }

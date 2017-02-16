@@ -1,6 +1,5 @@
 package framework;
 
-import framework.Try.TryTriConsumer;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -41,17 +40,19 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
 import javax.activation.MimetypesFileTypeMap;
-import javax.servlet.ServletOutputStream;
+
 import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
 import org.codehaus.jackson.annotate.JsonMethod;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig.Feature;
+
+import framework.Try.TryTriConsumer;
 
 /**
  * utility
@@ -392,6 +393,9 @@ public class Tool {
         return jar.stream().onClose(Try.r(jar::close)).map(JarEntry::getName).filter(i -> i.startsWith(location)).map(i -> trim("/", i.substring(location.length()), null));
     }
 
+    /**
+     * utf8 decoder
+     */
     static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder().onUnmappableCharacter(CodingErrorAction.REPLACE).onMalformedInput(CodingErrorAction.REPLACE);
 
     /**
@@ -432,6 +436,10 @@ public class Tool {
         return result.toString();
     }
 
+    /**
+     * @param in input
+     * @return lines
+     */
     static Stream<String> lines(InputStream in) {
         BufferedReader reader = new BufferedReader(newReader(in));
         return StreamSupport.stream(new Spliterator<String>() {

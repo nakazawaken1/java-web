@@ -59,6 +59,10 @@ public class Try {
         };
     }
     
+    /**
+     * @param runnable throwable runnable
+     * @return runnable
+     */
     public static Runnable r(TryRunnable runnable) {
         return r(runnable, catcher);
     }

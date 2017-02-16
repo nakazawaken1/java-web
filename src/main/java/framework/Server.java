@@ -1,9 +1,9 @@
 package framework;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -12,6 +12,8 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.net.JarURLConnection;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
@@ -64,9 +66,6 @@ import framework.annotation.Http;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Query;
-import java.io.File;
-import java.net.JarURLConnection;
-import java.net.URL;
 
 /**
  * Servlet implementation class

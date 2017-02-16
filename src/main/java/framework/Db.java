@@ -4,9 +4,6 @@ import java.io.FileNotFoundException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -46,8 +43,6 @@ import javax.sql.DataSource;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
-import static java.util.Spliterator.NONNULL;
-import static java.util.Spliterator.ORDERED;
 
 /**
  * database

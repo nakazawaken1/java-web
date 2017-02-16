@@ -22,6 +22,9 @@ public enum Message {
      */
     text_hello,
     
+    /**
+     * forbidden
+     */
     alert_forbidden,
     
     ;
