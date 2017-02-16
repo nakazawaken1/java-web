@@ -38,11 +38,11 @@ public class Lazy<T> implements AutoCloseable {
         }
         return value;
     }
-    
+
     /**
      * @param value value
      */
-    public void set(T value) {
+    public synchronized void set(T value) {
         if(supplier != null) {
             throw new UnsupportedOperationException();
         }

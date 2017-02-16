@@ -14,7 +14,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -137,11 +136,6 @@ public abstract class Session implements Attributes<Object> {
          * session id
          */
         String id;
-
-        /**
-         * closer
-         */
-        BiConsumer<Db, byte[]> closer;
 
         /**
          * Attributes
