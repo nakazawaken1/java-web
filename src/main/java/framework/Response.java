@@ -381,6 +381,7 @@ public abstract class Response {
         @Override
         public void flush() {
             HttpExchange exchange = ((Request.ForServer) Request.current().get()).exchange;
+            Session.current().map(s -> (Session.ForServer)s).ifPresent(Session.ForServer::save);
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
             Try.c(consumer).accept(exchange);
             exchange.close();

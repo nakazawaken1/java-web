@@ -226,7 +226,7 @@ public class Server implements Servlet {
      * @param request request
      * @param session session
      * @throws ServletException server error
-     * @throws IOException IO errror
+     * @throws IOException IO error
      */
     void handle(Request request, Lazy<Session> session) throws ServletException, IOException {
         logger.info(request.toString());

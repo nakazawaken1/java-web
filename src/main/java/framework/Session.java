@@ -141,6 +141,11 @@ public abstract class Session implements Attributes<Object> {
          * Attributes
          */
         Map<String, Object> attributes;
+        
+        /**
+         * saved attributes
+         */
+        boolean saved = false;
 
         /**
          * @param exchange exchange
@@ -227,9 +232,14 @@ public abstract class Session implements Attributes<Object> {
         public void removeAttr(String name) {
             attributes.remove(name);
         }
-
-        @Override
-        public void close() throws Exception {
+        
+        /**
+         * save session attributes
+         */
+        public void save() {
+            if(saved) {
+                return;
+            }
             try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream o = new ObjectOutputStream(out)) {
                 o.writeObject(attributes);
                 Timestamp now = Timestamp.valueOf(LocalDateTime.now());
@@ -252,6 +262,11 @@ public abstract class Session implements Attributes<Object> {
             } catch (IOException e) {
                 Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, e);
             }
+        }
+
+        @Override
+        public void close() throws Exception {
+            save();
         }
     }
 
