@@ -1,8 +1,8 @@
 package framework;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import javax.servlet.ServletContext;
@@ -11,12 +11,17 @@ import javax.servlet.ServletContext;
  * application scoped object
  */
 public interface Application extends Attributes<Object> {
-    
+
     /**
      * singleton
      */
     public static Lazy<Application> CURRENT = new Lazy<>(null);
-    
+
+    /**
+     * getters
+     */
+    static final Getters getters = new Getters(Application.class);
+
     /**
      * @return singleton
      */
@@ -66,7 +71,7 @@ public interface Application extends Attributes<Object> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) raw.getAttribute(name));
+            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> raw.getAttribute(name)));
         }
 
         /*
@@ -118,7 +123,7 @@ public interface Application extends Attributes<Object> {
         /**
          * Attributes
          */
-        Map<String, Object> attributes = new LinkedHashMap<>();
+        Map<String, Object> attributes = new ConcurrentHashMap<>();
 
         /**
          * @param contextPath context path
@@ -141,7 +146,7 @@ public interface Application extends Attributes<Object> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T)attributes.get(name));
+            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
         }
 
         @Override

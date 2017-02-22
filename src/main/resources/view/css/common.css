@@ -1,3 +1,11 @@
+* {
+    font-family: 'メイリオ';
+}
+
+body {
+    margin: 0;
+}
+
 nav {
     background-color: #eeeeff;
     display: table;

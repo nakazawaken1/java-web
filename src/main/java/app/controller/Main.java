@@ -10,6 +10,7 @@ import java.util.stream.IntStream;
 import app.model.Person;
 import framework.Config;
 import framework.Db;
+import framework.Request;
 import framework.Response;
 import framework.Session;
 import framework.Try;
@@ -34,11 +35,15 @@ public class Main {
     /**
      * top page
      * @param session session
+     * @param request request
      * @return response
      */
     @Http(path="index.html")
-    Response index(Session session) {
-        return Response.file(session.isLoggedIn() ? "index.html" : "login.html");
+    Response index(Session session, Request request) {
+        if(!session.isLoggedIn()) {
+            return Response.redirect("login.html");
+        }
+        return Response.file(request.getPath());
     }
 
     /**
@@ -99,6 +104,7 @@ public class Main {
     @Http(Method.POST)
     Response login(Session session, @Query Optional<String> loginId, @Query Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
+            session.remove("alert");
             return Response.redirect("index.html");
         } else {
             session.setAttr("alert", "ログインIDまたはパスワードが違います。");
@@ -178,6 +184,6 @@ public class Main {
     @Http
     @Only(Administrator.class)
     Response config() {
-        return Response.write(Config::createFile);
+        return Response.write(Config::createFile).contentType("text/plain;charset=UTF-8");
     }
 }

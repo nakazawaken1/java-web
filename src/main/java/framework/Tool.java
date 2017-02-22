@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -404,7 +405,7 @@ public class Tool {
                 if (n <= 0) {
                     break;
                 }
-                result.append(buffer);
+                result.append(buffer, 0, n);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -703,5 +704,20 @@ public class Tool {
      */
     public static Logger getLogger() {
         return Logger.getLogger(Request.current().map(i -> String.valueOf(i.hashCode())).orElse(""));
+    }
+
+    /**
+     * @param map map
+     * @param key key
+     * @param value value
+     */
+    public static void add(Map<String, List<String>> map, String key, String value) {
+        if (map.containsKey(key)) {
+            map.get(key).add(value);
+        } else {
+            List<String> list = new ArrayList<>();
+            list.add(value);
+            map.put(key, list);
+        }
     }
 }

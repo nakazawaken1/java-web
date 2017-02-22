@@ -315,6 +315,12 @@ public class Server implements Servlet {
             }
             return;
         }
+        
+        /* */
+        if(Arrays.asList(".css", ".js").contains(request.getExtension())) {
+            Response.text("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
+            return;
+        }
 
         throw new FileNotFoundException(request.getPath());
     }
@@ -366,6 +372,8 @@ public class Server implements Servlet {
                 server.handle(request.get(), session.get());
             } catch (Exception e) {
                 server.logger.log(Level.WARNING, "500", e);
+                exchange.sendResponseHeaders(500, -1);
+                exchange.close();
             }
         };
         Executor executor = Executors.newWorkStealingPool();

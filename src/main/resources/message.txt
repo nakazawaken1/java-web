@@ -5,4 +5,6 @@ error = 何か間違っていませんか？
 loginId = ログインID
 password = パスワード
 quit = 終了
-alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください
+alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください。
+prompt.login = ユーザ ID・ パスワードを入力して、 ログインボタンを押して下さい。
+copyright = © 2016, All Rights Reserved.

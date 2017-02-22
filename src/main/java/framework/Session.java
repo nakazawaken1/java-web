@@ -11,9 +11,9 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -174,7 +174,7 @@ public abstract class Session implements Attributes<Object> {
                 }
             }
             if (attributes == null) {
-                attributes = new LinkedHashMap<>();
+                attributes = new ConcurrentHashMap<>();
             }
         }
 
@@ -220,7 +220,7 @@ public abstract class Session implements Attributes<Object> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) attributes.get(name));
+            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
         }
 
         @Override
@@ -296,6 +296,7 @@ public abstract class Session implements Attributes<Object> {
             return true;
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
                 | NoSuchMethodException | SecurityException e) {
+            Tool.getLogger().info("login failed: " + loginId);
             return false;
         }
     }

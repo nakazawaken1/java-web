@@ -1,18 +1,25 @@
 #{F:include('parts/simple_header.html')}
-	<h1>{title}</h1>
-    <div data-load="alert"></div>
-	<form action="login" method="post">
-		<dl>
-			<dt>{loginId}</dt>
-			<dd>
-				<input name="loginId" type="text" maxlength="20" />
-			</dd>
-			<dt>{password}</dt>
-			<dd>
-				<input name="password" type="password" maxlength="20" />
-			</dd>
-		</dl>
-		<button type="submit">{login}</button>
-		<button type="button" class="quit">{quit}</button>
-	</form>
+<h1>
+    <img src="images/logo.png"/> {title}
+</h1>
+<div class="middle">
+<form method="post" action="login">
+    <div>
+        <strong>Please Login</strong>
+        <img src="images/loginlogo.png"/>
+    </div>
+    <h2>{prompt.login}</h2>
+    <div class="margin error" data-load="alert"></div>
+    <div class="margin">
+        <table>
+            <tr><th><label>USER ID</label></th><td><input type="text" class="input" id="loginId" name="loginId"/></td></tr>
+            <tr><th><label>PASSWORD</label></th><td><input type="password" class="input" name="password"/></td></tr>
+            <tr><td colspan="2" class="right"><input class="submit" type="submit" value=""/></td></tr>
+        </table>
+    </div>
+</form>
+</div>
+<div class="footer">
+    <div>{copyright}</div>
+</div>
 #{F:include('parts/footer.html')}

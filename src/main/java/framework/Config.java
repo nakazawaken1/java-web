@@ -81,7 +81,7 @@ public enum Config {
      * database auto config(create: drop and create, [update]: create if not
      * exists, reload: delete and insert, none: no operation)
      */
-    @Help({"database auto config", "create: drop and create", "[update]: create if not exists", "reload: delete and insert", "none: no operation"})
+    @Help({"database auto config", "CREATE: drop and create", "[UPDATE]: create if not exists", "RELOAD: delete and insert", "NONE: no operation"})
     db_setup(Db.Setup.UPDATE),
 
     /**

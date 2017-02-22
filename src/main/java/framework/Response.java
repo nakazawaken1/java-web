@@ -6,7 +6,9 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -232,6 +234,9 @@ public abstract class Response {
             HttpServletResponse response = ((Request.ForServlet) Request.current().get()).servletResponse;
             response.setCharacterEncoding(charset.name());
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
+            if(headers != null) {
+                headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
+            }
             Try.c(consumer).accept(response);
             super.flush();
         }
@@ -355,7 +360,9 @@ public abstract class Response {
         @Override
         public Response ofText(Object o) {
             return new ForServer().set(r -> {
-                r.getResponseHeaders().set("Content-Type", "text/plain;charset=" + charset);
+                if(!r.getResponseHeaders().containsKey("Content-Type")) {
+                    r.getResponseHeaders().set("Content-Type", "text/plain;charset=" + charset);
+                }
                 r.sendResponseHeaders(200, 0);
                 try(OutputStream out = r.getResponseBody()) {
                     out.write(o.toString().getBytes(charset));
@@ -385,6 +392,9 @@ public abstract class Response {
             HttpExchange exchange = ((Request.ForServer) Request.current().get()).exchange;
             Session.current().map(s -> (Session.ForServer)s).ifPresent(Session.ForServer::save);
             Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
+            if(headers != null) {
+                headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));
+            }
             Try.c(consumer).accept(exchange);
             exchange.close();
             super.flush();
@@ -403,9 +413,14 @@ public abstract class Response {
     static Charset charset = StandardCharsets.UTF_8;
 
     /**
-     * 属性
+     * attributes
      */
     Map<String, Object> map;
+
+    /**
+     * headers
+     */
+    Map<String, List<String>> headers;
 
     /**
      * @param key key
@@ -431,6 +446,47 @@ public abstract class Response {
             this.map.putAll(map);
         }
         return this;
+    }
+    
+    /**
+     * @param name name
+     * @param value value
+     * @return self
+     */
+    public Response addHeader(String name, String value) {
+        if(headers == null) {
+            headers = new HashMap<>();
+        }
+        List<String> list = headers.get(name);
+        if(list == null) {
+            list = new ArrayList<>();
+            headers.put(name, list);
+        }
+        list.add(value);
+        return this;
+    }
+    
+    /**
+     * @param name name
+     * @param value value
+     * @return self
+     */
+    public Response setHeader(String name, String value) {
+        if(headers == null) {
+            headers = new HashMap<>();
+        }
+        List<String> list = new ArrayList<>();
+        list.add(value);
+        headers.put(name, list);
+        return this;
+    }
+    
+    /**
+     * @param contentType content type
+     * @return self
+     */
+    public Response contentType(String contentType) {
+        return setHeader("Content-Type", contentType);
     }
 
     /**

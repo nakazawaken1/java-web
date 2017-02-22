@@ -19,7 +19,6 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -62,6 +61,11 @@ public abstract class Request implements Attributes<Object> {
      * current request
      */
     transient static final ThreadLocal<Request> CURRENT = new ThreadLocal<>();
+
+    /**
+     * getters
+     */
+    static final Getters getters = new Getters(Request.class);
 
     /**
      * @return current request
@@ -136,7 +140,7 @@ public abstract class Request implements Attributes<Object> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) servletRequest.getAttribute(name));
+            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> servletRequest.getAttribute(name)));
         }
 
         /*
@@ -319,9 +323,9 @@ public abstract class Request implements Attributes<Object> {
                                     logger.info("413 payload too large");
                                     break loop;
                                 }
-                                add(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
+                                Tool.add(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
                             } else {
-                                add(parameters, name, filename);
+                                Tool.add(parameters, name, filename);
                                 if (length > 0) {
                                     if (length < fileSizeThreshold) {
                                         byte[] bytes = new byte[length];
@@ -364,7 +368,7 @@ public abstract class Request implements Attributes<Object> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) attributes.get(name));
+            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
         }
 
         @Override
@@ -539,25 +543,10 @@ public abstract class Request implements Attributes<Object> {
             scanner.forEachRemaining(Try.c(part -> {
                 String[] pair = part.split("[=]");
                 if (pair.length > 0) {
-                    add(parameters, URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()),
+                    Tool.add(parameters, URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()),
                             pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "");
                 }
             }));
-        }
-
-        /**
-         * @param map map
-         * @param key key
-         * @param value value
-         */
-        public static void add(Map<String, List<String>> map, String key, String value) {
-            if (map.containsKey(key)) {
-                map.get(key).add(value);
-            } else {
-                List<String> list = new ArrayList<>();
-                list.add(value);
-                map.put(key, list);
-            }
         }
 
         /**
@@ -620,6 +609,34 @@ public abstract class Request implements Attributes<Object> {
      * @return path
      */
     public abstract String getPath();
+    
+    /**
+     * @return file name(without extension)
+     */
+    public String getName() {
+        String path = getPath();
+        int start = path.lastIndexOf('/');
+        if(start < 0) {
+            start = 0;
+        }
+        int end = path.lastIndexOf('.');
+        if(end < 0 || start > end) {
+            end = path.length();
+        }
+        return path.substring(start, end);
+    }
+    
+    /**
+     * @return extension(with period)
+     */
+    public String getExtension() {
+        String path = getPath();
+        int start = path.lastIndexOf('.');
+        if(start < 0 || path.lastIndexOf('/') > start) {
+            return "";
+        }
+        return path.substring(start);
+    }
 
     /**
      * @return http method
