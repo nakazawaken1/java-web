@@ -14,6 +14,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.el.ELProcessor;
 
 /**
@@ -441,7 +442,7 @@ public class Formatter implements AutoCloseable {
             throw new UncheckedIOException(e);
         }
     }
-
+    
     /**
      * @param expression expression
      * @param prefix prefix length
@@ -474,6 +475,7 @@ public class Formatter implements AutoCloseable {
                 try {
                     if (el == null) {
                         el = new ELProcessor();
+                        el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
                         // el.defineFunction("F", "includeIf",
                         // Tool.class.getMethod("includeIf", boolean.class,

@@ -270,31 +270,31 @@ public class Db implements AutoCloseable {
         String pad2 = "/";
         String url = null;
         switch (type) {
-            case H2:
-                url = name;
-                break;
-            case POSTGRESQL:
-                if (port <= 0) {
-                    port = 5432;
-                }
-                break;
-            case MYSQL:
-                if (port <= 0) {
-                    port = 3306;
-                }
-                break;
-            case ORACLE:
-                pad = "thin:@";
-                if (port <= 0) {
-                    port = 1521;
-                }
-                break;
-            case SQLSERVER:
-                pad2 = ";database=";
-                if (port <= 0) {
-                    port = 1433;
-                }
-                break;
+        case H2:
+            url = name;
+            break;
+        case POSTGRESQL:
+            if (port <= 0) {
+                port = 5432;
+            }
+            break;
+        case MYSQL:
+            if (port <= 0) {
+                port = 3306;
+            }
+            break;
+        case ORACLE:
+            pad = "thin:@";
+            if (port <= 0) {
+                port = 1521;
+            }
+            break;
+        case SQLSERVER:
+            pad2 = ";database=";
+            if (port <= 0) {
+                port = 1433;
+            }
+            break;
         }
         if (host == null) {
             host = "localhost";
@@ -321,36 +321,36 @@ public class Db implements AutoCloseable {
         this.type = type;
         logger.config(() -> "Connection created #" + connection.hashCode() + ", type = " + type);
         switch (type) {
-            case POSTGRESQL:
-                builder = new PostgresqlBuilder();
-                schema = "public";
-                break;
-            case ORACLE:
-                builder = new OracleBuilder();
-                schema = Try.s(connection::getSchema).get();
-                break;
-            case SQLSERVER:
-                builder = new SqlserverBuilder();
-                schema = "dbo";
-                break;
-            case H2:
-                builder = new Builder() {
+        case POSTGRESQL:
+            builder = new PostgresqlBuilder();
+            schema = "public";
+            break;
+        case ORACLE:
+            builder = new OracleBuilder();
+            schema = Try.s(connection::getSchema).get();
+            break;
+        case SQLSERVER:
+            builder = new SqlserverBuilder();
+            schema = "dbo";
+            break;
+        case H2:
+            builder = new Builder() {
 
-                    @Override
-                    public String getVariablesSql() {
-                        return "SELECT * FROM INFORMATION_SCHEMA.SETTINGS";
-                    }
-                };
-                break;
-            case MYSQL:
-                builder = new Builder() {
+                @Override
+                public String getVariablesSql() {
+                    return "SELECT * FROM INFORMATION_SCHEMA.SETTINGS";
+                }
+            };
+            break;
+        case MYSQL:
+            builder = new Builder() {
 
-                    @Override
-                    public String getVariablesSql() {
-                        return "SHOW VARIABLES";
-                    }
-                };
-                break;
+                @Override
+                public String getVariablesSql() {
+                    return "SHOW VARIABLES";
+                }
+            };
+            break;
         }
     }
 
@@ -366,6 +366,20 @@ public class Db implements AutoCloseable {
                 Class<?> c = Class.forName(Config.getOrThrow(Config.db_datasource_class + key, RuntimeException::new));
                 DataSource ds = (DataSource) c.newInstance();
                 Config.find(Config.db_url + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
+                    if (value.startsWith("jdbc:h2:")) { /*hack: h2 Duplicate property "USER"*/
+                        List<String> list = new ArrayList<>();
+                        for(String s : value.split("\\s*;\\s*")) {
+                            String[] a = s.split("\\s*=\\s*", 2);
+                            if("user".equalsIgnoreCase(a[0])) {
+                                if(a.length > 1) {
+                                    c.getMethod("setUser", String.class).invoke(ds, a[1]);
+                                }
+                            } else {
+                                list.add(s);
+                            }
+                        }
+                        value = String.join("; ", list);
+                    }
                     for (String method : Tool.array("setURL", "setUrl")) {
                         try {
                             c.getMethod(method, String.class).invoke(ds, value);
@@ -462,8 +476,8 @@ public class Db implements AutoCloseable {
 
     /**
      * preparedQuery(single sql only)
-
- {@code [example] db.preparedQuery("SELECT name FROM account ORDER BY 1", null).map(rs -> rs.getString(1)).forEach(System.out::println);}
+     * 
+     * {@code [example] db.preparedQuery("SELECT name FROM account ORDER BY 1", null).map(rs -> rs.getString(1)).forEach(System.out::println);}
      *
      * @param sql SQL
      * @param map name value map({key} : value)
@@ -718,7 +732,7 @@ public class Db implements AutoCloseable {
      */
     public Stream<String> tables() {
         try {
-            return stream(connection.getMetaData().getTables(null, schema, null, new String[]{"TABLE"})).map(Try.f(rs -> rs.getString(3).toLowerCase()));
+            return stream(connection.getMetaData().getTables(null, schema, null, new String[] { "TABLE" })).map(Try.f(rs -> rs.getString(3).toLowerCase()));
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
@@ -854,16 +868,16 @@ public class Db implements AutoCloseable {
         boolean create = false;
         boolean reload = false;
         switch (setup) {
-            case CREATE:
-                create = true;
-                break;
-            case UPDATE:
-                break;
-            case RELOAD:
-                reload = true;
-                break;
-            case NONE:
-                return;
+        case CREATE:
+            create = true;
+            break;
+        case UPDATE:
+            break;
+        case RELOAD:
+            reload = true;
+            break;
+        case NONE:
+            return;
         }
 
         /* get all sql files(object.*.sql or data.*.sql) */
@@ -1093,10 +1107,10 @@ public class Db implements AutoCloseable {
         @Override
         public String fn(String function, String... args) {
             switch (function.toUpperCase()) {
-                case "YEAR":
-                case "MONTH":
-                case "DAY":
-                    return "DATE_PART('" + function + "'" + join(", ", Arrays.asList(args), ", ") + ")";
+            case "YEAR":
+            case "MONTH":
+            case "DAY":
+                return "DATE_PART('" + function + "'" + join(", ", Arrays.asList(args), ", ") + ")";
             }
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
@@ -1219,12 +1233,12 @@ public class Db implements AutoCloseable {
         @Override
         public String fn(String function, String... args) {
             switch (function.toUpperCase()) {
-                case "NOW":
-                    return "SYSDATE";
-                case "YEAR":
-                case "MONTH":
-                case "DAY":
-                    return "EXTRACT(" + function + " FROM " + join("", Arrays.asList(args), ", ") + ")";
+            case "NOW":
+                return "SYSDATE";
+            case "YEAR":
+            case "MONTH":
+            case "DAY":
+                return "EXTRACT(" + function + " FROM " + join("", Arrays.asList(args), ", ") + ")";
             }
             return function + "(" + join("", Arrays.asList(args), ", ") + ")";
         }
@@ -1437,7 +1451,7 @@ public class Db implements AutoCloseable {
          * result set
          */
         ResultSet rs;
-        
+
         /**
          * logger
          */
@@ -1865,6 +1879,7 @@ public class Db implements AutoCloseable {
 
     /**
      * ? to value
+     * 
      * @param sql SQL
      * @param values values
      * @return executable SQL

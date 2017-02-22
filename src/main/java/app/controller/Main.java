@@ -54,7 +54,7 @@ public class Main {
      */
     @Http
     @Only(Administrator.class)
-    Response db(Db db, @Query Optional<String> sql) throws SQLException {
+    Response db_settings(Db db, @Query Optional<String> sql) throws SQLException {
         return Response.writeTemplate("table.html", (out, name, prefix) -> {
             if(!"".equals(name)) {
                 return;
@@ -69,6 +69,15 @@ public class Main {
                 out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
             }));
         });
+    }
+
+    /**
+     * @return response
+     */
+    @Http
+    @Only(Administrator.class)
+    Response db_console() {
+        return Response.redirect("http://localhost:" + Config.app_h2_port.integer());
     }
 
     /**
@@ -183,7 +192,17 @@ public class Main {
      */
     @Http
     @Only(Administrator.class)
-    Response config() {
-        return Response.write(Config::createFile).contentType("text/plain;charset=UTF-8");
+    Response config_default() {
+        return Response.write(Config::printDefault).contentType("text/plain;charset=UTF-8");
+    }
+    
+    /**
+     * default config file
+     * @return response
+     */
+    @Http
+    @Only(Administrator.class)
+    Response config_current() {
+        return Response.write(Config::printCurrent).contentType("text/plain;charset=UTF-8");
     }
 }

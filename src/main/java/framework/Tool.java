@@ -678,6 +678,14 @@ public class Tool {
         }
         return result.toString();
     }
+    
+    /**
+     * @param text text
+     * @return sha256
+     */
+    public static String hash(String text) {
+        return Tool.digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256");
+    }
 
     /**
      * copy stream

@@ -30,6 +30,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
@@ -90,7 +91,7 @@ public class Server implements Servlet {
      * @see javax.servlet.Servlet#init(javax.servlet.ServletConfig)
      */
     @Override
-    @SuppressFBWarnings({"LI_LAZY_INIT_UPDATE_STATIC", "LI_LAZY_INIT_STATIC"})
+    @SuppressFBWarnings({ "LI_LAZY_INIT_UPDATE_STATIC", "LI_LAZY_INIT_STATIC" })
     public void init(ServletConfig config) throws ServletException {
         setup(new Lazy<>(() -> new Application.ForServlet(config.getServletContext())), Response.ForServlet::new);
     }
@@ -149,7 +150,7 @@ public class Server implements Servlet {
      * @param applicationGetter applicationGetter
      * @param responseCreator responseCreator
      */
-    @SuppressFBWarnings({"LI_LAZY_INIT_STATIC"})
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
     void setup(Lazy<Application> applicationGetter, Supplier<ResponseCreator> responseCreator) {
 
         /* check to enabled of method parameters name */
@@ -177,19 +178,19 @@ public class Server implements Servlet {
         /* setup routing */
         if (table == null) {
             try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
-                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Http.class)))
-                        .filter(pair -> pair.r != null).map(pair -> Tuple.of(c, pair.l, pair.r))).collect(Collectors.toMap(trio -> {
-                    Class<?> c = trio.l;
-                    Method m = trio.r.l;
-                    String left = Optional.ofNullable(c.getAnnotation(Http.class))
-                            .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
-                    String right = Tool.string(trio.r.r.path()).orElse(m.getName());
-                    return left + right;
-                }, trio -> {
-                    Method m = trio.r.l;
-                    m.setAccessible(true);
-                    return Tuple.of(trio.l, m);
-                }));
+                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Http.class))).filter(pair -> pair.r != null)
+                        .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(Collectors.toMap(trio -> {
+                            Class<?> c = trio.l;
+                            Method m = trio.r.l;
+                            String left = Optional.ofNullable(c.getAnnotation(Http.class))
+                                    .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
+                            String right = Tool.string(trio.r.r.path()).orElse(m.getName());
+                            return left + right;
+                        }, trio -> {
+                            Method m = trio.r.l;
+                            m.setAccessible(true);
+                            return Tuple.of(trio.l, m);
+                        }));
             }
             logger.info(Tool.print(writer -> {
                 writer.println("---- routing ----");
@@ -300,12 +301,12 @@ public class Server implements Servlet {
         if (url.isPresent()) {
             if (!url.filter(Try.p(i -> {
                 switch (i.getProtocol()) {
-                    case "file":
-                        return !new File(i.toURI()).isDirectory();
-                    case "jar":
-                        return !((JarURLConnection)i.openConnection()).getJarEntry().isDirectory();
-                    default:
-                        return false;
+                case "file":
+                    return !new File(i.toURI()).isDirectory();
+                case "jar":
+                    return !((JarURLConnection) i.openConnection()).getJarEntry().isDirectory();
+                default:
+                    return false;
                 }
             }, e -> {
             })).isPresent()) {
@@ -315,9 +316,9 @@ public class Server implements Servlet {
             }
             return;
         }
-        
+
         /* */
-        if(Arrays.asList(".css", ".js").contains(request.getExtension())) {
+        if (Arrays.asList(".css", ".js").contains(request.getExtension())) {
             Response.text("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
             return;
         }
@@ -346,7 +347,7 @@ public class Server implements Servlet {
     /**
      * @param args not use
      */
-    @SuppressFBWarnings({"LI_LAZY_INIT_STATIC"})
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
     public static void main(String[] args) {
 
         String contextPath = Config.app_context_path.text();
@@ -356,7 +357,7 @@ public class Server implements Servlet {
         Stream<String> certPaths = Config.app_https_cert_files.stream();
 
         Server server = new Server();
-        
+
         server.setup(new Lazy<>(() -> new Application.ForServer(contextPath)), Response.ForServer::new);
 
         // start HTTPS server
@@ -395,9 +396,21 @@ public class Server implements Servlet {
                 https.start();
                 server.logger.info("https server started on port " + httpsPort);
             }
-        } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException | InvalidKeySpecException e) {
+        } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException
+                | InvalidKeySpecException e) {
             server.logger.log(Level.WARNING, "setup error", e);
         }
+
+        if (Config.app_h2_port.integer() > 0) {
+            try {
+                org.h2.tools.Server db = org.h2.tools.Server.createWebServer("-webAllowOthers", "-webPort", Config.app_h2_port.text(), "-properties", "null")
+                        .start();
+                Runtime.getRuntime().addShutdownHook(new Thread(db::stop));
+            } catch (SQLException e) {
+                server.logger.log(Level.WARNING, "h2 error", e);
+            }
+        }
+
         Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
     }
 

@@ -1,7 +1,7 @@
 db.suffix=.h2
 
 db.datasource.class.h2=org.h2.jdbcx.JdbcDataSource
-db.url.h2=jdbc:h2:~/db_test
+db.url.h2=jdbc:h2:~/test;user=sa
 
 db.datasource.class.oracle=oracle.jdbc.pool.OracleDataSource
 db.url.oracle=jdbc:oracle:thin:system/?@localhost:1521:orcl
@@ -17,11 +17,14 @@ db.url.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?
 
 job.daily=03:00
 
-app.accounts=admin:Adm1n:framework.annotation.Only$Administrator,user:U5er:framework.annotation.Only$User
+app.accounts=admin:Adm1n:管理者:framework.annotation.Only$Administrator,user:U5er:利用者:framework.annotation.Only$User
 
 log.level=INFO
 
-db.setup=create
+db.setup=RELOAD
 
 app.http.port=8880
-app.https.port = -1
+
+app.h2.port=8881
+
+app.account.class=framework.DbAccount

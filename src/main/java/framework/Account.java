@@ -18,15 +18,15 @@ public class Account implements Serializable {
     /**
      * id
      */
-    final String id;
+    protected String id;
     /**
      * name
      */
-    final String name;
+    protected String name;
     /**
      * role
      */
-    final Class<? extends User>[] roles;
+    protected Class<? extends User>[] roles;
 
     /**
      * @param id id
@@ -49,16 +49,15 @@ public class Account implements Serializable {
         String[] a = Config.app_accounts.stream().map(i -> i.split(":")).filter(i -> i[0].equals(loginId) && i[1].equals(password)).findFirst()
                 .orElseThrow(InstantiationException::new);
         this.id = a[0];
-        this.name = a[0];
-        this.roles = Tool.string(a[2]).map(Try.f(i -> Tool.array((Class<? extends User>) Class.forName(i)))).orElse(null);
+        this.name = a[2];
+        this.roles = Tool.string(a[3]).map(Try.f(i -> Tool.array((Class<? extends User>) Class.forName(i)))).orElse(null);
     }
 
     /**
      * @param roles roles
      * @return true if has role
      */
-    @SuppressWarnings("unchecked")
-    public boolean hasAnyRole(Class<? extends User>... roles) {
+    public boolean hasAnyRole(@SuppressWarnings("unchecked") Class<? extends User>... roles) {
         if (this.roles != null) {
             for (Class<? extends User> i : this.roles) {
                 for (Class<? extends User> j : roles) {

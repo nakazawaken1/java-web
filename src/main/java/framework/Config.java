@@ -78,10 +78,9 @@ public enum Config {
     db_url,
 
     /**
-     * database auto config(create: drop and create, [update]: create if not
-     * exists, reload: delete and insert, none: no operation)
+     * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
      */
-    @Help({"database auto config", "CREATE: drop and create", "[UPDATE]: create if not exists", "RELOAD: delete and insert", "NONE: no operation"})
+    @Help({ "database auto config", "CREATE: drop and create", "[UPDATE]: create if not exists", "RELOAD: delete and insert", "NONE: no operation" })
     db_setup(Db.Setup.UPDATE),
 
     /**
@@ -117,7 +116,7 @@ public enum Config {
     /**
      * add http response headers
      */
-    @Help({"add http response headers", "X-UA-Compatible: IE=edge #IE version", "X-Content-Type-Options: nosniff #IE auto detect disabled", "X-Download-Options: noopen #IE direct open disabled", "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache # cache disabled"})
+    @Help({ "add http response headers", "X-UA-Compatible: IE=edge #IE version", "X-Content-Type-Options: nosniff #IE auto detect disabled", "X-Download-Options: noopen #IE direct open disabled", "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache # cache disabled" })
     app_headers("X-UA-Compatible: IE=edge|X-Content-Type-Options: nosniff|X-Download-Options: noopen|Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache", "\\s*\\|\\s*"),
 
     /**
@@ -157,9 +156,9 @@ public enum Config {
     app_account_class("framework.Account"),
 
     /**
-     * account info(loginId:password:roles,...)
+     * accounts data(loginId:password:name:roles,...)
      */
-    @Help("account data")
+    @Help("accounts data(loginId:password:name:roles,...)")
     app_accounts(),
 
     /**
@@ -175,10 +174,10 @@ public enum Config {
     app_http_port(80),
 
     /**
-     * https port(disabled if negative)
+     * https port(disabled if negative, standard value is 443)
      */
-    @Help("https port(disabled if negative)")
-    app_https_port(443),
+    @Help("https port(disabled if negative, standard value is 443)")
+    app_https_port(-1),
 
     /**
      * https private key
@@ -197,6 +196,12 @@ public enum Config {
      */
     @Help("context path")
     app_context_path("/"),
+    
+    /**
+     * h2 web console port
+     */
+    @Help("h2 web console port(disabled if negative)")
+    app_h2_port(-1),
 
     ;
 
@@ -309,7 +314,7 @@ public enum Config {
 
             /* resolve variables */
             for (;;) {
-                boolean[] loop = {false};
+                boolean[] loop = { false };
                 Set<String> missings = new LinkedHashSet<>();
                 properties.entrySet().forEach(pair -> {
                     resolve((String) pair.getValue(), properties, value -> {
@@ -474,10 +479,10 @@ public enum Config {
      */
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     public static void main(String[] args) {
-        createFile(new PrintWriter(System.out));
-//        properties.entrySet().forEach(pair -> {
-//            System.out.println(pair.getKey() + " = " + pair.getValue());
-//        });
+        printDefault(new PrintWriter(System.out));
+        // properties.entrySet().forEach(pair -> {
+        // System.out.println(pair.getKey() + " = " + pair.getValue());
+        // });
     }
 
     /**
@@ -536,13 +541,33 @@ public enum Config {
 
     /**
      * create default setting file
+     * 
      * @param writer writer
      */
-    public static void createFile(PrintWriter writer) {
-        Stream.of(Config.values()).sorted().forEach(Try.c(i -> {
-            Optional.ofNullable(i.getClass().getField(i.name()).getAnnotation(Help.class)).map(Help::value).map(Stream::of).orElse(Stream.empty()).map(j -> "# " + j).forEach(writer::println);
+    public static void printDefault(PrintWriter writer) {
+        Stream.of(Config.values()).sorted((a, b) -> a.toString().compareToIgnoreCase(b.toString())).forEach(Try.c(i -> {
+            Optional.ofNullable(i.getClass().getField(i.name()).getAnnotation(Help.class)).map(Help::value).map(Stream::of).orElse(Stream.empty())
+                    .map(j -> "# " + j).forEach(writer::println);
             writer.println(i.toString() + " = " + i.defaultValue.replace("\\", "\\\\"));
             writer.println();
         }));
+    }
+
+    /**
+     * create default setting file
+     * 
+     * @param writer writer
+     */
+    public static void printCurrent(PrintWriter writer) {
+        properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey())).forEach(i -> {
+            try {
+                Optional.ofNullable(Config.class.getField(((String) i.getKey()).replace('.', '_')).getAnnotation(Help.class)).map(Help::value).map(Stream::of).orElse(Stream.empty())
+                        .map(j -> "# " + j).forEach(writer::println);
+            } catch (NoSuchFieldException | SecurityException e) {
+                logger.info(i.toString());
+            }
+            writer.println(i.getKey() + " = " + ((String)i.getValue()).replace("\\", "\\\\"));
+            writer.println();
+        });
     }
 }
