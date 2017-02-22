@@ -82,7 +82,7 @@ public class Server implements Servlet {
     /**
      * routing table{path: {class: method}}
      */
-    transient static Map<String, Pair<Class<?>, Method>> table;
+    transient static Map<String, Tuple<Class<?>, Method>> table;
 
     /*
      * (non-Javadoc)
@@ -177,23 +177,23 @@ public class Server implements Servlet {
         /* setup routing */
         if (table == null) {
             try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
-                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tool.pair(m, m.getAnnotation(Http.class)))
-                        .filter(pair -> pair.b != null).map(pair -> Tool.trio(c, pair.a, pair.b))).collect(Collectors.toMap(trio -> {
-                    Class<?> c = trio.a;
-                    Method m = trio.b;
+                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Http.class)))
+                        .filter(pair -> pair.r != null).map(pair -> Tuple.of(c, pair.l, pair.r))).collect(Collectors.toMap(trio -> {
+                    Class<?> c = trio.l;
+                    Method m = trio.r.l;
                     String left = Optional.ofNullable(c.getAnnotation(Http.class))
                             .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
-                    String right = Tool.string(trio.c.path()).orElse(m.getName());
+                    String right = Tool.string(trio.r.r.path()).orElse(m.getName());
                     return left + right;
                 }, trio -> {
-                    Method m = trio.b;
+                    Method m = trio.r.l;
                     m.setAccessible(true);
-                    return Tool.pair(trio.a, m);
+                    return Tuple.of(trio.l, m);
                 }));
             }
             logger.info(Tool.print(writer -> {
                 writer.println("---- routing ----");
-                table.forEach((path, pair) -> writer.println(path + " -> " + pair.a.getName() + "." + pair.b.getName()));
+                table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
             }));
         }
 
@@ -240,9 +240,9 @@ public class Server implements Servlet {
         }
 
         /* action */
-        Pair<Class<?>, Method> pair = table.get(request.getPath());
+        Tuple<Class<?>, Method> pair = table.get(request.getPath());
         if (pair != null) {
-            Method method = pair.b;
+            Method method = pair.r;
             Http http = method.getAnnotation(Http.class);
             if (http == null || (http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod()))) {
                 Response.error(400).flush();
@@ -260,7 +260,7 @@ public class Server implements Servlet {
             }
             try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                 try {
-                    ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : pair.a.newInstance(),
+                    ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : pair.l.newInstance(),
                             Stream.of(method.getParameters()).map(p -> {
                                 Class<?> type = p.getType();
                                 if (Request.class.isAssignableFrom(type)) {
@@ -418,15 +418,15 @@ public class Server implements Servlet {
                 key = factory.generatePrivate(new PKCS8EncodedKeySpec(bytes)); // PKCS#8
             } catch (InvalidKeySpecException e) {
                 DERReader reader = new DERReader(bytes);
-                Pair<Integer, byte[]> pair = reader.read(); // sequence
-                if ((pair.a & 0x1f) != 0x10) {
+                Tuple<Integer, byte[]> pair = reader.read(); // sequence
+                if ((pair.l & 0x1f) != 0x10) {
                     throw new InvalidKeySpecException("first part is not sequence");
                 }
-                reader = new DERReader(pair.b);
+                reader = new DERReader(pair.r);
                 reader.read(); // version;
-                BigInteger modulus = new BigInteger(reader.read().b);
+                BigInteger modulus = new BigInteger(reader.read().r);
                 reader.read(); // publicExponent
-                BigInteger privateExponent = new BigInteger(reader.read().b);
+                BigInteger privateExponent = new BigInteger(reader.read().r);
                 key = factory.generatePrivate(new RSAPrivateKeySpec(modulus, privateExponent)); // PKCS#5
             }
         }
@@ -485,7 +485,7 @@ public class Server implements Servlet {
         /**
          * @return tag, value
          */
-        public Pair<Integer, byte[]> read() {
+        public Tuple<Integer, byte[]> read() {
             int tag = bytes[index++];
             int length = bytes[index++];
             int index0 = index;
@@ -495,7 +495,7 @@ public class Server implements Servlet {
                 index0 = index;
             }
             index += length;
-            return Tool.pair(tag, Arrays.copyOfRange(bytes, index0, index));
+            return Tuple.of(tag, Arrays.copyOfRange(bytes, index0, index));
         }
     }
 }

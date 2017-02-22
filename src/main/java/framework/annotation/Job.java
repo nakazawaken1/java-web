@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 
 import framework.Config;
 import framework.Tool;
+import framework.Tuple;
 
 /**
  * Setting for job schedule.
@@ -55,10 +56,10 @@ public @interface Job {
          */
         public static void setup(Class<?>... classes) {
             for (Class<?> c : classes) {
-                Stream.of(c.getDeclaredMethods()).map(method -> Tool.pair(method, method.getAnnotation(Job.class))).filter(pair -> pair.getValue() != null)
+                Stream.of(c.getDeclaredMethods()).map(method -> Tuple.of(method, method.getAnnotation(Job.class))).filter(pair -> pair.r != null)
                         .forEach(pair -> {
-                            Method method = pair.a;
-                            Stream.of(pair.getValue().value().split("\\s*,\\s*")).filter(Tool.notEmpty)
+                            Method method = pair.l;
+                            Stream.of(pair.r.value().split("\\s*,\\s*")).filter(Tool.notEmpty)
                                     .<String>map(j -> j.startsWith("job.") ? Config.find(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
                                         if (scheduler.get() == null) {
                                             int n = Config.app_job_threads.integer();

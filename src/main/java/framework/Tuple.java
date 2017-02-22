@@ -1,5 +1,6 @@
 package framework;
 
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -8,7 +9,7 @@ import java.util.Objects;
  * @param <L> Left type
  * @param <R> Right type
  */
-public class Tuple<L, R> {
+public class Tuple<L, R> implements Map.Entry<L, R> {
 
     /**
      * left value
@@ -27,6 +28,21 @@ public class Tuple<L, R> {
     protected Tuple(L l, R r) {
         this.l = l;
         this.r = r;
+    }
+
+    @Override
+    public L getKey() {
+        return l;
+    }
+
+    @Override
+    public R getValue() {
+        return r;
+    }
+
+    @Override
+    public R setValue(R value) {
+        throw new UnsupportedOperationException();
     }
 
     /*
@@ -62,7 +78,7 @@ public class Tuple<L, R> {
     public String toString() {
         return Objects.toString(l) + (r == null ? "" : ", " + Objects.toString(r));
     }
-    
+
     /**
      * @param i index
      * @return value
@@ -70,10 +86,10 @@ public class Tuple<L, R> {
     @SuppressWarnings("unchecked")
     public <T> T at(int i) {
         Tuple<?, ?> value = this;
-        while(--i >= 0) {
-            value = (Tuple<?, ?>)value.r;
+        while (--i >= 0) {
+            value = (Tuple<?, ?>) value.r;
         }
-        return (T)value.l;
+        return (T) value.l;
     }
 
     /**
@@ -100,28 +116,12 @@ public class Tuple<L, R> {
     }
 
     /**
-     * 2 tuple
-     * 
-     * @param <A> 1 type
-     * @param <B> 2 type
-     */
-    public static class Tuple2<A, B> extends Tuple<A, Tuple1<B>> {
-        /**
-         * @param a 1 value
-         * @param b 2 value
-         */
-        public Tuple2(A a, B b) {
-            super(a, new Tuple1<>(b));
-        }
-    }
-
-    /**
      * @param a 1 value
      * @param b 2 value
      * @return 2 tuple
      */
-    public static <A, B> Tuple2<A, B> of(A a, B b) {
-        return new Tuple2<>(a, b);
+    public static <A, B> Tuple<A, B> of(A a, B b) {
+        return new Tuple<>(a, b);
     }
 
     /**
@@ -131,14 +131,14 @@ public class Tuple<L, R> {
      * @param <B> 2 type
      * @param <C> 3 type
      */
-    public static class Tuple3<A, B, C> extends Tuple<A, Tuple2<B, C>> {
+    public static class Tuple3<A, B, C> extends Tuple<A, Tuple<B, C>> {
         /**
          * @param a 1 value
          * @param b 2 value
          * @param c 3 value
          */
         public Tuple3(A a, B b, C c) {
-            super(a, new Tuple2<>(b, c));
+            super(a, new Tuple<>(b, c));
         }
     }
 
@@ -153,13 +153,45 @@ public class Tuple<L, R> {
     }
 
     /**
+     * 4 tuple
+     * 
+     * @param <A> 1 type
+     * @param <B> 2 type
+     * @param <C> 3 type
+     * @param <D> 4 type
+     */
+    public static class Tuple4<A, B, C, D> extends Tuple<A, Tuple3<B, C, D>> {
+        /**
+         * @param a 1 value
+         * @param b 2 value
+         * @param c 3 value
+         * @param d 4 value
+         */
+        public Tuple4(A a, B b, C c, D d) {
+            super(a, new Tuple3<>(b, c, d));
+        }
+    }
+
+    /**
+     * @param a 1 value
+     * @param b 2 value
+     * @param c 3 value
+     * @param d 4 value
+     * @return 4 tuple
+     */
+    public static <A, B, C, D> Tuple4<A, B, C, D> of(A a, B b, C c, D d) {
+        return new Tuple4<>(a, b, c, d);
+    }
+
+    /**
      * @param args not use
      */
     public static void main(String[] args) {
-        java.util.stream.IntStream.rangeClosed(1, 100)
-        .mapToObj(i -> Tuple.of(i % 3 == 0 ? "Fizz" : "", i))
-        .map(t -> Tuple.of(t.l + (t.r.l % 5 == 0 ? "Buzz" : ""), t.r.l))
-        .map(t -> t.l.isEmpty() ? t.r.l : t.l)
-        .forEach(System.out::println);
+        java.util.function.Consumer<Object> echo = System.out::println;
+        echo.accept(Tuple.of(1).equals(Tuple.of(1)));
+        echo.accept(Tuple.of(1, 2).equals(Tuple.of(1, 2)));
+        echo.accept(Tuple.of(1, 2, 3).equals(Tuple.of(1, 2, 3)));
+        java.util.stream.IntStream.rangeClosed(1, 100).mapToObj(i -> Tuple.of(i % 3 == 0 ? "Fizz" : "", i))
+                .map(t -> Tuple.of(t.l + (t.r % 5 == 0 ? "Buzz" : ""), t.r)).map(t -> t.r + ": " + (t.l.isEmpty() ? t.r : t.l)).forEach(echo);
     }
 }

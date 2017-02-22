@@ -251,8 +251,8 @@ public class Xml {
      * @param stream name-value pair
      * @return self
      */
-    public Xml attr(Stream<Pair<String, String>> stream) {
-        stream.forEach(i -> attr(i.a, i.b));
+    public Xml attr(Stream<Tuple<String, String>> stream) {
+        stream.forEach(i -> attr(i.l, i.r));
         return this;
     }
 
@@ -263,7 +263,7 @@ public class Xml {
      */
     public static void main(String[] args) {
         System.out.println(new Xml("br").attr("style", "clear:both").attr("id", "test"));
-        System.out.println(new Xml("br").attr(Stream.of(Tool.pair("style", "clear:both"), Tool.pair("id", "test"))));
+        System.out.println(new Xml("br").attr(Stream.of(Tuple.of("style", "clear:both"), Tuple.of("id", "test"))));
         System.out.println(new Xml("span").text("abc"));
         System.out.println(new Xml("span", "abc"));
         System.out.println(new Xml("ol").child("li").text("1").sibling("li").text("2"));

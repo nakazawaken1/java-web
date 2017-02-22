@@ -157,7 +157,7 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
      */
     @Override
     default Set<java.util.Map.Entry<String, ValueType>> entrySet() {
-        return names().map(i -> Tool.pair(i, getAttr(i).orElse(null))).collect(Collectors.toSet());
+        return names().map(i -> Tuple.of(i, getAttr(i).orElse(null))).collect(Collectors.toSet());
     }
 
     /**

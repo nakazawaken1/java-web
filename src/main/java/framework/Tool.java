@@ -315,30 +315,6 @@ public class Tool {
     }
 
     /**
-     * @param <K> first value type
-     * @param <V> second value type
-     * @param a first value
-     * @param b second value
-     * @return pair tuple
-     */
-    public static <K, V> Pair<K, V> pair(K a, V b) {
-        return new Pair<>(a, b);
-    }
-
-    /**
-     * @param <T> first value type
-     * @param <U> second value type
-     * @param <V> third value type
-     * @param a first value
-     * @param b second value
-     * @param c third value
-     * @return trio tuple
-     */
-    public static <T, U, V> Trio<T, U, V> trio(T a, U b, V c) {
-        return new Trio<>(a, b, c);
-    }
-
-    /**
      * @param <T> value type
      * @param array array
      * @param i index(support negative value)
@@ -520,18 +496,18 @@ public class Tool {
      * @param right second stream
      * @return zipped stream
      */
-    public static <T, U> Stream<Pair<T, U>> zip(Stream<T> left, Stream<U> right) {
+    public static <T, U> Stream<Tuple<T, U>> zip(Stream<T> left, Stream<U> right) {
         Iterator<T> l = left.iterator();
         Iterator<U> r = right.iterator();
-        Iterator<Pair<T, U>> iterator = new Iterator<Pair<T, U>>() {
+        Iterator<Tuple<T, U>> iterator = new Iterator<Tuple<T, U>>() {
             @Override
             public boolean hasNext() {
                 return l.hasNext() && r.hasNext();
             }
 
             @Override
-            public Pair<T, U> next() {
-                return pair(l.next(), r.next());
+            public Tuple<T, U> next() {
+                return Tuple.of(l.next(), r.next());
             }
         };
 
@@ -545,18 +521,18 @@ public class Tool {
      * @param right second stream
      * @return zipped stream
      */
-    public static <T, U> Stream<Pair<T, U>> zipLong(Stream<T> left, Stream<U> right) {
+    public static <T, U> Stream<Tuple<T, U>> zipLong(Stream<T> left, Stream<U> right) {
         Iterator<T> l = left.iterator();
         Iterator<U> r = right.iterator();
-        Iterator<Pair<T, U>> iterator = new Iterator<Pair<T, U>>() {
+        Iterator<Tuple<T, U>> iterator = new Iterator<Tuple<T, U>>() {
             @Override
             public boolean hasNext() {
                 return l.hasNext() || r.hasNext();
             }
 
             @Override
-            public Pair<T, U> next() {
-                return pair(l.hasNext() ? l.next() : null, r.hasNext() ? r.next() : null);
+            public Tuple<T, U> next() {
+                return Tuple.of(l.hasNext() ? l.next() : null, r.hasNext() ? r.next() : null);
             }
         };
 
@@ -706,9 +682,9 @@ public class Tool {
      * copy stream
      * @param in input
      * @param out output
+     * @param buffer buffer
      */
-    public static void copy(InputStream in, OutputStream out) {
-        byte[] buffer = new byte[1024];
+    public static void copy(InputStream in, OutputStream out, byte[] buffer) {
         for (;;) {
             try {
                 int n = in.read(buffer);

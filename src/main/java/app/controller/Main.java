@@ -12,8 +12,8 @@ import framework.Config;
 import framework.Db;
 import framework.Response;
 import framework.Session;
-import framework.Tool;
 import framework.Try;
+import framework.Tuple;
 import framework.Xml;
 import framework.annotation.Http;
 import framework.annotation.Http.Method;
@@ -147,7 +147,7 @@ public class Main {
     @Http
     Response save(Db db, @Valid(Save.class) Person person) {
         db.save(person);
-        return Response.json(Tool.pair("id", person.getId()));
+        return Response.json(Tuple.of("id", person.getId()));
     }
 
     /**
@@ -160,7 +160,7 @@ public class Main {
     @Http
     Response delete(Db db, @Valid(Delete.class) Person person) {
         db.delete(person);
-        return Response.json(Tool.pair("id", person.getId()));
+        return Response.json(Tuple.of("id", person.getId()));
     }
 
     /**

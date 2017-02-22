@@ -20,6 +20,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.sun.net.httpserver.HttpExchange;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
 import framework.Try.TryTriConsumer;
 
@@ -27,6 +28,7 @@ import framework.Try.TryTriConsumer;
  * Response
  */
 @SuppressWarnings("restriction")
+@SuppressFBWarnings("UWF_UNWRITTEN_FIELD")
 public abstract class Response {
 
     /**
@@ -150,7 +152,7 @@ public abstract class Response {
                         }
                     }
                 } else {
-                    Tool.copy(in, r.getOutputStream());
+                    Tool.copy(in, r.getOutputStream(), new byte[1024]);
                 }
             });
         }
@@ -288,7 +290,7 @@ public abstract class Response {
                         }
                     }
                 } else {
-                    Tool.copy(in, r.getResponseBody());
+                    Tool.copy(in, r.getResponseBody(), new byte[1024]);
                 }
             });
         }

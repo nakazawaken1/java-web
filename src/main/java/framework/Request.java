@@ -165,7 +165,7 @@ public abstract class Request implements Attributes<Object> {
         }
 
         @Override
-        public Map<String, Pair<byte[], File>> getFiles() {
+        public Map<String, Tuple<byte[], File>> getFiles() {
             return Collections.emptyMap();
         }
 
@@ -244,7 +244,7 @@ public abstract class Request implements Attributes<Object> {
         /**
          * files
          */
-        final Map<String, Pair<byte[], File>> files = new LinkedHashMap<>(); // file name, file content
+        final Map<String, Tuple<byte[], File>> files = new LinkedHashMap<>(); // file name, file content
         /**
          * attributes
          */
@@ -311,22 +311,22 @@ public abstract class Request implements Attributes<Object> {
                                 continue;
                             }
                             if (filename == null) {// parameter value
-                                Pair<byte[], File> pair = readBody(in, boundary);
-                                if (pair.b != null) {
-                                    logger.config(pair.b + " deleted " + pair.b.delete());
+                                Tuple<byte[], File> pair = readBody(in, boundary);
+                                if (pair.r != null) {
+                                    logger.config(pair.r + " deleted " + pair.r.delete());
                                 }
-                                if (pair.a == null) {
+                                if (pair.l == null) {
                                     logger.info("413 payload too large");
                                     break loop;
                                 }
-                                add(parameters, name, new String(pair.a, StandardCharsets.UTF_8));
+                                add(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
                             } else {
                                 add(parameters, name, filename);
                                 if (length > 0) {
                                     if (length < fileSizeThreshold) {
                                         byte[] bytes = new byte[length];
                                         int n = in.read(bytes);
-                                        files.put(filename, Tool.pair(Arrays.copyOfRange(bytes, 0, n), null));
+                                        files.put(filename, Tuple.of(Arrays.copyOfRange(bytes, 0, n), null));
                                     } else {
                                         File f = File.createTempFile("upload", "file", Config.app_upload_folder.get().map(File::new).orElse(null));
                                         f.deleteOnExit();
@@ -334,7 +334,7 @@ public abstract class Request implements Attributes<Object> {
                                             to.transferFrom(Channels.newChannel(in), 0, length);
                                         }
                                         logger.info("saved " + f + " " + length + "bytes");
-                                        files.put(filename, Tool.pair(null, f));
+                                        files.put(filename, Tuple.of(null, f));
                                     }
                                 } else if (!filename.isEmpty()) {
                                     files.put(filename, readBody(in, boundary));
@@ -388,7 +388,7 @@ public abstract class Request implements Attributes<Object> {
         }
 
         @Override
-        public Map<String, Pair<byte[], File>> getFiles() {
+        public Map<String, Tuple<byte[], File>> getFiles() {
             return files;
         }
 
@@ -414,7 +414,7 @@ public abstract class Request implements Attributes<Object> {
          * @return body(bytes or file)
          * @throws IOException IO error
          */
-        static Pair<byte[], File> readBody(InputStream in, String boundary) throws IOException {
+        static Tuple<byte[], File> readBody(InputStream in, String boundary) throws IOException {
             ByteArrayOutputStream lines = new ByteArrayOutputStream();
             OutputStream out = lines;
             try {
@@ -449,10 +449,10 @@ public abstract class Request implements Attributes<Object> {
                     }
                 }
                 if (out == lines) {
-                    return Tool.pair(lines.toByteArray(), null);
+                    return Tuple.of(lines.toByteArray(), null);
                 }
                 logger.info("saved " + f + " " + size + "bytes");
-                return Tool.pair(null, f);
+                return Tuple.of(null, f);
             } finally {
                 lines.close();
                 out.close();
@@ -675,7 +675,7 @@ public abstract class Request implements Attributes<Object> {
     /**
      * @return files
      */
-    public abstract Map<String, Pair<byte[], File>> getFiles();
+    public abstract Map<String, Tuple<byte[], File>> getFiles();
 
     /**
      * @return headers
