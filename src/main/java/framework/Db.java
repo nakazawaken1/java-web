@@ -2,6 +2,8 @@ package framework;
 
 import java.io.FileNotFoundException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Connection;
@@ -41,8 +43,11 @@ import java.util.stream.StreamSupport;
 import javax.sql.DataSource;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
+import framework.annotation.DbName;
+import framework.annotation.Id;
 
 /**
  * database
@@ -366,12 +371,12 @@ public class Db implements AutoCloseable {
                 Class<?> c = Class.forName(Config.getOrThrow(Config.db_datasource_class + key, RuntimeException::new));
                 DataSource ds = (DataSource) c.newInstance();
                 Config.find(Config.db_url + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
-                    if (value.startsWith("jdbc:h2:")) { /*hack: h2 Duplicate property "USER"*/
+                    if (value.startsWith("jdbc:h2:")) { /* hack: h2 Duplicate property "USER" */
                         List<String> list = new ArrayList<>();
-                        for(String s : value.split("\\s*;\\s*")) {
+                        for (String s : value.split("\\s*;\\s*")) {
                             String[] a = s.split("\\s*=\\s*", 2);
-                            if("user".equalsIgnoreCase(a[0])) {
-                                if(a.length > 1) {
+                            if ("user".equalsIgnoreCase(a[0])) {
+                                if (a.length > 1) {
                                     c.getMethod("setUser", String.class).invoke(ds, a[1]);
                                 }
                             } else {
@@ -1934,43 +1939,114 @@ public class Db implements AutoCloseable {
 
     /**
      * @param <T> model type
-     * @param model find target
-     * @param targetFields condition fields
+     * @param model conditions
+     * @param targetColumns fill columns
      * @return found list
      */
-    public <T> Stream<T> find(T model, String... targetFields) {
-        throw new UnsupportedOperationException();
+    @SuppressWarnings("unchecked")
+    public <T extends S, S> Stream<S> find(T model, String... targetColumns) {
+        List<Field> fields;
+        Class<?> c = model.getClass();
+        if (targetColumns == null || targetColumns.length <= 0) {
+            targetColumns = Tool.array();
+            fields = Stream.of(c.getDeclaredFields()).filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
+        } else {
+            fields = Stream.of(targetColumns).map(Try.f(s -> c.getField(s))).collect(Collectors.toList());
+        }
+        return select(targetColumns).from(getTableName(model)).rows().map(rs -> {
+            return fields.stream().collect(Try.s(() -> (T) c.newInstance()), Try.c((row, field) -> field.set(row, rs.getObject(field.getName()))), (a, b) -> {
+            });
+        });
     }
 
     /**
      * @param model insert target
-     * @param targetFields save fields(primary key is automatic inclusion)
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return inserted rows
      */
-    public void insert(Object model, String... targetFields) {
-        throw new UnsupportedOperationException();
+    public int insert(Object model, String... targetColumns) {
+        return modelAction(this::insert, model, targetColumns);
     }
 
     /**
      * @param model update target
-     * @param targetFields save fields(primary key is automatic inclusion)
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return updated rows
      */
-    public void update(Object model, String... targetFields) {
-        throw new UnsupportedOperationException();
+    public int update(Object model, String... targetColumns) {
+        return modelAction(this::update, model, targetColumns);
     }
 
     /**
      * @param model save target
-     * @param targetFields save fields(primary key is automatic inclusion)
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return true: inserted、 false: updated
      */
-    public void save(Object model, String... targetFields) {
-        throw new UnsupportedOperationException();
+    public boolean save(Object model, String... targetColumns) {
+        return modelAction(this::save, model, targetColumns);
     }
 
     /**
      * @param model delete target
-     * @param keyFields key fields
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return deleted rows
      */
-    public void delete(Object model, String... keyFields) {
-        throw new UnsupportedOperationException();
+    public int delete(Object model, String... targetColumns) {
+        return modelAction(this::delete, model, targetColumns);
+    }
+
+    /**
+     * @param action action
+     * @param model target model
+     * @param targetColumns target column names(primary key is automatic inclusion)
+     * @return action result
+     */
+    static <T> T modelAction(QuadFunction<String, String[], Integer, Object[], T> action, Object model, String... targetColumns) {
+        List<String> names = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+        List<String> keys = Stream.of(model.getClass().getDeclaredFields()).filter(f -> f.getAnnotation(Id.class) != null).map(Try.f(f -> {
+            String name = f.getName();
+            names.add(name);
+            values.add(f.get(model));
+            return name;
+        })).collect(Collectors.toList());
+        if (targetColumns == null || targetColumns.length <= 0) {
+            Stream.of(model.getClass().getDeclaredFields()).map(f -> Tuple.of(getColumnName(f), f)).filter(t -> !keys.contains(t.l))
+                    .filter(t -> !Modifier.isTransient(t.r.getModifiers())).forEach(Try.c(t -> {
+                        names.add(t.l);
+                        values.add(t.r.get(model));
+                    }));
+        } else {
+            for (String name : targetColumns) {
+                if (keys.contains(name)) {
+                    continue;
+                }
+                names.add(name);
+                Try.r(() -> values.add(model.getClass().getDeclaredField(name).get(model))).run();
+            }
+        }
+        return action.apply(getTableName(model), names.toArray(new String[names.size()]), keys.size(), values.toArray());
+    }
+
+    /**
+     * @param model model
+     * @return table name
+     */
+    public static String getTableName(Object model) {
+        for (Class<?> c = model.getClass(); c != Object.class; c = c.getSuperclass()) {
+            DbName name = c.getAnnotation(DbName.class);
+            if (name != null) {
+                return name.value();
+            }
+        }
+        return model.getClass().getSimpleName();
+    }
+
+    /**
+     * @param field field
+     * @return column name
+     */
+    public static String getColumnName(Field field) {
+        return Optional.ofNullable(field.getAnnotation(DbName.class)).map(DbName::value).orElseGet(field::getName);
     }
 }

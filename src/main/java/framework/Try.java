@@ -453,4 +453,44 @@ public class Try {
     public static <T> Predicate<T> p(TryPredicate<T> predicate) {
         return p(predicate, catcher);
     }
+
+    /**
+     * Tri function
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     * @param <R> other object type
+     */
+    @FunctionalInterface
+    public static interface TriFunction<T, U, V, R> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         * @return return object
+         */
+        R apply(T t, U u, V v);
+    }
+
+    /**
+     * Quad function
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     * @param <W> other object type
+     * @param <R> return object type
+     */
+    @FunctionalInterface
+    public static interface QuadFunction<T, U, V, W, R> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         * @param w other object
+         * @return return object
+         */
+        R apply(T t, U u, V v, W w);
+    }
 }
