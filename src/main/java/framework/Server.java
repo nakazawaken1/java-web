@@ -14,6 +14,7 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.JarURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
@@ -31,12 +32,15 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -401,13 +405,27 @@ public class Server implements Servlet {
             server.logger.log(Level.WARNING, "setup error", e);
         }
 
+        // start H2 DB console
         if (Config.app_h2_port.integer() > 0) {
             try {
-                org.h2.tools.Server db = org.h2.tools.Server.createWebServer("-webAllowOthers", "-webPort", Config.app_h2_port.text(), "-properties", "null")
-                        .start();
+                File config = new File(Tool.suffix(System.getProperty("java.io.tmpdir"), File.separator) + ".h2.server.properties");
+                List<String> lines = new ArrayList<>();
+                lines.add("webAllowOthers=" + Config.app_h2_allow_remote.isTrue());
+                lines.add("webPort=" + Config.app_h2_port.text());
+                lines.add("webSSL=" + Config.app_h2_ssl.isTrue());
+                AtomicInteger index = new AtomicInteger(-1);
+                Config.properties.entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
+                        .map(p -> Tuple.of((String) p.getKey(), (String) p.getValue())).filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
+                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\="))
+                        .forEach(lines::add);
+                Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
+                config.deleteOnExit();
+                org.h2.tools.Server db = org.h2.tools.Server.createWebServer("-properties", config.getParent()).start();
                 Runtime.getRuntime().addShutdownHook(new Thread(db::stop));
             } catch (SQLException e) {
                 server.logger.log(Level.WARNING, "h2 error", e);
+            } catch (IOException e) {
+                server.logger.log(Level.WARNING, "h2 config error", e);
             }
         }
 

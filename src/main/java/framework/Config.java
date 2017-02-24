@@ -75,7 +75,7 @@ public enum Config {
      * database connection string(inclucde id and password)
      */
     @Help("database connection string(inclucde id and password)")
-    db_url,
+    db,
 
     /**
      * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
@@ -202,6 +202,18 @@ public enum Config {
      */
     @Help("h2 web console port(disabled if negative)")
     app_h2_port(-1),
+    
+    /**
+     * h2 web console access limited local only
+     */
+    @Help("h2 web console access allowed remote client")
+    app_h2_allow_remote(false),
+    
+    /**
+     * h2 web console using https
+     */
+    @Help("h2 web console using https")
+    app_h2_ssl(false),
 
     ;
 
@@ -286,7 +298,7 @@ public enum Config {
         Set<String> dbKeys = new HashSet<>();
         for (Config i : Config.values()) {
             String key = i.toString();
-            if (key.startsWith("db.") && i != db_suffix) {
+            if (key.startsWith("db") && i != db_suffix) {
                 dbKeys.add(key);
             }
             properties.setProperty(key, i.text());
@@ -295,10 +307,10 @@ public enum Config {
             /* overwrite file properties */
             properties.load(reader);
 
-            /* overwrite system properties(prefix "app. db. log." only) */
+            /* overwrite system properties(prefix "app db log" only) */
             System.getProperties().forEach((k, v) -> {
                 String key = (String) k;
-                if (Stream.of("app.", "db.", "log.").anyMatch(key::startsWith)) {
+                if (Stream.of("app", "db", "log").anyMatch(key::startsWith)) {
                     properties.setProperty(key, (String) v);
                 }
             });

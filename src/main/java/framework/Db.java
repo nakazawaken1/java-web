@@ -62,23 +62,42 @@ public class Db implements AutoCloseable {
         /**
          * H2
          */
-        H2,
+        H2("org.h2.Driver", "org.h2.jdbcx.JdbcDataSource"),
         /**
          * MySQL
          */
-        MYSQL,
+        MYSQL("com.mysql.jdbc.Driver", "com.mysql.jdbc.jdbc2.optional.MysqlDataSource"),
         /**
          * PostgreSQL
          */
-        POSTGRESQL,
+        POSTGRESQL("org.postgresql.Driver", "org.postgresql.ds.PGSimpleDataSource"),
         /**
          * SQLServer
          */
-        SQLSERVER,
+        SQLSERVER("com.microsoft.sqlserver.jdbc.SQLServerDriver", "com.microsoft.sqlserver.jdbc.SQLServerDataSource"),
         /**
          * Oracle
          */
-        ORACLE;
+        ORACLE("oracle.jdbc.OracleDriver", "oracle.jdbc.pool.OracleDataSource");
+
+        /**
+         * default driver
+         */
+        public final String driver;
+
+        /**
+         * default data source
+         */
+        public final String dataSource;
+
+        /**
+         * @param driver driver
+         * @param dataSource data source
+         */
+        private Type(String driver, String dataSource) {
+            this.driver = driver;
+            this.dataSource = dataSource;
+        }
 
         /*
          * (non-Javadoc)
@@ -88,6 +107,14 @@ public class Db implements AutoCloseable {
         @Override
         public String toString() {
             return super.toString().toLowerCase();
+        }
+
+        /**
+         * @param url URL
+         * @return type
+         */
+        public static Type fromUrl(String url) {
+            return Enum.valueOf(Type.class, url.split(":")[1].toUpperCase());
         }
     }
 
@@ -214,7 +241,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Enum.valueOf(Type.class, Config.getOrThrow(Config.db_url + suffix, SQLException::new).split(":")[1].toUpperCase());
+            Type type = Enum.valueOf(Type.class, Config.getOrThrow(Config.db + suffix, SQLException::new).split(":")[1].toUpperCase());
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -368,10 +395,11 @@ public class Db implements AutoCloseable {
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, key -> {
             try {
-                Class<?> c = Class.forName(Config.getOrThrow(Config.db_datasource_class + key, RuntimeException::new));
+                Type type = Type.fromUrl(Config.find(Config.db + key).orElseThrow(RuntimeException::new));
+                Class<?> c = Class.forName(Config.find(Config.db_datasource_class + key).orElse(type.dataSource));
                 DataSource ds = (DataSource) c.newInstance();
-                Config.find(Config.db_url + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
-                    if (value.startsWith("jdbc:h2:")) { /* hack: h2 Duplicate property "USER" */
+                Config.find(Config.db + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
+                    if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
                         List<String> list = new ArrayList<>();
                         for (String s : value.split("\\s*;\\s*")) {
                             String[] a = s.split("\\s*=\\s*", 2);
