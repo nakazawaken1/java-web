@@ -344,8 +344,7 @@ public class Tool {
      */
     public static Stream<String> getResources(String location) {
         return Config.toURL(location).map(Try.f(i -> {
-            boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), e -> {
-            }).test(i);
+            boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
             if ("jar".equals(i.getProtocol())) {
                 Logger.getGlobal().info("jar inside");
                 return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());

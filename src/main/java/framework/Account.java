@@ -50,7 +50,8 @@ public class Account implements Serializable {
                 .orElseThrow(InstantiationException::new);
         this.id = a[0];
         this.name = a[2];
-        this.roles = Tool.string(a[3]).map(Try.f(i -> Tool.array((Class<? extends User>) Class.forName(i)))).orElse(null);
+        this.roles = Tool.string(a[3]).map(Try.f(i -> Class.forName(i), (e, i) -> Try.f(j -> Class.forName(User.class.getName() + "$" + j)).apply(i)))
+                .map(c -> Tool.array((Class<? extends User>) c)).orElse(null);
     }
 
     /**

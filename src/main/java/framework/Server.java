@@ -312,8 +312,7 @@ public class Server implements Servlet {
                 default:
                     return false;
                 }
-            }, e -> {
-            })).isPresent()) {
+            }, (e, i) -> false)).isPresent()) {
                 Response.redirect(Tool.trim(null, application.getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
             } else {
                 Response.file(request.getPath()).flush();

@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.sql.SQLException;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -16,19 +18,19 @@ import java.util.function.Supplier;
  * support lambda exception
  */
 public class Try {
-    
+
     /**
      * Exception catcher
      */
     public static final Consumer<Exception> catcher = e -> {
-        if(e instanceof RuntimeException) {
-            throw (RuntimeException)e;
+        if (e instanceof RuntimeException) {
+            throw (RuntimeException) e;
         }
-        if(e instanceof IOException) {
-            throw new UncheckedIOException((IOException)e);
+        if (e instanceof IOException) {
+            throw new UncheckedIOException((IOException) e);
         }
-        if(e instanceof SQLException) {
-            throw new UncheckedSQLException((SQLException)e);
+        if (e instanceof SQLException) {
+            throw new UncheckedSQLException((SQLException) e);
         }
         throw new RuntimeException(e);
     };
@@ -51,14 +53,14 @@ public class Try {
      */
     public static Runnable r(TryRunnable runnable, Consumer<Exception> error) {
         return () -> {
-                try {
-                    runnable.run();
-                } catch (Exception e) {
-                    error.accept(e);
-                }
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                error.accept(e);
+            }
         };
     }
-    
+
     /**
      * @param runnable throwable runnable
      * @return runnable
@@ -87,13 +89,13 @@ public class Try {
      * @param error error action
      * @return consumer
      */
-    public static <T> Consumer<T> c(TryConsumer<T> consumer, Consumer<Exception> error) {
+    public static <T> Consumer<T> c(TryConsumer<T> consumer, BiConsumer<Exception, T> error) {
         return value -> {
-                try {
-                    consumer.accept(value);
-                } catch (Exception e) {
-                    error.accept(e);
-                }
+            try {
+                consumer.accept(value);
+            } catch (Exception e) {
+                error.accept(e, value);
+            }
         };
     }
 
@@ -103,7 +105,7 @@ public class Try {
      * @return consumer
      */
     public static <T> Consumer<T> c(TryConsumer<T> consumer) {
-        return c(consumer, catcher);
+        return c(consumer, (e, a) -> catcher.accept(e));
     }
 
     /**
@@ -123,12 +125,12 @@ public class Try {
      * @param error error action
      * @return consumer
      */
-    public static IntConsumer intC(TryIntConsumer consumer, Consumer<Exception> error) {
+    public static IntConsumer intC(TryIntConsumer consumer, ObjIntConsumer<Exception> error) {
         return t -> {
             try {
                 consumer.accept(t);
             } catch (Exception e) {
-                error.accept(e);
+                error.accept(e, t);
             }
         };
     }
@@ -138,9 +140,9 @@ public class Try {
      * @return consumer
      */
     public static IntConsumer intC(TryIntConsumer consumer) {
-        return intC(consumer, catcher);
+        return intC(consumer, (e, a) -> catcher.accept(e));
     }
-    
+
     /**
      * throwable consumer
      *
@@ -164,12 +166,12 @@ public class Try {
      * @param error error action
      * @return consumer
      */
-    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer, Consumer<Exception> error) {
+    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer, TriConsumer<Exception, T, U> error) {
         return (t, u) -> {
             try {
                 consumer.accept(t, u);
             } catch (Exception e) {
-                error.accept(e);
+                error.accept(e, t, u);
             }
         };
     }
@@ -181,7 +183,7 @@ public class Try {
      * @return consumer
      */
     public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer) {
-        return c(consumer, catcher);
+        return c(consumer, (e, t, u) -> catcher.accept(e));
     }
 
     /**
@@ -220,6 +222,25 @@ public class Try {
     }
 
     /**
+     * 4 consumer
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     * @param <W> other object type
+     */
+    @FunctionalInterface
+    public static interface QuadConsumer<T, U, V, W> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         * @param w other object
+         */
+        void accept(T t, U u, V v, W w);
+    }
+
+    /**
      * @param consumer consumer
      * @param error error action
      * @return consumer
@@ -227,12 +248,12 @@ public class Try {
      * @param <U> other object type
      * @param <V> other object type
      */
-    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer, Consumer<Exception> error) {
+    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer, QuadConsumer<Exception, T, U, V> error) {
         return (t, u, v) -> {
             try {
                 consumer.accept(t, u, v);
             } catch (Exception e) {
-                error.accept(e);
+                error.accept(e, t, u, v);
             }
         };
     }
@@ -245,7 +266,7 @@ public class Try {
      * @param <V> other object type
      */
     public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer) {
-        return c(consumer, catcher);
+        return c(consumer, (e, t, u, v) -> catcher.accept(e));
     }
 
     /**
@@ -264,17 +285,33 @@ public class Try {
     }
 
     /**
+     * throwable consumer
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     */
+    @FunctionalInterface
+    public static interface ObjObjIntConsumer<T, U> {
+        /**
+         * @param t object
+         * @param u other value
+         * @param i integer value
+         */
+        void accept(T t, U u, int i);
+    }
+
+    /**
      * @param <T> object type
      * @param consumer throwable consumer
      * @param error error action
      * @return consumer
      */
-    public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer, Consumer<Exception> error) {
-        return (t, u) -> {
+    public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer, ObjObjIntConsumer<Exception, T> error) {
+        return (t, i) -> {
             try {
-                consumer.accept(t, u);
+                consumer.accept(t, i);
             } catch (Exception e) {
-                error.accept(e);
+                error.accept(e, t, i);
             }
         };
     }
@@ -285,7 +322,7 @@ public class Try {
      * @return consumer
      */
     public static <T> ObjIntConsumer<T> intC(TryObjIntConsumer<T> consumer) {
-        return intC(consumer, catcher);
+        return intC(consumer, (e, t, i) -> catcher.accept(e));
     }
 
     /**
@@ -311,13 +348,12 @@ public class Try {
      * @param error error action
      * @return function
      */
-    public static <A, R> Function<A, R> f(TryFunction<A, R> function, Consumer<Exception> error) {
+    public static <A, R> Function<A, R> f(TryFunction<A, R> function, BiFunction<Exception, A, R> error) {
         return argument -> {
             try {
                 return function.apply(argument);
             } catch (Exception e) {
-                error.accept(e);
-                return null;
+                return error.apply(e, argument);
             }
         };
     }
@@ -329,7 +365,10 @@ public class Try {
      * @return function
      */
     public static <A, R> Function<A, R> f(TryFunction<A, R> function) {
-        return f(function, catcher);
+        return f(function, (e, a) -> {
+            catcher.accept(e);
+            return null;
+        });
     }
 
     /**
@@ -353,12 +392,12 @@ public class Try {
      * @param error error action
      * @return function
      */
-    public static <R> IntFunction<R> intF(TryIntFunction<R> function, Consumer<Exception> error) {
-        return t -> {
+    public static <R> IntFunction<R> intF(TryIntFunction<R> function, ObjIntConsumer<Exception> error) {
+        return i -> {
             try {
-                return function.apply(t);
+                return function.apply(i);
             } catch (Exception e) {
-                error.accept(e);
+                error.accept(e, i);
                 return null;
             }
         };
@@ -370,7 +409,7 @@ public class Try {
      * @return function
      */
     public static <R> IntFunction<R> intF(TryIntFunction<R> function) {
-        return intF(function, catcher);
+        return intF(function, (e, i) -> catcher.accept(e));
     }
 
     /**
@@ -393,13 +432,12 @@ public class Try {
      * @param error error action
      * @return function
      */
-    public static <R> Supplier<R> s(TrySupplier<R> function, Consumer<Exception> error) {
+    public static <R> Supplier<R> s(TrySupplier<R> function, Function<Exception, R> error) {
         return () -> {
             try {
                 return function.get();
             } catch (Exception e) {
-                error.accept(e);
-                return null;
+                return error.apply(e);
             }
         };
     }
@@ -410,7 +448,10 @@ public class Try {
      * @return function
      */
     public static <R> Supplier<R> s(TrySupplier<R> function) {
-        return s(function, catcher);
+        return s(function, e -> {
+            catcher.accept(e);
+            return null;
+        });
     }
 
     /**
@@ -434,13 +475,12 @@ public class Try {
      * @param error error action
      * @return consumer
      */
-    public static <T> Predicate<T> p(TryPredicate<T> predicate, Consumer<Exception> error) {
+    public static <T> Predicate<T> p(TryPredicate<T> predicate, BiPredicate<Exception, T> error) {
         return t -> {
             try {
                 return predicate.test(t);
             } catch (Exception e) {
-                error.accept(e);
-                return false;
+                return error.test(e, t);
             }
         };
     }
@@ -451,7 +491,10 @@ public class Try {
      * @return consumer
      */
     public static <T> Predicate<T> p(TryPredicate<T> predicate) {
-        return p(predicate, catcher);
+        return p(predicate, (e, t) -> {
+            catcher.accept(e);
+            return false;
+        });
     }
 
     /**

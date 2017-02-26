@@ -63,6 +63,6 @@ public class Lazy<T> implements AutoCloseable {
      */
     @Override
     public void close() {
-        instance.filter(i -> i instanceof AutoCloseable).ifPresent(Try.c(i -> ((AutoCloseable) i).close(), e -> Logger.getGlobal().log(Level.WARNING, "close error", e)));
+        instance.filter(i -> i instanceof AutoCloseable).ifPresent(Try.c(i -> ((AutoCloseable) i).close(), (e, i) -> Logger.getGlobal().log(Level.WARNING, "close error", e)));
     }
 }
