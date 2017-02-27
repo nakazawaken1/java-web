@@ -1,6 +1,7 @@
 package framework;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +19,10 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
@@ -47,6 +51,12 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import javax.activation.MimetypesFileTypeMap;
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
 import org.codehaus.jackson.annotate.JsonMethod;
@@ -333,7 +343,8 @@ public class Tool {
      */
     public static Stream<Class<?>> getClasses(String packageName) {
         String prefix = Tool.string(packageName).map(i -> i + '.').orElse("");
-        return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class")).map(f -> prefix + f.substring(0, f.length() - ".class".length())).<Class<?>>map(Try.f(Class::forName));
+        return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class")).map(f -> prefix + f.substring(0, f.length() - ".class".length()))
+                .<Class<?>>map(Try.f(Class::forName));
     }
 
     /**
@@ -366,13 +377,15 @@ public class Tool {
      * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
-        return jar.stream().onClose(Try.r(jar::close)).map(JarEntry::getName).filter(i -> i.startsWith(location)).map(i -> trim("/", i.substring(location.length()), null));
+        return jar.stream().onClose(Try.r(jar::close)).map(JarEntry::getName).filter(i -> i.startsWith(location))
+                .map(i -> trim("/", i.substring(location.length()), null));
     }
 
     /**
      * utf8 decoder
      */
-    static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder().onUnmappableCharacter(CodingErrorAction.REPLACE).onMalformedInput(CodingErrorAction.REPLACE);
+    static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder().onUnmappableCharacter(CodingErrorAction.REPLACE)
+            .onMalformedInput(CodingErrorAction.REPLACE);
 
     /**
      * list files in folder
@@ -453,6 +466,7 @@ public class Tool {
 
     /**
      * create reader
+     * 
      * @param in input
      * @return reader
      */
@@ -564,8 +578,8 @@ public class Tool {
                     }
                 }
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
-                ChronoUnit[] units = {ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS};
-                ChronoField[] last = {null};
+                ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
+                ChronoField[] last = { null };
                 Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
                 ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey())
                         .reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
@@ -578,8 +592,8 @@ public class Tool {
             }
             if (!value.isEmpty()) {
                 List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
-                ChronoField[] last = {null};
-                ChronoUnit[] units = {ChronoUnit.MONTHS, ChronoUnit.YEARS, null};
+                ChronoField[] last = { null };
+                ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
                 Stream<Long> values = Stream.of(value.split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
                 ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
                         (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
@@ -591,24 +605,6 @@ public class Tool {
             }
             Logger.getGlobal().info("next: " + next);
             return ChronoUnit.MILLIS.between(from, next);
-        }
-    }
-
-    /**
-     * test
-     *
-     * @param args text
-     */
-    public static void main(String[] args) {
-//        Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
-//        Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
-//        // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
-//        // ZonedDateTime.now()));
-//        try(Stream<String> list = getResources("app/controller")) {
-//            list.forEach(Logger.getGlobal()::info);
-//        }
-        try (Stream<Class<?>> list = getClasses("test")) {
-            list.forEach(c -> Logger.getGlobal().info(c.getCanonicalName()));
         }
     }
 
@@ -668,26 +664,35 @@ public class Tool {
      * @param algorithm algorithm
      * @return digest
      */
-    public static String digest(byte[] bytes, String algorithm) {
+    public static byte[] digest(byte[] bytes, String algorithm) {
         MessageDigest digest = Try.s(() -> MessageDigest.getInstance(algorithm)).get();
         digest.update(bytes);
-        StringBuilder result = new StringBuilder();
-        for (byte b : digest.digest()) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
+        return digest.digest();
     }
-    
+
     /**
      * @param text text
      * @return sha256
      */
     public static String hash(String text) {
-        return Tool.digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256");
+        return hex(digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256"));
+    }
+
+    /**
+     * @param bytes bytes
+     * @return hex string
+     */
+    public static String hex(byte[] bytes) {
+        StringBuilder result = new StringBuilder();
+        for (byte b : bytes) {
+            result.append(String.format("%02X", b));
+        }
+        return result.toString();
     }
 
     /**
      * copy stream
+     * 
      * @param in input
      * @param out output
      * @param buffer buffer
@@ -705,7 +710,50 @@ public class Tool {
             }
         }
     }
-    
+
+    /**
+     * Initial Vector
+     */
+    static final String IV = "CYKJRWWIYWJHSLEU";
+
+    /**
+     * encrypt stream
+     * 
+     * @param out output
+     * @param key salt
+     * @param iv initial vector(16characters=128bit)
+     * @return OutputStream
+     */
+    public static OutputStream withEncrypt(OutputStream out, String key, String... iv) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
+                    new IvParameterSpec((iv.length > 0 ? iv[0] : IV).getBytes(StandardCharsets.UTF_8)));
+            return new CipherOutputStream(out, cipher);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * decrypt stream
+     * 
+     * @param in input
+     * @param key salt
+     * @param iv initial vector(16characters=128bit)
+     * @return InputStream
+     */
+    public static InputStream withDecrypt(InputStream in, String key, String... iv) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
+                    new IvParameterSpec((iv.length > 0 ? iv[0] : IV).getBytes(StandardCharsets.UTF_8)));
+            return new CipherInputStream(in, cipher);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * @return logger
      */
@@ -726,5 +774,35 @@ public class Tool {
             list.add(value);
             map.put(key, list);
         }
+    }
+
+    /**
+     * test
+     *
+     * @param args text
+     */
+    public static void main(String[] args) {
+        // Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
+        // Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
+        // // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
+        // // ZonedDateTime.now()));
+        // try(Stream<String> list = getResources("app/controller")) {
+        // list.forEach(Logger.getGlobal()::info);
+        // }
+        // try (Stream<Class<?>> list = getClasses("test")) {
+        // list.forEach(c -> Logger.getGlobal().info(c.getCanonicalName()));
+        // }
+        String password = "abcd123";
+        String text = "Encrypted target text";
+        Logger.getGlobal().info("source: " + text);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        byte[] encrypted = bytes.toByteArray();
+        Logger.getGlobal().info("encrypted: " + hex(encrypted));
+        Logger.getGlobal().info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)));
     }
 }

@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -155,7 +154,7 @@ public abstract class Session implements Attributes<Object> {
             id = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
                     .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
             if (id == null) {
-                id = Tool.digest(("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()).getBytes(StandardCharsets.UTF_8), "SHA-256");
+                id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
                 exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
             } else {
                 try (Db db = Db.connect()) {
