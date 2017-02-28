@@ -12,6 +12,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.nio.charset.CharsetDecoder;
@@ -414,7 +415,7 @@ public class Tool {
             char[] buffer = new char[1024];
             for (;;) {
                 int n = reader.read(buffer);
-                if (n <= 0) {
+                if (n < 0) {
                     break;
                 }
                 result.append(buffer, 0, n);
@@ -736,6 +737,22 @@ public class Tool {
     }
 
     /**
+     * @param text text
+     * @param key slat
+     * @param iv initial vector
+     * @return encrypted text
+     */
+    public static String encrypt(String text, String key, String... iv) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (OutputStream out = withEncrypt(bytes, key, iv)) { // must to close before decrypt
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return hex(bytes.toByteArray());
+    }
+
+    /**
      * decrypt stream
      * 
      * @param in input
@@ -752,6 +769,28 @@ public class Tool {
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @param text encrypted text
+     * @param key slat
+     * @param iv initial vector
+     * @return decrypted text
+     */
+    public static String decrypt(String text, String key, String... iv) {
+        return loadText(withDecrypt(new InputStream() {
+            int max = text.length();
+            int index = 0;
+
+            @Override
+            public int read() throws IOException {
+                index += 2;
+                if (index > max) {
+                    return -1;
+                }
+                return Integer.parseInt(text.substring(index - 2, index), 16);
+            }
+        }, key, iv));
     }
 
     /**
@@ -777,6 +816,144 @@ public class Tool {
     }
 
     /**
+     * base 128 characters
+     */
+    static final byte[] base128 = Try
+            .s(() -> "ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ!#$%&()*+-/0123456789:;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz{}"
+                    .getBytes("MS932"))
+            .get();
+
+    /**
+     * @param out output
+     * @return base128 OutputStream
+     */
+    public static OutputStream withBase128Encode(OutputStream out) {
+        return new OutputStream() {
+            byte[] buffer = new byte[7];
+            int length = buffer.length;
+            int position = 0;
+
+            @Override
+            public void close() throws IOException {
+                if (position > 0) {
+                    out.write(base128[buffer[0] & 0x7f]);
+                }
+                if (position > 0) {
+                    out.write(base128[((buffer[0] >> 7) & 0x01) | ((buffer[1] << 1) & 0x7f)]);
+                }
+                if (position > 1) {
+                    out.write(base128[((buffer[1] >> 6) & 0x03) | ((buffer[2] << 2) & 0x7f)]);
+                }
+                if (position > 2) {
+                    out.write(base128[((buffer[2] >> 5) & 0x07) | ((buffer[3] << 3) & 0x7f)]);
+                }
+                if (position > 3) {
+                    out.write(base128[((buffer[3] >> 4) & 0x0f) | ((buffer[4] << 4) & 0x7f)]);
+                }
+                if (position > 4) {
+                    out.write(base128[((buffer[4] >> 3) & 0x1f) | ((buffer[5] << 5) & 0x7f)]);
+                }
+                if (position > 5) {
+                    out.write(base128[((buffer[5] >> 2) & 0x3f) | ((buffer[6] << 6) & 0x7f)]);
+                }
+                if (position > 6) {
+                    out.write(base128[(buffer[6] >> 1) & 0x7f]);
+                }
+                position = 0;
+            }
+
+            @Override
+            public void write(int b) throws IOException {
+                if (position < length) {
+                    buffer[position] = (byte) b;
+                    position++;
+                }
+                if (position < length) {
+                    return;
+                }
+                close();
+            }
+        };
+    }
+
+    /**
+     * @param text text
+     * @return base128 text
+     */
+    public static String base128Encode(String text) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (OutputStream out = withBase128Encode(bytes)) { // must to close before encoded
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try {
+            return bytes.toString("MS932");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @param in input
+     * @return base128 InputStream
+     */
+    public static InputStream withBase128Decode(InputStream in) {
+        return new InputStream() {
+            byte[] buffer = new byte[8];
+            int length = buffer.length;
+            int position = 0;
+            int max;
+
+            @Override
+            public int read() throws IOException {
+                if (position == 0) {
+                    max = in.read(buffer, 0, length);
+                    if (max < 0) {
+                        return -1;
+                    }
+                    for (int i = 0; i < max; i++) {
+                        int b = Arrays.binarySearch(base128, buffer[i]);
+                        if(b == -1) {
+                            throw new IllegalArgumentException("Invalid base128 character: " + new String(buffer, i, i + 1, "MS932") + String.format(" (0x%02X)", buffer[i]));
+                        }
+                        buffer[i] = (byte) b;
+                    }
+                }
+                switch (position++) {
+                case 0:
+                    return max < 2 ? -1 : ((buffer[0] & 0xff) >> 0) | ((buffer[1] & 0x01) << 7);
+                case 1:
+                    return max < 3 ? -1 : ((buffer[1] & 0xfe) >> 1) | ((buffer[2] & 0x03) << 6);
+                case 2:
+                    return max < 4 ? -1 : ((buffer[2] & 0xfc) >> 2) | ((buffer[3] & 0x07) << 5);
+                case 3:
+                    return max < 5 ? -1 : ((buffer[3] & 0xf8) >> 3) | ((buffer[4] & 0x0f) << 4);
+                case 4:
+                    return max < 6 ? -1 : ((buffer[4] & 0xf0) >> 4) | ((buffer[5] & 0x1f) << 3);
+                case 5:
+                    return max < 7 ? -1 : ((buffer[5] & 0xe0) >> 5) | ((buffer[6] & 0x3f) << 2);
+                default:
+                    position = 0;
+                    return max < 8 ? -1 : ((buffer[6] & 0xc0) >> 6) | ((buffer[7] & 0x7f) << 1);
+                }
+            }
+        };
+    }
+
+    /**
+     * @param text encoded text
+     * @return decoded text
+     */
+    public static String base128Decode(String text) {
+        try {
+            return loadText(withBase128Decode(new ByteArrayInputStream(text.getBytes("MS932"))));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * test
      *
      * @param args text
@@ -792,17 +969,21 @@ public class Tool {
         // try (Stream<Class<?>> list = getClasses("test")) {
         // list.forEach(c -> Logger.getGlobal().info(c.getCanonicalName()));
         // }
-        String password = "abcd123";
-        String text = "Encrypted target text";
-        Logger.getGlobal().info("source: " + text);
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
-            out.write(text.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        byte[] encrypted = bytes.toByteArray();
-        Logger.getGlobal().info("encrypted: " + hex(encrypted));
-        Logger.getGlobal().info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)));
+        Logger logger = Logger.getGlobal();
+        String text = "target text!";
+        // String password = "abcd123";
+        // logger.info("source: " + text);
+        // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        // try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
+        // out.write(text.getBytes(StandardCharsets.UTF_8));
+        // } catch (IOException e) {
+        // e.printStackTrace();
+        // }
+        // byte[] encrypted = bytes.toByteArray();
+        // logger.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
+        // logger.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
+        // password));
+        logger.info("base128encoded: " + base128Decode(text));
+        logger.info("base128decoded: " + base128Decode(base128Encode(text)));
     }
 }

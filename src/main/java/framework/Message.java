@@ -2,8 +2,6 @@ package framework;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.Optional;
@@ -15,23 +13,22 @@ import java.util.ResourceBundle.Control;
  * Message
  */
 public enum Message {
-    /*define message key here*/
-    
+    /* define message key here */
+
     /**
      * sample
      */
     text_hello,
-    
+
     /**
      * forbidden
      */
     alert_forbidden,
-    
+
     ;
 
     /**
-     * messages from message.txt
-     * <div>The locale setting can be specified in the server startup parameter - app.locale</div>
+     * messages from message.txt <div>The locale setting can be specified in the server startup parameter - app.locale</div>
      */
     public static final ResourceBundle messages = ResourceBundle.getBundle("message",
             Optional.ofNullable(System.getProperty("app.locale")).map(Locale::new).orElse(Locale.getDefault()), Thread.currentThread().getContextClassLoader(),
@@ -46,9 +43,8 @@ public enum Message {
                         throws IllegalAccessException, InstantiationException, IOException {
                     String resourceName = toResourceName(toBundleName(baseName, locale), "txt");
 
-                    try (InputStream in = loader.getResourceAsStream(resourceName);
-                            InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-                        return new PropertyResourceBundle(reader);
+                    try (InputStream in = loader.getResourceAsStream(resourceName)) {
+                        return new PropertyResourceBundle(Tool.newReader(in));
                     }
                 }
             });
@@ -66,7 +62,7 @@ public enum Message {
             return Optional.empty();
         }
     }
-    
+
     /**
      * @return id
      */
@@ -74,7 +70,9 @@ public enum Message {
         return name().replace('_', '.');
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see java.lang.Enum#toString()
      */
     @Override
