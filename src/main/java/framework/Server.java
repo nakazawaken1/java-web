@@ -31,7 +31,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -350,7 +349,7 @@ public class Server implements Servlet {
     /**
      * @param args not use
      */
-    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC", "REC_CATCH_EXCEPTION" })
     public static void main(String[] args) {
 
         String contextPath = Config.app_context_path.text();
@@ -419,12 +418,11 @@ public class Server implements Servlet {
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
-                org.h2.tools.Server db = org.h2.tools.Server.createWebServer("-properties", config.getParent()).start();
-                Runtime.getRuntime().addShutdownHook(new Thread(db::stop));
-            } catch (SQLException e) {
+                Object db = Tool.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class), new Object[]{Tool.array("-properties", config.getParent())});
+                Tool.invoke(db, "start", Tool.array());
+                Runtime.getRuntime().addShutdownHook(new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
+            } catch (Exception e) {
                 server.logger.log(Level.WARNING, "h2 error", e);
-            } catch (IOException e) {
-                server.logger.log(Level.WARNING, "h2 config error", e);
             }
         }
 

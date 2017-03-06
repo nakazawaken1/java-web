@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.InvocationTargetException;
+import java.io.Serializable;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -25,13 +25,13 @@ import com.sun.net.httpserver.HttpExchange;
  * session scoped object
  */
 @SuppressWarnings("restriction")
-public abstract class Session implements Attributes<Object> {
+public abstract class Session implements Attributes<Serializable> {
 
     /**
      * current session
      */
     transient static final ThreadLocal<Session> CURRENT = new ThreadLocal<>();
-    
+
     /**
      * @return current session
      */
@@ -96,7 +96,7 @@ public abstract class Session implements Attributes<Object> {
          */
         @SuppressWarnings("unchecked")
         @Override
-        public <T> Optional<T> getAttr(String name) {
+        public <T extends Serializable> Optional<T> getAttr(String name) {
             return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> session.getAttribute(name)));
         }
 
@@ -106,7 +106,7 @@ public abstract class Session implements Attributes<Object> {
          * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
          */
         @Override
-        public void setAttr(String name, Object value) {
+        public void setAttr(String name, Serializable value) {
             session.setAttribute(name, value);
         }
 
@@ -139,8 +139,8 @@ public abstract class Session implements Attributes<Object> {
         /**
          * Attributes
          */
-        Map<String, Object> attributes;
-        
+        Map<String, Serializable> attributes;
+
         /**
          * saved attributes
          */
@@ -155,7 +155,8 @@ public abstract class Session implements Attributes<Object> {
                     .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
             if (id == null) {
                 id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
-                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id, null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
+                exchange.getResponseHeaders().add("Set-Cookie",
+                        createSetCookie(NAME, id, null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
             } else {
                 try (Db db = Db.connect()) {
                     int timeout = Config.app_session_timeout_minutes.integer();
@@ -166,7 +167,7 @@ public abstract class Session implements Attributes<Object> {
                         try (InputStream in = rs.getBinaryStream(1)) {
                             if (in != null) {
                                 ObjectInputStream o = new ObjectInputStream(in);
-                                attributes = (Map<String, Object>) o.readObject();
+                                attributes = (Map<String, Serializable>) o.readObject();
                             }
                         }
                     });
@@ -218,12 +219,12 @@ public abstract class Session implements Attributes<Object> {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <T> Optional<T> getAttr(String name) {
+        public <T extends Serializable> Optional<T> getAttr(String name) {
             return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
         }
 
         @Override
-        public void setAttr(String name, Object value) {
+        public void setAttr(String name, Serializable value) {
             attributes.put(name, value);
         }
 
@@ -231,12 +232,12 @@ public abstract class Session implements Attributes<Object> {
         public void removeAttr(String name) {
             attributes.remove(name);
         }
-        
+
         /**
          * save session attributes
          */
         public void save() {
-            if(saved) {
+            if (saved) {
                 return;
             }
             try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream o = new ObjectOutputStream(out)) {
@@ -289,22 +290,22 @@ public abstract class Session implements Attributes<Object> {
      * @return true if success, else failure
      */
     public boolean login(String loginId, String password) {
-        try {
-            setAttr(sessionKey, Class.forName(Config.app_account_class.text()).getConstructor(String.class, String.class).newInstance(loginId, password));
+        Optional<Account> a = Try
+                .s(() -> Tool.<Optional<Account>>invoke(Config.app_login_method.text(), Tool.array(String.class, String.class), loginId, password), e -> {
+                    Tool.getLogger().warning(Tool.print(e::printStackTrace));
+                    return Optional.<Account>empty();
+                }).get();
+        return Tool.ifPresentOr(a, i -> {
+            setAttr(sessionKey, i);
             Tool.getLogger().info("logged in : " + loginId);
-            return true;
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                | NoSuchMethodException | SecurityException e) {
-            Tool.getLogger().info("login failed: " + loginId);
-            return false;
-        }
+        }, () -> Tool.getLogger().info("login failed: " + loginId));
     }
 
     /**
      * @return login id
      */
     public String logout() {
-        String result = getAccount().getId();
+        String result = getAccount().id;
         clear();
         return result;
     }

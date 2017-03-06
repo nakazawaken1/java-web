@@ -621,7 +621,7 @@ public class Db implements AutoCloseable {
         }
         if (empty) {
             insert(table, names, primary, values);
-        } else {
+        } else if(names.length > primary) {
             update(table, names, primary, values);
         }
         return empty;
@@ -1843,9 +1843,9 @@ public class Db implements AutoCloseable {
          * @param fetcher function that ResultSet to value
          * @return value
          */
-        public <T> Optional<T> one(Function<ResultSet, T> fetcher) {
+        public <T> Optional<T> one(TryFunction<ResultSet, T> fetcher) {
             try (Stream<ResultSet> rows = rows()) {
-                return rows.findFirst().map(fetcher);
+                return rows.findFirst().map(Try.f(fetcher));
             }
         }
 
@@ -1966,7 +1966,8 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * @param <T> model type
+     * @param <T> criteria model type
+     * @param <S> model type
      * @param model conditions
      * @param targetColumns fill columns
      * @return found list
@@ -2024,6 +2025,7 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * @param <T> model type
      * @param action action
      * @param model target model
      * @param targetColumns target column names(primary key is automatic inclusion)

@@ -1,21 +1,29 @@
 package framework;
 
+import java.beans.FeatureDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.el.ELContext;
 import javax.el.ELProcessor;
+import javax.el.ELResolver;
+import javax.el.PropertyNotWritableException;
 
 /**
  * formatter with el, config, message
@@ -305,22 +313,22 @@ public class Formatter implements AutoCloseable {
                 int prefix = first == '$' || first == '#' ? 2 : 1;
                 int suffix = 1;
                 switch (first) {
-                    case '<':
-                        eat("-->");
-                        prefix = "<!--{".length();
-                        suffix = "}-->".length();
-                        break;
-                    case '/':
-                        eat("*/");
-                        prefix = "/*{".length();
-                        suffix = "}*/".length();
-                        break;
-                    default:
-                        if (source.charAt(start + 1) == '/') {
-                            prefix = "{/*".length();
-                            suffix = "*/}".length();
-                        }
-                        break;
+                case '<':
+                    eat("-->");
+                    prefix = "<!--{".length();
+                    suffix = "}-->".length();
+                    break;
+                case '/':
+                    eat("*/");
+                    prefix = "/*{".length();
+                    suffix = "}*/".length();
+                    break;
+                default:
+                    if (source.charAt(start + 1) == '/') {
+                        prefix = "{/*".length();
+                        suffix = "*/}".length();
+                    }
+                    break;
                 }
                 int end = index;
                 if (start + prefix < end - suffix) {
@@ -343,11 +351,11 @@ public class Formatter implements AutoCloseable {
     void skipSpaces() {
         for (; index < lastIndex; index++) {
             switch (source.charAt(index)) {
-                case ' ':
-                case '\t':
-                case '\r':
-                case '\n':
-                    continue;
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
             }
             break;
         }
@@ -416,8 +424,7 @@ public class Formatter implements AutoCloseable {
     /**
      * format
      *
-     * @param text target({key} replace messages, ${expression} replace el value
-     * with escape, #{expression} replace el value with no escape)
+     * @param text target({key} replace messages, ${expression} replace el value with escape, #{expression} replace el value with no escape)
      * @param exclude exclude
      * @param escape escape
      * @param map ${key} replace to value
@@ -436,13 +443,12 @@ public class Formatter implements AutoCloseable {
      */
     public static String include(String path) {
         try {
-            return current.get().copy().format(
-                    Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream()));
+            return current.get().copy().format(Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
-    
+
     /**
      * @param expression expression
      * @param prefix prefix length
@@ -475,23 +481,84 @@ public class Formatter implements AutoCloseable {
                 try {
                     if (el == null) {
                         el = new ELProcessor();
+                        el.getELManager().addELResolver(new ELResolver() { /* field resolver */
+
+                            @Override
+                            public void setValue(ELContext context, Object base, Object property, Object value) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Field f = base.getClass().getDeclaredField((String) property);
+                                        int m = f.getModifiers();
+                                        if (Modifier.isFinal(m)) {
+                                            throw new PropertyNotWritableException((String) property);
+                                        }
+                                        f.set(base, value);
+                                        context.setPropertyResolved(true);
+                                    }
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+                                }
+                            }
+
+                            @Override
+                            public boolean isReadOnly(ELContext context, Object base, Object property) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        int m = base.getClass().getDeclaredField((String) property).getModifiers();
+                                        context.setPropertyResolved(true);
+                                        return Modifier.isFinal(m);
+                                    }
+                                } catch (NoSuchFieldException | SecurityException e) {
+                                }
+                                return false;
+                            }
+
+                            @Override
+                            public Object getValue(ELContext context, Object base, Object property) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Object value = base.getClass().getDeclaredField((String) property).get(base);
+                                        context.setPropertyResolved(true);
+                                        return value;
+                                    }
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Class<?> getType(ELContext context, Object base, Object property) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Class<?> c = base.getClass().getDeclaredField((String) property).getType();
+                                        context.setPropertyResolved(true);
+                                        return c;
+                                    }
+                                } catch (NoSuchFieldException | SecurityException e) {
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+                                Objects.requireNonNull(context);
+                                return Arrays.<FeatureDescriptor>asList().iterator();
+                            }
+
+                            @Override
+                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
+                                Objects.requireNonNull(context);
+                                return base == null ? String.class : Object.class;
+                            }
+                        });
                         el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
-                        // el.defineFunction("F", "includeIf",
-                        // Tool.class.getMethod("includeIf", boolean.class,
-                        // String.class, Object.class, Object[].class));
-                        // el.defineFunction("F", "includeN",
-                        // Tool.class.getMethod("includeN", int.class,
-                        // String.class, Object.class, Object[].class));
-                        // el.defineFunction("F", "includeFor",
-                        // Tool.class.getMethod("includeFor", Stream.class,
-                        // String.class, Object.class, Object[].class));
-                        // el.defineFunction("F", "json",
-                        // Tool.class.getMethod("json", Object.class,
-                        // boolean.class));
                         el.defineBean("C", Config.properties);
                         el.defineBean("M", Message.messages);
-                        el.defineBean("V", values == null ? new Object[]{} : values);
+                        el.defineBean("V", values == null ? new Object[] {} : values);
                         el.defineBean("A", Application.current().orElse(null));
                         el.defineBean("S", Session.current().orElse(null));
                         el.defineBean("R", Request.current().orElse(null));

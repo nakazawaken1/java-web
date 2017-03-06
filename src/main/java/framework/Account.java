@@ -1,8 +1,11 @@
 package framework;
 
 import java.io.Serializable;
+import java.util.Objects;
+import java.util.Optional;
 
 import framework.annotation.Only.User;
+import framework.annotation.Required;
 
 /**
  * account info
@@ -13,20 +16,24 @@ public class Account implements Serializable {
     /**
      * user for not login
      */
-    public static final Account GUEST = new Account("guest", "guest", null);
+    public static final Account GUEST = new Account("guest", "guest", Tool.array());
 
     /**
      * id
      */
-    protected String id;
+    @Required
+    public final String id;
+
     /**
      * name
      */
-    protected String name;
+    @Required
+    public final String name;
+
     /**
      * role
      */
-    protected Class<? extends User>[] roles;
+    public final Class<? extends User>[] roles;
 
     /**
      * @param id id
@@ -34,24 +41,42 @@ public class Account implements Serializable {
      * @param roles roles
      */
     protected Account(String id, String name, Class<? extends User>[] roles) {
-        this.id = id;
-        this.name = name;
-        this.roles = roles;
+        this.id = Objects.requireNonNull(id);
+        this.name = Objects.requireNonNull(name);
+        this.roles = Objects.requireNonNull(roles);
     }
 
     /**
-     * @param loginId login id
-     * @param password password
-     * @throws InstantiationException login error
+     * Builder
      */
-    @SuppressWarnings("unchecked")
-    public Account(String loginId, String password) throws InstantiationException {
-        String[] a = Config.app_accounts.stream().map(i -> i.split(":")).filter(i -> i[0].equals(loginId) && i[1].equals(password)).findFirst()
-                .orElseThrow(InstantiationException::new);
-        this.id = a[0];
-        this.name = a[2];
-        this.roles = Tool.string(a[3]).map(Try.f(i -> Class.forName(i), (e, i) -> Try.f(j -> Class.forName(User.class.getName() + "$" + j)).apply(i)))
-                .map(c -> Tool.array((Class<? extends User>) c)).orElse(null);
+    @SuppressWarnings("javadoc")
+    public static class Builder extends AbstractBuilder<Account, Builder> {
+        enum F {
+            id, name, roles,
+        }
+
+        public Builder() {
+            super(F.class, Account.class);
+        }
+
+        public Builder id(String id) {
+            return set(F.id, id);
+        }
+
+        public Builder name(String name) {
+            return set(F.name, name);
+        }
+
+        public Builder roles(@SuppressWarnings("unchecked") Class<? extends User>... roles) {
+            return set(F.roles, roles);
+        }
+    }
+
+    /**
+     * @return builder
+     */
+    public static Builder of() {
+        return new Builder();
     }
 
     /**
@@ -72,16 +97,24 @@ public class Account implements Serializable {
     }
 
     /**
-     * @return id
+     * @param loginId login id
+     * @param password password
+     * @return account or empty if login failed
      */
-    public String getId() {
-        return id;
+    public static Optional<Account> loginWithConfig(String loginId, String password) {
+        return Config.app_accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst()
+                .map(a -> new Account(loginId, a[2], Tool.string(a[3]).map(User::fromString).map(Tool::array).orElse(Tool.array())));
     }
 
     /**
-     * @return name
+     * @param loginId login id
+     * @param password password
+     * @return account or empty if login failed
      */
-    public String getName() {
-        return name;
+    public static Optional<Account> loginWithDb(String loginId, String password) {
+        try (Db db = Db.connect()) {
+            return db.queryFile("login.sql", Tool.jsonMap("id", loginId, "password", password)).findFirst().map(Try
+                    .f(rs -> new Account(loginId, rs.getString(1), Tool.string(rs.getString(2)).map(User::fromString).map(Tool::array).orElse(Tool.array()))));
+        }
     }
 }

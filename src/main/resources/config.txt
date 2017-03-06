@@ -10,6 +10,7 @@ db.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?
 job.daily=03:00
 
 app.accounts=admin:Adm1n:管理者:Administrator,user:U5er:利用者:User
+app.login.method=framework.Account.loginWithDb
 
 log.level=INFO
 

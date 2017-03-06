@@ -20,6 +20,23 @@ public @interface Only {
      * user
      */
     public interface User {
+        
+        /**
+         * @param text class name
+         * @return class
+         */
+        @SuppressWarnings("unchecked")
+        public static Class<? extends User> fromString(String text) {
+            try {
+                return (Class<? extends User>)Class.forName(User.class.getName() + "$" + text);
+            } catch (ClassNotFoundException e) {
+                try {
+                    return (Class<? extends User>)Class.forName(text);
+                } catch (ClassNotFoundException e1) {
+                    return null;
+                }
+            } 
+        }
     }
 
     /**

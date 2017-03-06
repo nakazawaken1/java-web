@@ -150,10 +150,10 @@ public enum Config {
     app_job_threads(1),
 
     /**
-     * account class
+     * login method(must to be static method)
      */
-    @Help("account class")
-    app_account_class("framework.Account"),
+    @Help("login method(must to be static method)")
+    app_login_method("framework.Account.loginWithConfig"),
 
     /**
      * accounts data(loginId:password:name:roles,...)

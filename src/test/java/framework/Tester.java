@@ -14,14 +14,14 @@ import java.util.stream.Stream;
 
 import org.junit.Assert;
 import org.junit.runner.Description;
-import org.junit.runner.RunWith;
+//import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunNotifier;
 
 /**
  * Tester
  */
-@RunWith(Tester.Runner.class)
+//@RunWith(Tester.Runner.class)
 public class Tester {
 
     /**

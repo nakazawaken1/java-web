@@ -13,6 +13,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.nio.charset.CharsetDecoder;
@@ -914,8 +915,9 @@ public class Tool {
                     }
                     for (int i = 0; i < max; i++) {
                         int b = Arrays.binarySearch(base128, buffer[i]);
-                        if(b == -1) {
-                            throw new IllegalArgumentException("Invalid base128 character: " + new String(buffer, i, i + 1, "MS932") + String.format(" (0x%02X)", buffer[i]));
+                        if (b == -1) {
+                            throw new IllegalArgumentException(
+                                    "Invalid base128 character: " + new String(buffer, i, i + 1, "MS932") + String.format(" (0x%02X)", buffer[i]));
                         }
                         buffer[i] = (byte) b;
                     }
@@ -985,5 +987,59 @@ public class Tool {
         // password));
         logger.info("base128encoded: " + base128Decode(text));
         logger.info("base128decoded: " + base128Decode(base128Encode(text)));
+    }
+
+    /**
+     * @param methodFullName full method name
+     * @param argClasses argument classes
+     * @param args arguments
+     * @return return value
+     * @throws NoSuchMethodException
+     * @throws IllegalAccessException
+     * @throws IllegalArgumentException
+     * @throws InvocationTargetException
+     * @throws SecurityException
+     * @throws ClassNotFoundException
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(String methodFullName, Class<?>[] argClasses, Object... args) throws NoSuchMethodException, IllegalAccessException,
+            IllegalArgumentException, InvocationTargetException, SecurityException, ClassNotFoundException {
+        int i = methodFullName.lastIndexOf('.');
+        if (i < 0) {
+            throw new NoSuchMethodException(methodFullName);
+        }
+        return (T) Class.forName(methodFullName.substring(0, i)).getDeclaredMethod(methodFullName.substring(i + 1), argClasses).invoke(null, args);
+    }
+
+    /**
+     * @param instance instance
+     * @param name method name
+     * @param argClasses argument classes
+     * @param args arguments
+     * @return return value
+     * @throws IllegalAccessException
+     * @throws IllegalArgumentException
+     * @throws InvocationTargetException
+     * @throws NoSuchMethodException
+     * @throws SecurityException
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+        return (T) instance.getClass().getDeclaredMethod(name, argClasses).invoke(instance, args);
+    }
+
+    /**
+     * @param value optional value
+     * @param ifPresent action if present
+     * @param ifNotPresent action if not present
+     * @return true if present
+     */
+    public static <T> boolean ifPresentOr(Optional<T> value, Consumer<T> ifPresent, Runnable ifNotPresent) {
+        value.ifPresent(ifPresent);
+        if (!value.isPresent()) {
+            ifNotPresent.run();
+            return false;
+        }
+        return true;
     }
 }
