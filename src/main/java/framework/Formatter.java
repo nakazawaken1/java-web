@@ -356,8 +356,9 @@ public class Formatter implements AutoCloseable {
             case '\r':
             case '\n':
                 continue;
+            default:
+                break;
             }
-            break;
         }
     }
 
@@ -458,7 +459,7 @@ public class Formatter implements AutoCloseable {
     String eval(String expression, int prefix, int suffix) {
         return cache.computeIfAbsent(expression, s -> {
             boolean isEl = !(s.startsWith("{") && prefix == 1);
-            boolean isEscape = !isEl || (s.startsWith("${") && prefix == 2);
+            boolean isEscape = !isEl || s.startsWith("${") && prefix == 2;
             BiFunction<Object, String, String> getResult = (result, type) -> {
                 String value;
                 if (escape != null && isEscape) {
@@ -497,6 +498,7 @@ public class Formatter implements AutoCloseable {
                                         context.setPropertyResolved(true);
                                     }
                                 } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+                                    throw new InternalError(e);
                                 }
                             }
 
@@ -510,6 +512,7 @@ public class Formatter implements AutoCloseable {
                                         return Modifier.isFinal(m);
                                     }
                                 } catch (NoSuchFieldException | SecurityException e) {
+                                    throw new InternalError(e);
                                 }
                                 return false;
                             }
@@ -524,6 +527,7 @@ public class Formatter implements AutoCloseable {
                                         return value;
                                     }
                                 } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
+                                    throw new InternalError(e);
                                 }
                                 return null;
                             }
@@ -538,6 +542,7 @@ public class Formatter implements AutoCloseable {
                                         return c;
                                     }
                                 } catch (NoSuchFieldException | SecurityException e) {
+                                    throw new InternalError(e);
                                 }
                                 return null;
                             }

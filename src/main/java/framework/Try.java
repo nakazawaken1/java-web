@@ -39,7 +39,7 @@ public class Try {
      * throwable runnable
      */
     @FunctionalInterface
-    public static interface TryRunnable {
+    public interface TryRunnable {
         /**
          * @throws Exception exception
          */
@@ -75,7 +75,7 @@ public class Try {
      * @param <T> object type
      */
     @FunctionalInterface
-    public static interface TryConsumer<T> {
+    public interface TryConsumer<T> {
         /**
          * @param t object
          * @throws Exception exception
@@ -112,7 +112,7 @@ public class Try {
      * throwable consumer
      */
     @FunctionalInterface
-    public static interface TryIntConsumer {
+    public interface TryIntConsumer {
         /**
          * @param t object
          * @throws Exception exception
@@ -150,7 +150,7 @@ public class Try {
      * @param <U> second object type
      */
     @FunctionalInterface
-    public static interface TryBiConsumer<T, U> {
+    public interface TryBiConsumer<T, U> {
         /**
          * @param t first object
          * @param u second object
@@ -194,7 +194,7 @@ public class Try {
      * @param <V> other object type
      */
     @FunctionalInterface
-    public static interface TriConsumer<T, U, V> {
+    public interface TriConsumer<T, U, V> {
         /**
          * @param t object
          * @param u other object
@@ -211,7 +211,7 @@ public class Try {
      * @param <V> other object type
      */
     @FunctionalInterface
-    public static interface TryTriConsumer<T, U, V> {
+    public interface TryTriConsumer<T, U, V> {
         /**
          * @param t object
          * @param u other object
@@ -230,7 +230,7 @@ public class Try {
      * @param <W> other object type
      */
     @FunctionalInterface
-    public static interface QuadConsumer<T, U, V, W> {
+    public interface QuadConsumer<T, U, V, W> {
         /**
          * @param t object
          * @param u other object
@@ -275,7 +275,7 @@ public class Try {
      * @param <T> object type
      */
     @FunctionalInterface
-    public static interface TryObjIntConsumer<T> {
+    public interface TryObjIntConsumer<T> {
         /**
          * @param t object
          * @param u int value
@@ -291,7 +291,7 @@ public class Try {
      * @param <U> other object type
      */
     @FunctionalInterface
-    public static interface ObjObjIntConsumer<T, U> {
+    public interface ObjObjIntConsumer<T, U> {
         /**
          * @param t object
          * @param u other value
@@ -332,7 +332,7 @@ public class Try {
      * @param <R> return object type
      */
     @FunctionalInterface
-    public static interface TryFunction<A, R> {
+    public interface TryFunction<A, R> {
         /**
          * @param t object
          * @return value
@@ -377,7 +377,7 @@ public class Try {
      * @param <R> return object type
      */
     @FunctionalInterface
-    public static interface TryIntFunction<R> {
+    public interface TryIntFunction<R> {
         /**
          * @param t object
          * @return value
@@ -418,7 +418,7 @@ public class Try {
      * @param <R> return object type
      */
     @FunctionalInterface
-    public static interface TrySupplier<R> {
+    public interface TrySupplier<R> {
         /**
          * @return value
          * @throws Exception exception
@@ -460,7 +460,7 @@ public class Try {
      * @param <T> object type
      */
     @FunctionalInterface
-    public static interface TryPredicate<T> {
+    public interface TryPredicate<T> {
         /**
          * @param t object type
          * @return result
@@ -506,7 +506,7 @@ public class Try {
      * @param <R> other object type
      */
     @FunctionalInterface
-    public static interface TriFunction<T, U, V, R> {
+    public interface TriFunction<T, U, V, R> {
         /**
          * @param t object
          * @param u other object
@@ -526,7 +526,7 @@ public class Try {
      * @param <R> return object type
      */
     @FunctionalInterface
-    public static interface QuadFunction<T, U, V, W, R> {
+    public interface QuadFunction<T, U, V, W, R> {
         /**
          * @param t object
          * @param u other object

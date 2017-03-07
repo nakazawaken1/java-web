@@ -80,6 +80,7 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     }
 
     /**
+     * @param <T> return type
      * @param i index
      * @return value
      */
@@ -108,6 +109,7 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     }
 
     /**
+     * @param <A> first value type
      * @param a 1 value
      * @return 1 tuple
      */
@@ -116,6 +118,8 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     }
 
     /**
+     * @param <A> first value type
+     * @param <B> second value type
      * @param a 1 value
      * @param b 2 value
      * @return 2 tuple
@@ -127,9 +131,9 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     /**
      * 3 tuple
      * 
-     * @param <A> 1 type
-     * @param <B> 2 type
-     * @param <C> 3 type
+     * @param <A> first value type
+     * @param <B> second value type
+     * @param <C> third value type
      */
     public static class Tuple3<A, B, C> extends Tuple<A, Tuple<B, C>> {
         /**
@@ -143,6 +147,9 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     }
 
     /**
+     * @param <A> first value type
+     * @param <B> second value type
+     * @param <C> third value type
      * @param a 1 value
      * @param b 2 value
      * @param c 3 value
@@ -173,6 +180,10 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     }
 
     /**
+     * @param <A> 1 type
+     * @param <B> 2 type
+     * @param <C> 3 type
+     * @param <D> 4 type
      * @param a 1 value
      * @param b 2 value
      * @param c 3 value

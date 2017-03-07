@@ -14,25 +14,25 @@ import java.util.stream.Stream;
 
 import org.junit.Assert;
 import org.junit.runner.Description;
-//import org.junit.runner.RunWith;
+import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunNotifier;
 
 /**
  * Tester
  */
-//@RunWith(Tester.Runner.class)
+@RunWith(Tester.Runner.class)
 public class Tester {
 
     /**
      * test stack
      */
-    Deque<Tester> stack;
+    final Deque<Tester> stack;
 
     /**
      * description
      */
-    Description description;
+    final Description description;
 
     /**
      * value getter
@@ -63,13 +63,29 @@ public class Tester {
      * constructor
      */
     public Tester() {
-        stack = new LinkedList<>();
-        stack.push(this);
-        description = Tester.class == getClass() ? Description.EMPTY : Description.createSuiteDescription(getClass().getName());
+        if (getClass() != Tester.class) {
+            stack = new LinkedList<>();
+            stack.push(this);
+            description = Description.createSuiteDescription(getClass().getName());
+        } else {
+            stack = null;
+            description = Description.EMPTY;
+        }
     }
 
     /**
-     * constructor
+     * constructor for group
+     * 
+     * @param stack test stack
+     * @param name test name
+     */
+    Tester(Deque<Tester> stack, String name) {
+        this.stack = stack;
+        description = Description.createSuiteDescription(name);
+    }
+
+    /**
+     * constructor for expect
      * 
      * @param stack test stack
      * @param name test name
@@ -78,7 +94,7 @@ public class Tester {
      */
     Tester(Deque<Tester> stack, String name, Supplier<Object> supplier, Runnable action) {
         this.stack = stack;
-        description = Description.createSuiteDescription(name);
+        description = Description.createTestDescription(getClass().getSimpleName(), name);
         getter = () -> {
             if (action != null) {
                 action.run();
@@ -94,7 +110,7 @@ public class Tester {
      * @param supplier value supplier
      * @return expect object
      */
-    public <T> Expect expect(String name, Supplier<Object> supplier) {
+    public Expect expect(String name, Supplier<Object> supplier) {
         return new Expect(stack.peek().add(new Tester(stack, name, supplier, null)));
     }
 
@@ -105,7 +121,7 @@ public class Tester {
      * @param action value supplier
      * @return expect object
      */
-    public <T> Expect expect(String name, Runnable action) {
+    public Expect expect(String name, Runnable action) {
         return new Expect(stack.peek().add(new Tester(stack, name, null, action)));
     }
 
@@ -116,7 +132,7 @@ public class Tester {
      * @param action tests
      */
     public void group(String name, Runnable action) {
-        stack.push(stack.peek().add(new Tester(stack, name, null, null)));
+        stack.push(stack.peek().add(new Tester(stack, name)));
         action.run();
         stack.pop();
     }
@@ -345,7 +361,9 @@ public class Tester {
          */
         @Override
         public void run(RunNotifier notifier) {
-            tester.run(notifier);
+            if (tester.description != Description.EMPTY) {
+                tester.run(notifier);
+            }
         }
     }
 }

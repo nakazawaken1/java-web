@@ -162,6 +162,7 @@ public class Server implements Servlet {
                 throw new RuntimeException("must to enable compile option `-parameters`");
             }
         } catch (NoSuchMethodException | SecurityException e) {
+            throw new InternalError(e);
         }
 
         /* log setup */
@@ -248,7 +249,7 @@ public class Server implements Servlet {
         if (pair != null) {
             Method method = pair.r;
             Http http = method.getAnnotation(Http.class);
-            if (http == null || (http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod()))) {
+            if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
                 Response.error(400).flush();
                 return;
             }

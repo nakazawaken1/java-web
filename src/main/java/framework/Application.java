@@ -15,24 +15,24 @@ public interface Application extends Attributes<Object> {
     /**
      * singleton
      */
-    public static Lazy<Application> CURRENT = new Lazy<>(null);
+    Lazy<Application> CURRENT = new Lazy<>(null);
 
     /**
      * getters
      */
-    static final Getters getters = new Getters(Application.class);
+    Getters getters = new Getters(Application.class);
 
     /**
      * @return singleton
      */
-    public static Optional<Application> current() {
+    static Optional<Application> current() {
         return Optional.ofNullable(CURRENT.get());
     }
 
     /**
      * For Servlet
      */
-    static class ForServlet implements Application {
+    class ForServlet implements Application {
         @Override
         public String toString() {
             return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
@@ -115,7 +115,7 @@ public interface Application extends Attributes<Object> {
     /**
      * For Server
      */
-    static class ForServer implements Application {
+    class ForServer implements Application {
         /**
          * Context path
          */

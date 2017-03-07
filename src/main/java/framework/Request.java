@@ -109,8 +109,10 @@ public abstract class Request implements Attributes<Object> {
             path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
         }
 
-        @Override
-        public int hashCode() {
+        /**
+         * @return request id
+         */
+        public int getId() {
             return servletRequest.hashCode();
         }
 
@@ -603,7 +605,18 @@ public abstract class Request implements Attributes<Object> {
         public Map<String, List<String>> getParameters() {
             return parameters;
         }
+
+        @Override
+        public int getId() {
+            return hashCode();
+        }
     }
+
+
+    /**
+     * @return request id
+     */
+    public abstract int getId();
 
     /**
      * @return path

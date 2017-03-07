@@ -26,7 +26,7 @@ public @interface Only {
          * @return class
          */
         @SuppressWarnings("unchecked")
-        public static Class<? extends User> fromString(String text) {
+        static Class<? extends User> fromString(String text) {
             try {
                 return (Class<? extends User>)Class.forName(User.class.getName() + "$" + text);
             } catch (ClassNotFoundException e) {

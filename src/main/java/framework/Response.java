@@ -46,7 +46,7 @@ public abstract class Response {
     /**
      * creator
      */
-    static interface ResponseCreator {
+    interface ResponseCreator {
 
         /**
          * @param file file
@@ -243,7 +243,7 @@ public abstract class Response {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> i.hashCode() + Optional.of(((Request.ForServlet) i).servletResponse)
+            return Request.current().map(i -> i.getId() + Optional.of(((Request.ForServlet) i).servletResponse)
                     .map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse("")).orElse("");
         }
     }

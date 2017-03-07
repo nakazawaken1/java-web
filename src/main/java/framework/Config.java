@@ -196,19 +196,19 @@ public enum Config {
      */
     @Help("context path")
     app_context_path("/"),
-    
+
     /**
      * h2 web console port
      */
     @Help("h2 web console port(disabled if negative)")
     app_h2_port(-1),
-    
+
     /**
      * h2 web console access limited local only
      */
     @Help("h2 web console access allowed remote client")
     app_h2_allow_remote(false),
-    
+
     /**
      * h2 web console using https
      */
@@ -448,11 +448,9 @@ public enum Config {
             root.setLevel(level);
             boolean noEntry = true;
             for (Handler i : root.getHandlers()) {
-                if (i instanceof ConsoleHandler) {
-                    if (!(i.getFormatter() instanceof LogFormatter)) {
-                        i.setFormatter(new LogFormatter(log_format.text()));
-                        i.setLevel(level);
-                    }
+                if (i instanceof ConsoleHandler && !(i.getFormatter() instanceof LogFormatter)) {
+                    i.setFormatter(new LogFormatter(log_format.text()));
+                    i.setLevel(level);
                 }
                 if (i instanceof LogHandler) {
                     noEntry = false;
@@ -573,12 +571,12 @@ public enum Config {
     public static void printCurrent(PrintWriter writer) {
         properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey())).forEach(i -> {
             try {
-                Optional.ofNullable(Config.class.getField(((String) i.getKey()).replace('.', '_')).getAnnotation(Help.class)).map(Help::value).map(Stream::of).orElse(Stream.empty())
-                        .map(j -> "# " + j).forEach(writer::println);
+                Optional.ofNullable(Config.class.getField(((String) i.getKey()).replace('.', '_')).getAnnotation(Help.class)).map(Help::value).map(Stream::of)
+                        .orElse(Stream.empty()).map(j -> "# " + j).forEach(writer::println);
             } catch (NoSuchFieldException | SecurityException e) {
                 logger.info(i.toString());
             }
-            writer.println(i.getKey() + " = " + ((String)i.getValue()).replace("\\", "\\\\"));
+            writer.println(i.getKey() + " = " + ((String) i.getValue()).replace("\\", "\\\\"));
             writer.println();
         });
     }

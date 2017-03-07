@@ -183,6 +183,7 @@ public class Tool {
                     }
                 }
             } catch (IllegalArgumentException | IllegalAccessException | NoSuchMethodException | SecurityException e) {
+                throw new InternalError(e);
             }
             return field.getName() + ": " + value;
         }).collect(Collectors.joining("\n"));
@@ -363,7 +364,7 @@ public class Tool {
                 return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
             } else if (isDirectory) {
                 Logger.getGlobal().info("folder");
-                return getResourcesFromFolder(location, new File(i.getFile()));
+                return getResourcesFromFolder(new File(i.getFile()));
             } else {
                 Logger.getGlobal().info("jar file");
                 return getResourcesFromJar("", new JarFile(i.getFile()));
@@ -392,11 +393,10 @@ public class Tool {
     /**
      * list files in folder
      *
-     * @param location location
      * @param folder folder
      * @return file name stream(must to close)
      */
-    private static Stream<String> getResourcesFromFolder(String location, File folder) {
+    private static Stream<String> getResourcesFromFolder(File folder) {
         try {
             return Files.list(folder.toPath()).map(Path::getFileName).map(Object::toString);
         } catch (IOException e) {
@@ -798,15 +798,16 @@ public class Tool {
      * @return logger
      */
     public static Logger getLogger() {
-        return Logger.getLogger(Request.current().map(i -> String.valueOf(i.hashCode())).orElse(""));
+        return Logger.getLogger(Request.current().map(i -> String.valueOf(i.getId())).orElse(""));
     }
 
     /**
      * @param map map
      * @param key key
      * @param value value
+     * @return map
      */
-    public static void add(Map<String, List<String>> map, String key, String value) {
+    public static Map<String, List<String>> add(Map<String, List<String>> map, String key, String value) {
         if (map.containsKey(key)) {
             map.get(key).add(value);
         } else {
@@ -814,6 +815,7 @@ public class Tool {
             list.add(value);
             map.put(key, list);
         }
+        return map;
     }
 
     /**
@@ -990,16 +992,17 @@ public class Tool {
     }
 
     /**
+     * @param <T> return type
      * @param methodFullName full method name
      * @param argClasses argument classes
      * @param args arguments
      * @return return value
-     * @throws NoSuchMethodException
-     * @throws IllegalAccessException
-     * @throws IllegalArgumentException
-     * @throws InvocationTargetException
-     * @throws SecurityException
-     * @throws ClassNotFoundException
+     * @throws NoSuchMethodException method not found
+     * @throws IllegalAccessException access failed
+     * @throws IllegalArgumentException illegal argument
+     * @throws InvocationTargetException not throw
+     * @throws SecurityException security error
+     * @throws ClassNotFoundException class not found
      */
     @SuppressWarnings("unchecked")
     public static <T> T invoke(String methodFullName, Class<?>[] argClasses, Object... args) throws NoSuchMethodException, IllegalAccessException,
@@ -1012,23 +1015,26 @@ public class Tool {
     }
 
     /**
+     * @param <T> return type
      * @param instance instance
      * @param name method name
      * @param argClasses argument classes
      * @param args arguments
      * @return return value
-     * @throws IllegalAccessException
-     * @throws IllegalArgumentException
-     * @throws InvocationTargetException
-     * @throws NoSuchMethodException
-     * @throws SecurityException
+     * @throws IllegalAccessException access failed
+     * @throws IllegalArgumentException illegal argument
+     * @throws InvocationTargetException not throw
+     * @throws NoSuchMethodException method not found
+     * @throws SecurityException security error
      */
     @SuppressWarnings("unchecked")
-    public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+    public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args)
+            throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
         return (T) instance.getClass().getDeclaredMethod(name, argClasses).invoke(instance, args);
     }
 
     /**
+     * @param <T> return type
      * @param value optional value
      * @param ifPresent action if present
      * @param ifNotPresent action if not present
