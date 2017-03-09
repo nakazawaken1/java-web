@@ -67,7 +67,8 @@ public class Account implements Serializable {
             return set(F.name, name);
         }
 
-        public Builder roles(@SuppressWarnings("unchecked") Class<? extends User>... roles) {
+        @SafeVarargs
+        public final Builder roles(Class<? extends User>... roles) {
             return set(F.roles, roles);
         }
     }
