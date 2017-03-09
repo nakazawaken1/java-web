@@ -2,10 +2,19 @@ db.setup=RELOAD
 db.suffix=.h2
 
 db.h2=jdbc:h2:~/test
+
+db.h2server=jdbc:h2:tcp//localhost:9092/test
+#java -cp /pathto/h2.jar org.h2.tools.Server -tcp
+
 db.oracle=jdbc:oracle:thin:system/?@localhost:1521:orcl
+#ojdbc6.jar set to classpath
+
 db.mysql=jdbc:mysql://localhost/test?user=root&password=&characterEncoding=utf8
+
 db.postgres=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=?
+
 db.sqlserver=jdbc:sqlserver://localhost:1433;user=sa;password=?
+#sqljdbc42.jar set to classpath
 
 job.daily=03:00
 

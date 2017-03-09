@@ -1,10 +1,14 @@
 package framework;
 
 import java.beans.FeatureDescriptor;
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -357,7 +361,7 @@ public class Formatter implements AutoCloseable {
             case '\n':
                 continue;
             default:
-                break;
+                return;
             }
         }
     }
@@ -489,16 +493,26 @@ public class Formatter implements AutoCloseable {
                                 Objects.requireNonNull(context);
                                 try {
                                     if (base != null && property instanceof String) {
-                                        Field f = base.getClass().getDeclaredField((String) property);
-                                        int m = f.getModifiers();
-                                        if (Modifier.isFinal(m)) {
-                                            throw new PropertyNotWritableException((String) property);
+                                        Method method;
+                                        try {
+                                            method = new PropertyDescriptor((String)property, base.getClass()).getWriteMethod();
+                                        } catch (IntrospectionException e) {
+                                            method = null;
                                         }
-                                        f.set(base, value);
+                                        if(method != null) {
+                                            method.invoke(base, value);
+                                        } else {
+                                            Field f = base.getClass().getDeclaredField((String) property);
+                                            int m = f.getModifiers();
+                                            if (Modifier.isFinal(m)) {
+                                                throw new PropertyNotWritableException((String) property);
+                                            }
+                                            f.set(base, value);
+                                        }
                                         context.setPropertyResolved(true);
                                     }
-                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-                                    throw new InternalError(e);
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
+                                    throw new PropertyNotWritableException((String) property);
                                 }
                             }
 
@@ -507,12 +521,12 @@ public class Formatter implements AutoCloseable {
                                 Objects.requireNonNull(context);
                                 try {
                                     if (base != null && property instanceof String) {
-                                        int m = base.getClass().getDeclaredField((String) property).getModifiers();
+                                        boolean result = new PropertyDescriptor((String)property, base.getClass()).getWriteMethod() == null || Modifier.isFinal(base.getClass().getDeclaredField((String) property).getModifiers());
                                         context.setPropertyResolved(true);
-                                        return Modifier.isFinal(m);
+                                        return result;
                                     }
-                                } catch (NoSuchFieldException | SecurityException e) {
-                                    throw new InternalError(e);
+                                } catch (NoSuchFieldException | SecurityException | IntrospectionException e) {
+                                    return true;
                                 }
                                 return false;
                             }
@@ -522,12 +536,23 @@ public class Formatter implements AutoCloseable {
                                 Objects.requireNonNull(context);
                                 try {
                                     if (base != null && property instanceof String) {
-                                        Object value = base.getClass().getDeclaredField((String) property).get(base);
+                                        Method method;
+                                        try {
+                                            method = new PropertyDescriptor((String)property, base.getClass()).getReadMethod();
+                                        } catch (IntrospectionException e) {
+                                            method = null;
+                                        }
+                                        Object value;
+                                        if(method != null) {
+                                            value = method.invoke(base);
+                                        } else {
+                                            value = base.getClass().getDeclaredField((String) property).get(base);
+                                        }
                                         context.setPropertyResolved(true);
                                         return value;
                                     }
-                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-                                    throw new InternalError(e);
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
+                                    return null;
                                 }
                                 return null;
                             }
@@ -537,12 +562,20 @@ public class Formatter implements AutoCloseable {
                                 Objects.requireNonNull(context);
                                 try {
                                     if (base != null && property instanceof String) {
-                                        Class<?> c = base.getClass().getDeclaredField((String) property).getType();
+                                        Class<?> c;
+                                        try {
+                                            c = new PropertyDescriptor((String)property, base.getClass()).getPropertyType();
+                                        } catch (IntrospectionException e) {
+                                            c = null;
+                                        }
+                                        if(c == null) {
+                                            c = base.getClass().getDeclaredField((String) property).getType();
+                                        }
                                         context.setPropertyResolved(true);
                                         return c;
                                     }
                                 } catch (NoSuchFieldException | SecurityException e) {
-                                    throw new InternalError(e);
+                                    return null;
                                 }
                                 return null;
                             }
