@@ -214,6 +214,12 @@ public enum Config {
      */
     @Help("h2 web console using https")
     app_h2_ssl(false),
+    
+    /**
+     * cluster node name suffix(for session cookie)
+     */
+    @Help("cluster node name suffix(for session cookie)")
+    app_cluster_suffix,
 
     ;
 

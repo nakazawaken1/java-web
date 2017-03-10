@@ -152,11 +152,11 @@ public abstract class Session implements Attributes<Serializable> {
         @SuppressWarnings("unchecked")
         ForServer(HttpExchange exchange) {
             id = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
-                    .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1]).orElse(null)).orElse(null);
+                    .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1].replaceFirst("\\..*$", "")).orElse(null)).orElse(null);
             if (id == null) {
                 id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
                 exchange.getResponseHeaders().add("Set-Cookie",
-                        createSetCookie(NAME, id, null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
+                        createSetCookie(NAME, id + Config.app_cluster_suffix.text(), null, -1, null, Application.current().map(Application::getContextPath).orElse(null), false, true));
             } else {
                 try (Db db = Db.connect()) {
                     int timeout = Config.app_session_timeout_minutes.integer();
