@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Http {
+public @interface Route {
 
     /**
      * @return allowed method(not check if empty)
@@ -58,5 +58,9 @@ public @interface Http {
          * CONNECT
          */
         CONNECT,
+        /**
+         * PATCH
+         */
+        PATCH,
     }
 }

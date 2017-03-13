@@ -43,8 +43,8 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import framework.annotation.Http;
-import framework.annotation.Http.Method;
+import framework.annotation.Route;
+import framework.annotation.Route.Method;
 
 /**
  * request scoped object
@@ -120,8 +120,8 @@ public abstract class Request implements Attributes<Object> {
          * @return http method
          */
         @Override
-        public Http.Method getMethod() {
-            return Enum.valueOf(Http.Method.class, servletRequest.getMethod());
+        public Route.Method getMethod() {
+            return Enum.valueOf(Route.Method.class, servletRequest.getMethod());
         }
 
         /*
@@ -654,7 +654,7 @@ public abstract class Request implements Attributes<Object> {
     /**
      * @return http method
      */
-    public abstract Http.Method getMethod();
+    public abstract Route.Method getMethod();
 
     @Override
     public String toString() {

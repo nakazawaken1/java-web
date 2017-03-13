@@ -221,6 +221,17 @@ public enum Config {
     @Help("cluster node name suffix(for session cookie)")
     app_cluster_suffix,
 
+    /**
+     * controller packages
+     */
+    @Help("controller packages")
+    app_controller_packages("app.controller"),
+
+    /**
+     * job packages
+     */
+    @Help("job packages")
+    app_job_packages("app.controller"),
     ;
 
     /**
@@ -440,7 +451,7 @@ public enum Config {
      * @return true if text is true or 1 or yes or on(ignore case)
      */
     public boolean isTrue() {
-        return get().filter(i -> Arrays.asList("TRUE", "1", "YES", "ON").contains(i.toUpperCase())).isPresent();
+        return Arrays.asList("TRUE", "1", "YES", "ON").contains(text().toUpperCase());
     }
 
     /**

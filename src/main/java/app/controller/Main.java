@@ -16,12 +16,12 @@ import framework.Session;
 import framework.Try;
 import framework.Tuple;
 import framework.Xml;
-import framework.annotation.Http;
-import framework.annotation.Http.Method;
+import framework.annotation.Route;
+import framework.annotation.Route.Method;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
-import framework.annotation.Query;
+import framework.annotation.Param;
 import framework.annotation.Valid;
 import framework.annotation.Valid.Delete;
 import framework.annotation.Valid.Read;
@@ -31,16 +31,17 @@ import framework.annotation.Valid.Save;
  * main controller
  */
 public class Main {
-    
+
     /**
      * top page
+     * 
      * @param session session
      * @param request request
      * @return response
      */
-    @Http(path="index.html")
+    @Route(path = "index.html")
     Response index(Session session, Request request) {
-        if(!session.isLoggedIn()) {
+        if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
         }
         return Response.file(request.getPath());
@@ -52,11 +53,11 @@ public class Main {
      * @return response
      * @throws SQLException database error
      */
-    @Http
+    @Route
     @Only(Administrator.class)
-    Response db_settings(Db db, @Query Optional<String> sql) throws SQLException {
+    Response db_settings(Db db, @Param Optional<String> sql) throws SQLException {
         return Response.writeTemplate("table.html", (out, name, prefix) -> {
-            if(!"".equals(name)) {
+            if (!"".equals(name)) {
                 return;
             }
             AtomicInteger columns = new AtomicInteger(-1);
@@ -74,7 +75,7 @@ public class Main {
     /**
      * @return response
      */
-    @Http
+    @Route
     @Only(Administrator.class)
     Response db_console() {
         return Response.redirect("http://localhost:" + Config.app_h2_port.integer());
@@ -85,9 +86,9 @@ public class Main {
      * @param b right term
      * @return response
      */
-    @Http
+    @Route
     @Only
-    Response add(@Query int a, @Query Optional<Integer> b) {
+    Response add(@Param int a, @Param Optional<Integer> b) {
         return Response.write(out -> out.println(a + " + " + b + " = " + (a + b.orElse(0))));
     }
 
@@ -95,7 +96,7 @@ public class Main {
      * @param session session
      * @return response
      */
-    @Http
+    @Route
     Response info(Session session) {
         if (session.isLoggedIn()) {
             return Response.template("logged_in.html");
@@ -110,8 +111,8 @@ public class Main {
      * @param password password
      * @return response
      */
-    @Http(Method.POST)
-    Response login(Session session, @Query Optional<String> loginId, @Query Optional<String> password) {
+    @Route(Method.POST)
+    Response login(Session session, @Param Optional<String> loginId, @Param Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
             return Response.redirect("index.html");
@@ -125,7 +126,7 @@ public class Main {
      * @param session session
      * @return response
      */
-    @Http
+    @Route
     Response logout(Session session) {
         session.logout();
         return Response.redirect("login.html");
@@ -135,7 +136,7 @@ public class Main {
      * @param session session
      * @return response
      */
-    @Http
+    @Route
     Response alert(Session session) {
         return Response.text(session.flash("alert"));
     }
@@ -147,7 +148,7 @@ public class Main {
      * @param person condition
      * @return response
      */
-    @Http
+    @Route
     Response find(Db db, @Valid(Read.class) Person person) {
         return Response.json(db.find(person));
     }
@@ -159,7 +160,7 @@ public class Main {
      * @param person save data
      * @return response
      */
-    @Http
+    @Route
     Response save(Db db, @Valid(Save.class) Person person) {
         db.save(person);
         return Response.json(Tuple.of("id", person.getId()));
@@ -172,7 +173,7 @@ public class Main {
      * @param person delete key
      * @return response
      */
-    @Http
+    @Route
     Response delete(Db db, @Valid(Delete.class) Person person) {
         db.delete(person);
         return Response.json(Tuple.of("id", person.getId()));
@@ -185,22 +186,24 @@ public class Main {
     void daily() {
         Logger.getGlobal().info("daily");
     }
-    
+
     /**
      * default config file
+     * 
      * @return response
      */
-    @Http
+    @Route
     @Only(Administrator.class)
     Response config_default() {
         return Response.write(Config::printDefault).contentType("text/plain;charset=UTF-8");
     }
-    
+
     /**
      * default config file
+     * 
      * @return response
      */
-    @Http
+    @Route
     @Only(Administrator.class)
     Response config_current() {
         return Response.write(Config::printCurrent).contentType("text/plain;charset=UTF-8");

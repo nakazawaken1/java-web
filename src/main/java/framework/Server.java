@@ -34,6 +34,7 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,10 +67,10 @@ import com.sun.net.httpserver.HttpsServer;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.Response.ResponseCreator;
-import framework.annotation.Http;
+import framework.annotation.Route;
 import framework.annotation.Job;
 import framework.annotation.Only;
-import framework.annotation.Query;
+import framework.annotation.Param;
 
 /**
  * Servlet implementation class
@@ -181,21 +182,21 @@ public class Server implements Servlet {
 
         /* setup routing */
         if (table == null) {
-            try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
-                table = classes.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Http.class))).filter(pair -> pair.r != null)
-                        .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(Collectors.toMap(trio -> {
-                            Class<?> c = trio.l;
-                            Method m = trio.r.l;
-                            String left = Optional.ofNullable(c.getAnnotation(Http.class))
-                                    .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
-                            String right = Tool.string(trio.r.r.path()).orElse(m.getName());
-                            return left + right;
-                        }, trio -> {
-                            Method m = trio.r.l;
-                            m.setAccessible(true);
-                            return Tuple.of(trio.l, m);
-                        }));
-            }
+            table = new HashMap<>();
+            Config.app_controller_packages.stream().forEach(p -> {
+                try (Stream<Class<?>> cs = Tool.getClasses(p)) {
+                    cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
+                            .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
+                                Class<?> c = trio.l;
+                                Method m = trio.r.l;
+                                String left = Optional.ofNullable(c.getAnnotation(Route.class))
+                                        .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
+                                String right = Tool.string(trio.r.r.path()).orElse(m.getName());
+                                m.setAccessible(true);
+                                map.put(left + right, Tuple.of(c, m));
+                            }, Map::putAll);
+                }
+            });
             logger.info(Tool.print(writer -> {
                 writer.println("---- routing ----");
                 table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
@@ -206,9 +207,13 @@ public class Server implements Servlet {
         Db.setup(Config.db_setup.enumOf(Setup.class));
 
         /* job scheduler setup */
-        try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
-            Job.Scheduler.setup(classes.toArray(Class<?>[]::new));
-        }
+        List<Class<?>> cs = new ArrayList<>();
+        Config.app_job_packages.stream().forEach(p -> {
+            try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
+                classes.forEach(cs::add);
+            }
+        });
+        Job.Scheduler.setup(cs.toArray(new Class<?>[cs.size()]));
     }
 
     /**
@@ -248,7 +253,7 @@ public class Server implements Servlet {
         Tuple<Class<?>, Method> pair = table.get(request.getPath());
         if (pair != null) {
             Method method = pair.r;
-            Http http = method.getAnnotation(Http.class);
+            Route http = method.getAnnotation(Route.class);
             if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
                 Response.error(400).flush();
                 return;
@@ -280,7 +285,7 @@ public class Server implements Servlet {
                                 if (Db.class.isAssignableFrom(type)) {
                                     return db.get();
                                 }
-                                if (p.getAnnotation(Query.class) != null) {
+                                if (p.getAnnotation(Param.class) != null) {
                                     return parseValue(type, p, request.getFirstParameter(p.getName()));
                                 }
                                 return null;
@@ -380,6 +385,7 @@ public class Server implements Servlet {
                 exchange.close();
             }
         };
+
         Executor executor = Executors.newWorkStealingPool();
 
         try {
@@ -419,9 +425,11 @@ public class Server implements Servlet {
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
-                Object db = Tool.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class), new Object[]{Tool.array("-properties", config.getParent())});
+                Object db = Tool.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
+                        new Object[] { Tool.array("-properties", config.getParent()) });
                 Tool.invoke(db, "start", Tool.array());
-                Runtime.getRuntime().addShutdownHook(new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
+                Runtime.getRuntime().addShutdownHook(
+                        new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
             } catch (Exception e) {
                 server.logger.log(Level.WARNING, "h2 error", e);
             }
