@@ -6,14 +6,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Help document
+ * database mapping
  */
 @Target({ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface DbName {
+public @interface DbMap {
 
     /**
-     * @return document
+     * @return mapping name(use field name if empty)
      */
-    String value();
+    String value() default "";
 }

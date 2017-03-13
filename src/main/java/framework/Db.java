@@ -46,8 +46,10 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
-import framework.annotation.DbName;
+import framework.annotation.DbMap;
+import framework.annotation.Help;
 import framework.annotation.Id;
+import framework.annotation.Size;
 
 /**
  * database
@@ -621,7 +623,7 @@ public class Db implements AutoCloseable {
         }
         if (empty) {
             insert(table, names, primary, values);
-        } else if(names.length > primary) {
+        } else if (names.length > primary) {
             update(table, names, primary, values);
         }
         return empty;
@@ -837,6 +839,19 @@ public class Db implements AutoCloseable {
      * @return column names
      */
     public String[] create(String table, int primary, Column... columns) {
+        execute(createSql(table, primary, columns), null);
+        return Stream.of(columns).map(column -> column.name).toArray(String[]::new);
+    }
+
+    /**
+     * create table
+     *
+     * @param table table name
+     * @param primary primary key columns
+     * @param columns columns
+     * @return column names
+     */
+    public String createSql(String table, int primary, Column... columns) {
         StringBuilder sql = new StringBuilder("CREATE TABLE ");
         sql.append(table).append("(");
         String pad = "";
@@ -857,8 +872,7 @@ public class Db implements AutoCloseable {
         if (primary > 0) {
             sql.append(join(", PRIMARY KEY(", Arrays.asList(names).subList(0, primary), ", ")).append(")");
         }
-        execute(sql.append(")").toString(), null);
-        return names;
+        return sql.append(")").toString();
     }
 
     /**
@@ -930,6 +944,15 @@ public class Db implements AutoCloseable {
             /* get table creation sql */
             List<String> tables = all.stream().filter(file -> file.startsWith(tablePrefix)).collect(Collectors.toList());
 
+            List<Tuple<String, Class<?>>> models = new ArrayList<>();
+            Config.app_model_packages.stream().forEach(p -> {
+                try (Stream<Class<?>> classes = Tool.getClasses(p)) {
+                    classes.map(c -> Tuple.of(c.getAnnotation(DbMap.class), c)).filter(t -> t.l != null)
+                            .map(t -> Tuple.<String, Class<?>>of(Tool.string(t.l.value()).orElseGet(() -> t.r.getSimpleName()).toLowerCase(), t.r))
+                            .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
+                }
+            });
+
             /* get exists tables */
             Set<String> existTables = db.tables().collect(Collectors.toSet());
 
@@ -939,18 +962,22 @@ public class Db implements AutoCloseable {
             Set<String> reloadTables;
             if (create) {
                 /* drop exists tables */
-                tables.stream().map(tableName).filter(existTables::contains).forEach(db::drop);
+                Stream.concat(tables.stream().map(tableName), models.stream().map(t -> t.l)).filter(existTables::contains).forEach(db::drop);
                 /* create all tables and entry to load data */
-                reloadTables = tables.stream().peek(file -> db.executeFile(file, null)).map(tableName).collect(Collectors.toSet());
+                reloadTables = Stream.concat(tables.stream().peek(file -> db.executeFile(file, null)).map(tableName),
+                        models.stream().peek(t -> db.create(t.r)).map(t -> t.l)).collect(Collectors.toSet());
             } else if (reload) {
                 /* create no-exists tables */
                 tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).forEach(file -> db.executeFile(file, null));
+                models.stream().filter(t -> !existTables.contains(t.l)).forEach(t -> db.create(t.r));
                 /* entry all tables to load data */
                 reloadTables = tables.stream().map(tableName).collect(Collectors.toSet());
             } else {
                 /* create no-exists table and entry to load data */
-                reloadTables = tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).peek(file -> db.executeFile(file, null))
-                        .map(tableName).collect(Collectors.toSet());
+                reloadTables = Stream
+                        .concat(tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).peek(file -> db.executeFile(file, null))
+                                .map(tableName), models.stream().filter(t -> !existTables.contains(t.l)).peek(t -> db.create(t.r)).map(t -> t.l))
+                        .collect(Collectors.toSet());
             }
 
             /* data load */
@@ -2063,13 +2090,17 @@ public class Db implements AutoCloseable {
      * @return table name
      */
     public static String getTableName(Object model) {
-        for (Class<?> c = model.getClass(); c != Object.class; c = c.getSuperclass()) {
-            DbName name = c.getAnnotation(DbName.class);
+        Class<?> start = model instanceof Class ? (Class<?>) model : model.getClass();
+        for (Class<?> c = start; c != Object.class; c = c.getSuperclass()) {
+            DbMap name = c.getAnnotation(DbMap.class);
             if (name != null) {
-                return name.value();
+                String value = name.value();
+                if(Tool.string(value).isPresent()) {
+                    return value;
+                }
             }
         }
-        return model.getClass().getSimpleName();
+        return start.getSimpleName().toLowerCase();
     }
 
     /**
@@ -2077,6 +2108,101 @@ public class Db implements AutoCloseable {
      * @return column name
      */
     public static String getColumnName(Field field) {
-        return Optional.ofNullable(field.getAnnotation(DbName.class)).map(DbName::value).orElseGet(field::getName);
+        return Optional.ofNullable(field.getAnnotation(DbMap.class)).map(DbMap::value).orElseGet(field::getName);
+    }
+
+    /**
+     * @param <T> taget class type
+     * @param clazz target class
+     * @return stream of target class instance
+     */
+    public <T> Stream<T> query(Class<T> clazz) {
+        return from(getTableName(clazz)).rows().map(toObject(clazz));
+    }
+
+    /**
+     * field cache
+     */
+    static Map<Class<?>, Tuple<Field[], List<String>>> fieldCache = new HashMap<>();
+
+    /**
+     * @param <T> taget class type
+     * @param clazz target class
+     * @return object
+     */
+    public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
+        T object;
+        try {
+            object = clazz.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            Tool.getLogger().log(Level.WARNING, "cannot newInstance", e);
+            return rs -> null;
+        }
+        Tuple<Field[], List<String>> pair = getFields(clazz);
+        return Try.f(rs -> {
+            ResultSetMetaData meta = rs.getMetaData();
+            IntStream.range(0, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
+                int index = pair.r.indexOf(name.toUpperCase());
+                if (index >= 0) {
+                    try {
+                        pair.l[index].set(object, rs.getObject(name));
+                    } catch (IllegalArgumentException | IllegalAccessException | SQLException e) {
+                        throw new InternalError(e);
+                    }
+                }
+            });
+            return object;
+        });
+    }
+
+    /**
+     * @param clazz target class
+     * @return fields(field array, field name list)
+     */
+    private static Tuple<Field[], List<String>> getFields(Class<?> clazz) {
+        return fieldCache.computeIfAbsent(clazz, c -> {
+            Field[] fields = c.getDeclaredFields();
+            for (Field field : fields) {
+                field.setAccessible(true);
+            }
+            return Tuple.of(fields, Stream.of(fields).map(Field::getName).map(String::toUpperCase).collect(Collectors.toList()));
+        });
+    }
+
+    /**
+     * @param clazz target class
+     * @return SQL
+     */
+    public String createSql(Class<?> clazz) {
+        Tuple<Field[], List<String>> pair = getFields(clazz);
+        List<Column> primary = new ArrayList<>();
+        List<Column> columns = new ArrayList<>();
+        pair.r.forEach(Tool.withIndex((name, i) -> {
+            Field f = pair.l[i];
+            if (Modifier.isTransient(f.getModifiers())) {
+                return;
+            }
+            Column c = new Column(name);
+            c.type = f.getType();
+            if (Optional.class.isAssignableFrom(c.type)) {
+                c.type = f.getGenericType().getClass();
+                c.nullable();
+            }
+            Optional.ofNullable(f.getAnnotation(Help.class)).ifPresent(help -> c.display(String.join(" ", help.value())));
+            Optional.ofNullable(f.getAnnotation(Size.class)).ifPresent(size -> c.length(size.value()));
+            if (f.getAnnotation(Id.class) != null) {
+                primary.add(c);
+            } else {
+                columns.add(c);
+            }
+        }));
+        return createSql(getTableName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream()).toArray(Column[]::new));
+    }
+
+    /**
+     * @param clazz target class
+     */
+    public void create(Class<?> clazz) {
+        execute(createSql(clazz), null);
     }
 }

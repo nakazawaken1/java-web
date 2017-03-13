@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Consumer;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
@@ -1047,5 +1048,15 @@ public class Tool {
             return false;
         }
         return true;
+    }
+
+    /**
+     * @param <T> Object type
+     * @param consumer ObjIntConsumer
+     * @return Consumer
+     */
+    public static <T> Consumer<T> withIndex(ObjIntConsumer<T> consumer) {
+        int[] n = { 0 };
+        return obj -> consumer.accept(obj, n[0]++);
     }
 }

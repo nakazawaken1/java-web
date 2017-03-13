@@ -232,6 +232,12 @@ public enum Config {
      */
     @Help("job packages")
     app_job_packages("app.controller"),
+
+    /**
+     * model packages
+     */
+    @Help("model packages")
+    app_model_packages("app.model"),
     ;
 
     /**

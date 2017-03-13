@@ -374,6 +374,7 @@ public abstract class Response {
         public Response ofJson(Object o) {
             return new ForServer().set(r -> {
                 r.getResponseHeaders().set("Content-Type", "application/json;charset=" + charset);
+                r.sendResponseHeaders(200, 0);
                 try(OutputStream out = r.getResponseBody()) {
                     out.write(Tool.json(o).getBytes(charset));
                 }

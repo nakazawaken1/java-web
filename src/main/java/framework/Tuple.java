@@ -2,6 +2,8 @@ package framework;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 /**
  * Tuple
@@ -77,6 +79,28 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     @Override
     public String toString() {
         return Objects.toString(l) + (r == null ? "" : ", " + Objects.toString(r));
+    }
+
+    /**
+     * @param left left consumer
+     * @param right right consumer
+     */
+    public void accept(Consumer<L> left, Consumer<R> right) {
+        if (l != null) {
+            left.accept(l);
+        }
+        if (r != null) {
+            right.accept(r);
+        }
+    }
+
+    /**
+     * @param <T> result type
+     * @param mapper mapper
+     * @return result
+     */
+    public <T> T map(BiFunction<L, R, T> mapper) {
+        return mapper.apply(l, r);
     }
 
     /**
