@@ -455,6 +455,7 @@ public class Server implements Servlet {
                 Tool.invoke(db, "start", Tool.array());
                 Runtime.getRuntime().addShutdownHook(
                         new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
+                server.logger.info("h2 console started on port " + Config.app_h2_port.integer());
             } catch (Exception e) {
                 server.logger.log(Level.WARNING, "h2 error", e);
             }

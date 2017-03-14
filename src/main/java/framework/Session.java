@@ -10,7 +10,9 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -250,6 +252,7 @@ public abstract class Session implements Attributes<Serializable> {
                     ps.setBytes(1, out.toByteArray());
                     ps.setTimestamp(2, now);
                     ps.setString(3, id);
+                    ps.executeUpdate();
                     return Tool.array("(blob)", now, id);
                 })) <= 0) {
                     db.prepare("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
@@ -260,6 +263,7 @@ public abstract class Session implements Attributes<Serializable> {
                         return Tool.array(id, "(blob)", now);
                     });
                 }
+                saved = true;
             } catch (IOException e) {
                 Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, e);
             }
@@ -298,7 +302,7 @@ public abstract class Session implements Attributes<Serializable> {
                 }).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
-            Tool.getLogger().info("logged in : " + loginId);
+            Tool.getLogger().info("logged in : " + loginId + Arrays.toString(i.roles));
         }, () -> Tool.getLogger().info("login failed: " + loginId));
     }
 

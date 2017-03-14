@@ -497,9 +497,11 @@ public class Db implements AutoCloseable {
             }
             if (isRollback) {
                 connection.rollback();
+            } else {
+                connection.commit();
             }
             connection.close();
-            logger.config("Connection dropped #" + connection.hashCode());
+            logger.config("Connection dropped #" + connection.hashCode() + " " +(isRollback ? "rollback" : "commit"));
             connection = null;
         } catch (SQLException e) {
             logger.log(Level.WARNING, "Connection close error", e);

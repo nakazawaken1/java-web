@@ -75,7 +75,7 @@ public enum Config {
      * database connection string(inclucde id and password)
      */
     @Help("database connection string(inclucde id and password)")
-    db,
+    db("jdbc:h2:~/test"),
 
     /**
      * database auto config(create: drop and create, [update]: create if not exists, reload: delete and insert, none: no operation)
@@ -159,7 +159,7 @@ public enum Config {
      * accounts data(loginId:password:name:roles,...)
      */
     @Help("accounts data(loginId:password:name:roles,...)")
-    app_accounts(),
+    app_accounts("admin:Adm1n:Administrator:Administrator"),
 
     /**
      * file extension of text type contents
@@ -214,7 +214,7 @@ public enum Config {
      */
     @Help("h2 web console using https")
     app_h2_ssl(false),
-    
+
     /**
      * cluster node name suffix(for session cookie)
      */
@@ -237,8 +237,7 @@ public enum Config {
      * model packages
      */
     @Help("model packages")
-    app_model_packages("app.model"),
-    ;
+    app_model_packages("app.model"),;
 
     /**
      * logger
@@ -326,53 +325,54 @@ public enum Config {
             }
             properties.setProperty(key, i.text());
         }
+
+        /* overwrite file properties */
         try (Reader reader = Tool.newReader(toURL(configFile).orElseThrow(() -> new IOException(configFile + " not found")).openStream())) {
-            /* overwrite file properties */
             properties.load(reader);
-
-            /* overwrite system properties(prefix "app db log" only) */
-            System.getProperties().forEach((k, v) -> {
-                String key = (String) k;
-                if (Stream.of("app", "db", "log").anyMatch(key::startsWith)) {
-                    properties.setProperty(key, (String) v);
-                }
-            });
-
-            /* overwrite dynamic properties */
-            Map<String, String> backup = dbKeys.stream().filter(i -> Config.find(i).isPresent()).collect(Collectors.toMap(i -> i, properties::getProperty));
-            db_suffix.get().ifPresent(suffix -> {
-                for (String key : dbKeys) {
-                    find(key + suffix).ifPresent(value -> properties.setProperty(key, value));
-                }
-            });
-            backup.forEach((key, value) -> properties.setProperty(key, value));
-
-            /* resolve variables */
-            for (;;) {
-                boolean[] loop = { false };
-                Set<String> missings = new LinkedHashSet<>();
-                properties.entrySet().forEach(pair -> {
-                    resolve((String) pair.getValue(), properties, value -> {
-                        properties.setProperty((String) pair.getKey(), value);
-                        loop[0] = true;
-                    }, missings::add);
-                });
-                if (!loop[0]) {
-                    missings.stream().map(key -> BEGIN + key + END + " cannot resolve.").forEach(logger::warning);
-                    break;
-                }
-            }
-
-            /* dump */
-            startupLog();
-            Logger.getGlobal().info(Tool.print(writer -> {
-                writer.println("---- config ----");
-                properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey()))
-                        .forEach(i -> writer.println(i.getKey() + "=" + i.getValue()));
-            }));
         } catch (IOException e) {
             Logger.getGlobal().warning(() -> e.toString());
         }
+
+        /* overwrite system properties(prefix "app db log" only) */
+        System.getProperties().forEach((k, v) -> {
+            String key = (String) k;
+            if (Stream.of("app", "db", "log").anyMatch(key::startsWith)) {
+                properties.setProperty(key, (String) v);
+            }
+        });
+
+        /* overwrite dynamic properties */
+        Map<String, String> backup = dbKeys.stream().filter(i -> Config.find(i).isPresent()).collect(Collectors.toMap(i -> i, properties::getProperty));
+        db_suffix.get().ifPresent(suffix -> {
+            for (String key : dbKeys) {
+                find(key + suffix).ifPresent(value -> properties.setProperty(key, value));
+            }
+        });
+        backup.forEach((key, value) -> properties.setProperty(key, value));
+
+        /* resolve variables */
+        for (;;) {
+            boolean[] loop = { false };
+            Set<String> missings = new LinkedHashSet<>();
+            properties.entrySet().forEach(pair -> {
+                resolve((String) pair.getValue(), properties, value -> {
+                    properties.setProperty((String) pair.getKey(), value);
+                    loop[0] = true;
+                }, missings::add);
+            });
+            if (!loop[0]) {
+                missings.stream().map(key -> BEGIN + key + END + " cannot resolve.").forEach(logger::warning);
+                break;
+            }
+        }
+
+        /* dump */
+        startupLog();
+        Logger.getGlobal().info(Tool.print(writer -> {
+            writer.println("---- config ----");
+            properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey()))
+                    .forEach(i -> writer.println(i.getKey() + "=" + i.getValue()));
+        }));
     }
 
     /*
