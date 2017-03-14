@@ -8,6 +8,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -112,6 +113,17 @@ public class Tester {
      */
     public Expect expect(String name, Supplier<Object> supplier) {
         return new Expect(stack.peek().add(new Tester(stack, name, supplier, null)));
+    }
+
+    /**
+     * test for value
+     * 
+     * @param name test name
+     * @param supplier value supplier
+     * @return expect object
+     */
+    public Expect expectWith(String name, Function<String, Object> supplier) {
+        return new Expect(stack.peek().add(new Tester(stack, name, () -> supplier.apply(name), null)));
     }
 
     /**

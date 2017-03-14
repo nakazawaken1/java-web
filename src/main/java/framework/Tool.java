@@ -25,7 +25,9 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
@@ -37,12 +39,13 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -61,10 +64,16 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.Version;
 import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
 import org.codehaus.jackson.annotate.JsonMethod;
+import org.codehaus.jackson.map.JsonSerializer;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig.Feature;
+import org.codehaus.jackson.map.SerializerProvider;
+import org.codehaus.jackson.map.module.SimpleModule;
 
 import framework.Try.TryTriConsumer;
 
@@ -134,7 +143,7 @@ public class Tool {
      * @return String or empty if null or empty
      */
     public static Optional<String> string(Object value) {
-        return value == null ? Optional.empty() : Optional.ofNullable(value.toString()).filter(notEmpty);
+        return optional(value, String::valueOf).filter(notEmpty);
     }
 
     /**
@@ -144,11 +153,30 @@ public class Tool {
      * @return integer
      */
     public static Optional<Integer> integer(Object value) {
+        return optional(value, Integer::parseInt);
+    }
+
+    /**
+     * get optional
+     * 
+     * @param <T> object type
+     * @param <R> result type
+     *
+     * @param object object
+     * @param fromString string to value
+     * @return optional value
+     */
+    public static <T, R> Optional<R> optional(T object, Function<String, R> fromString) {
         try {
-            return value == null ? Optional.empty() : Optional.of(Integer.parseInt(value.toString()));
+            if (object != null) {
+                String text = object.toString();
+                if (text != null) {
+                    return Optional.ofNullable(fromString.apply(text));
+                }
+            }
         } catch (Exception e) {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -495,14 +523,63 @@ public class Tool {
      * @param o object
      * @return json
      */
+    @SuppressWarnings("unchecked")
     public static String json(Object o) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(JsonMethod.FIELD, Visibility.PUBLIC_ONLY);
         mapper.configure(Feature.FAIL_ON_EMPTY_BEANS, false);
+        mapper.registerModule(new SimpleModule("optional", Version.unknownVersion())
+                .<Optional<?>>addSerializer((Class<Optional<?>>) Optional.empty().getClass(), new JsonSerializer<Optional<?>>() {
+                    @Override
+                    public void serialize(Optional<?> value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                        json.writeObject(value.orElse(null));
+                    }
+                }).addSerializer(LocalDate.class, new JsonSerializer<LocalDate>() {
+                    @Override
+                    public void serialize(LocalDate value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                        if (value == null) {
+                            json.writeNull();
+                        } else {
+                            json.writeString(value.toString());
+                        }
+                    }
+                }));
         try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(o);
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(o instanceof Stream ? ((Stream<?>) o).toArray() : o);
         } catch (IOException e) {
-            return Objects.toString(o);
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @param o object
+     * @param out OutputStream
+     */
+    @SuppressWarnings("unchecked")
+    public static void json(Object o, OutputStream out) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setVisibility(JsonMethod.FIELD, Visibility.PUBLIC_ONLY);
+        mapper.configure(Feature.FAIL_ON_EMPTY_BEANS, false);
+        mapper.registerModule(new SimpleModule("optional", Version.unknownVersion())
+                .<Optional<?>>addSerializer((Class<Optional<?>>) Optional.empty().getClass(), new JsonSerializer<Optional<?>>() {
+                    @Override
+                    public void serialize(Optional<?> value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                        json.writeObject(value.orElse(null));
+                    }
+                }).addSerializer(LocalDate.class, new JsonSerializer<LocalDate>() {
+                    @Override
+                    public void serialize(LocalDate value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                        if (value == null) {
+                            json.writeNull();
+                        } else {
+                            json.writeString(value.toString());
+                        }
+                    }
+                }));
+        try {
+            mapper.writerWithDefaultPrettyPrinter().writeValue(out, o instanceof Stream ? ((Stream<?>) o).toArray() : o);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -559,15 +636,14 @@ public class Tool {
     /**
      * get next time
      *
-     * @param text text
+     * @param text duration text
      * @param from start point
      * @return milliseconds
      */
-    public static long nextMillis(String text, ZonedDateTime from) {
+    public static long nextMillis(final String text, final ZonedDateTime from) {
         String value = text.trim().toUpperCase();
         if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
             Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
-            Logger.getGlobal().info("interval: " + interval + ", next: " + from.plus(interval));
             return interval.toMillis();
         } else {
             ZonedDateTime next = from;
@@ -582,31 +658,48 @@ public class Tool {
                 }
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
                 ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
-                ChronoField[] last = { null };
-                Stream<Long> values = Stream.of(value.substring(timeIndex).split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
-                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey())
-                        .reduce(next, (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i).truncatedTo(units[fields.indexOf(last[0]) + 1]);
-                if (from.isAfter(calc)) {
-                    next = calc.plus(1, ChronoUnit.DAYS);
-                } else {
-                    next = calc;
+                ChronoField[] field = { null, null };
+                next = Tool.zip(fields.stream(), Stream.of(value.substring(timeIndex).split("[^0-9]")).map(s -> Tool.string(s).map(Long::valueOf).orElse(-1L)))
+                        .peek(i -> {
+                            if (i.r < 0) {
+                                field[0] = i.l;
+                            } else {
+                                field[1] = i.l;
+                            }
+                        }).reduce(next, (i, pair) -> pair.r < 0 ? i : i.with(pair.l, pair.r), (i, j) -> i).truncatedTo(units[fields.indexOf(field[1]) + 1]);
+                if (from.isAfter(next)) {
+                    next = next.plus(1, units[fields.indexOf(field[0]) + 1]);
                 }
-                value = value.substring(0, timeIndex);
+                value = value.substring(0, timeIndex).trim();
+            } else {
+                next = next.truncatedTo(ChronoUnit.DAYS);
             }
             if (!value.isEmpty()) {
-                List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
-                ChronoField[] last = { null };
-                ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
-                Stream<Long> values = Stream.of(value.split("[^0-9]+")).filter(Tool.notEmpty).map(Long::valueOf);
-                ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
-                        (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
-                if (last[0] != null && next.isAfter(calc)) {
-                    next = calc.plus(1, units[fields.indexOf(last[0])]);
-                } else {
-                    next = calc;
+                boolean until = true;
+                for (DayOfWeek i : DayOfWeek.values()) {
+                    if (i.name().startsWith(value)) {
+                        next = next.with(ChronoField.DAY_OF_WEEK, i.getValue());
+                        if (from.isAfter(next)) {
+                            next = next.plus(7, ChronoUnit.DAYS);
+                        }
+                        until = false;
+                        break;
+                    }
+                }
+                if (until) {
+                    List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
+                    ChronoField[] last = { null };
+                    ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
+                    Stream<Long> values = Stream.of(value.split("[^0-9]")).filter(Tool.notEmpty).map(Long::valueOf);
+                    ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
+                            (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
+                    if (last[0] != null && next.isAfter(calc)) {
+                        next = calc.plus(1, units[fields.indexOf(last[0])]);
+                    } else {
+                        next = calc;
+                    }
                 }
             }
-            Logger.getGlobal().info("next: " + next);
             return ChronoUnit.MILLIS.between(from, next);
         }
     }
@@ -1056,7 +1149,44 @@ public class Tool {
      * @return Consumer
      */
     public static <T> Consumer<T> withIndex(ObjIntConsumer<T> consumer) {
-        int[] n = { 0 };
-        return obj -> consumer.accept(obj, n[0]++);
+        AtomicInteger n = new AtomicInteger(-1);
+        return obj -> consumer.accept(obj, n.incrementAndGet());
+    }
+
+    /**
+     * @param <T> value type
+     * @param value value
+     * @param action action(not call if value is null)
+     */
+    public static <T> void let(T value, Consumer<T> action) {
+        if (value != null) {
+            action.accept(value);
+        }
+    }
+
+    /**
+     * @param <T> value type
+     * @param value value
+     * @param consumer call if value is not null
+     * @param runnable call if value is null
+     */
+    public static <T> void let(T value, Consumer<T> consumer, Runnable runnable) {
+        if (value == null) {
+            runnable.run();
+        } else {
+            consumer.accept(value);
+        }
+    }
+
+    /**
+     * @param <T> value type
+     * @param <R> return type
+     * @param value value
+     * @param converter call if value is not null
+     * @param supplier call if value is null
+     * @return value
+     */
+    public static <T, R> R val(T value, Function<T, R> converter, Supplier<R> supplier) {
+        return value == null ? supplier.get() : converter.apply(value);
     }
 }

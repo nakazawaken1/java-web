@@ -225,13 +225,13 @@ public enum Config {
      * controller packages
      */
     @Help("controller packages")
-    app_controller_packages("app.controller"),
+    app_controller_packages("app.controller,app.job"),
 
     /**
      * job packages
      */
     @Help("job packages")
-    app_job_packages("app.controller"),
+    app_job_packages("app.job"),
 
     /**
      * model packages

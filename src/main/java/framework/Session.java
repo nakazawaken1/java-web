@@ -246,16 +246,17 @@ public abstract class Session implements Attributes<Serializable> {
                 if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? FOR UPDATE", ps -> {
                     ps.setString(1, id);
                     return Tool.array(id);
-                }, rs -> db.preparedExecute("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
+                }, rs -> db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
                     ps.setBytes(1, out.toByteArray());
                     ps.setTimestamp(2, now);
                     ps.setString(3, id);
                     return Tool.array("(blob)", now, id);
                 })) <= 0) {
-                    db.preparedExecute("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
+                    db.prepare("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
                         ps.setString(1, id);
                         ps.setBytes(2, out.toByteArray());
                         ps.setTimestamp(3, now);
+                        ps.executeUpdate();
                         return Tool.array(id, "(blob)", now);
                     });
                 }

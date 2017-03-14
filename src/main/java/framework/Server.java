@@ -34,10 +34,11 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,10 +68,10 @@ import com.sun.net.httpserver.HttpsServer;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.Response.ResponseCreator;
-import framework.annotation.Route;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Param;
+import framework.annotation.Route;
 
 /**
  * Servlet implementation class
@@ -87,7 +88,7 @@ public class Server implements Servlet {
     /**
      * routing table{path: {class: method}}
      */
-    transient static Map<String, Tuple<Class<?>, Method>> table;
+    transient static SortedMap<String, Tuple<Class<?>, Method>> table;
 
     /*
      * (non-Javadoc)
@@ -182,7 +183,7 @@ public class Server implements Servlet {
 
         /* setup routing */
         if (table == null) {
-            table = new HashMap<>();
+            table = new TreeMap<>();
             Config.app_controller_packages.stream().forEach(p -> {
                 try (Stream<Class<?>> cs = Tool.getClasses(p)) {
                     cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
@@ -209,7 +210,7 @@ public class Server implements Servlet {
         /* job scheduler setup */
         List<Class<?>> cs = new ArrayList<>();
         Config.app_job_packages.stream().forEach(p -> {
-            try (Stream<Class<?>> classes = Tool.getClasses("app.controller")) {
+            try (Stream<Class<?>> classes = Tool.getClasses(p)) {
                 classes.forEach(cs::add);
             }
         });
@@ -341,15 +342,39 @@ public class Server implements Servlet {
      * @return value
      */
     static Object parseValue(Type type, Parameter p, String value) {
+        if (type == String.class) {
+            return value;
+        }
+        if (type == boolean.class || type == Boolean.class) {
+            return Tool.optional(value, Boolean::parseBoolean).orElse(false);
+        }
+        if (type == byte.class || type == Byte.class) {
+            return Tool.optional(value, Byte::parseByte).orElse((byte)0);
+        }
+        if (type == short.class || type == Short.class) {
+            return Tool.optional(value, Short::parseShort).orElse((short)0);
+        }
         if (type == int.class || type == Integer.class) {
-            return Tool.integer(value).orElse(0);
+            return Tool.optional(value, Integer::parseInt).orElse(0);
+        }
+        if (type == long.class || type == Long.class) {
+            return Tool.optional(value, Long::parseLong).orElse(0L);
+        }
+        if (type == float.class || type == Float.class) {
+            return Tool.optional(value, Float::parseFloat).orElse(0F);
+        }
+        if (type == double.class || type == Double.class) {
+            return Tool.optional(value, Double::parseDouble).orElse(0.);
+        }
+        if (type == char.class || type == Character.class) {
+            return Tool.optional(value, s -> s.charAt(0)).orElse('\0');
         }
         if (type == Optional.class) {
             Type valueType = ((ParameterizedType) p.getParameterizedType()).getActualTypeArguments()[0];
             return Optional.ofNullable(valueType == String.class ? value : parseValue(valueType, null, value))
                     .filter(i -> !(i instanceof String) || !((String) i).isEmpty());
         }
-        return value;
+        return p == null ? null : Try.s(((Class<?>)type)::newInstance).get();
     }
 
     /**
