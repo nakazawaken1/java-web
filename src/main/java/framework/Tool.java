@@ -33,12 +33,14 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
@@ -641,6 +643,10 @@ public class Tool {
      * @return milliseconds
      */
     public static long nextMillis(final String text, final ZonedDateTime from) {
+        Objects.requireNonNull(from);
+        if(Objects.requireNonNull(text).length() <= 0) {
+            return 0;
+        }
         String value = text.trim().toUpperCase();
         if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
             Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
@@ -659,7 +665,9 @@ public class Tool {
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
                 ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
                 ChronoField[] field = { null, null };
-                next = Tool.zip(fields.stream(), Stream.of(value.substring(timeIndex).split("[^0-9]")).map(s -> Tool.string(s).map(Long::valueOf).orElse(-1L)))
+                next = Tool
+                        .zip(fields.stream(),
+                                Stream.of(value.substring(timeIndex).trim().split("[^0-9]")).map(s -> Tool.string(s).map(Long::valueOf).orElse(-1L)))
                         .peek(i -> {
                             if (i.r < 0) {
                                 field[0] = i.l;
@@ -675,11 +683,12 @@ public class Tool {
                 next = next.truncatedTo(ChronoUnit.DAYS);
             }
             if (!value.isEmpty()) {
+                final ZonedDateTime start = next;
                 boolean until = true;
                 for (DayOfWeek i : DayOfWeek.values()) {
                     if (i.name().startsWith(value)) {
                         next = next.with(ChronoField.DAY_OF_WEEK, i.getValue());
-                        if (from.isAfter(next)) {
+                        if (start.isAfter(next)) {
                             next = next.plus(7, ChronoUnit.DAYS);
                         }
                         until = false;
@@ -688,15 +697,13 @@ public class Tool {
                 }
                 if (until) {
                     List<ChronoField> fields = Arrays.asList(ChronoField.DAY_OF_MONTH, ChronoField.MONTH_OF_YEAR, ChronoField.YEAR);
-                    ChronoField[] last = { null };
+                    ChronoField[] field = { null };
                     ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
-                    Stream<Long> values = Stream.of(value.split("[^0-9]")).filter(Tool.notEmpty).map(Long::valueOf);
-                    ZonedDateTime calc = Tool.zip(fields.stream(), values).peek(i -> last[0] = i.getKey()).reduce(next,
-                            (i, pair) -> i.with(pair.getKey(), pair.getValue()), (i, j) -> i);
-                    if (last[0] != null && next.isAfter(calc)) {
-                        next = calc.plus(1, units[fields.indexOf(last[0])]);
-                    } else {
-                        next = calc;
+                    List<String> values = Arrays.asList(value.split("[^0-9]"));
+                    Collections.reverse(values);
+                    next = Tool.zip(fields.stream(), values.stream().map(Long::valueOf)).peek(i -> field[0] = i.l).reduce(next, (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
+                    if (start.isAfter(next)) {
+                        next = next.plus(1, units[fields.indexOf(field[0])]);
                     }
                 }
             }
