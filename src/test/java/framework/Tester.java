@@ -273,6 +273,15 @@ public class Tester {
         }
 
         /**
+         * check equals
+         * 
+         * @param expected expected value
+         */
+        public void toArrayEqual(Object expected) {
+            tester.test = notifier -> Assert.assertArrayEquals((Object[])get(expected), (Object[])tester.get());
+        }
+
+        /**
          * check not equals
          * 
          * @param expected expected value

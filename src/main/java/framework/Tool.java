@@ -509,14 +509,37 @@ public class Tool {
 
     /**
      * build map{String: Object}
+     * @param <T> value type
      *
      * @param keyValues key, value, key, value...
      * @return map
      */
-    public static Map<String, Object> jsonMap(Object... keyValues) {
-        Map<String, Object> map = new LinkedHashMap<>();
+    @SafeVarargs
+    public static <T> Map<String, T> jsonMap(T... keyValues) {
+        if(keyValues == null) {
+            return null;
+        }
+        Map<String, T> map = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keyValues.length; i += 2) {
             map.put(keyValues[i].toString(), keyValues[i + 1]);
+        }
+        return map;
+    }
+
+    /**
+     * @param <K> key type
+     * @param <V> value type
+     * @param key key
+     * @param value value
+     * @param keyValues key, value,...
+     * @return map
+     */
+    @SuppressWarnings("unchecked")
+    public static <K, V> Map<K, V> map(K key, V value, Object... keyValues) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(key, value);
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            map.put((K)keyValues[i], (V)keyValues[i + 1]);
         }
         return map;
     }
@@ -1195,5 +1218,16 @@ public class Tool {
      */
     public static <T, R> R val(T value, Function<T, R> converter, Supplier<R> supplier) {
         return value == null ? supplier.get() : converter.apply(value);
+    }
+
+    /**
+     * @param <T> value type
+     * @param value value
+     * @param consumer consumer
+     * @return value
+     */
+    public static <T> T peek(T value, Consumer<T> consumer) {
+        consumer.accept(value);
+        return value;
     }
 }
