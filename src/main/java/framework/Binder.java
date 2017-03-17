@@ -3,6 +3,7 @@ package framework;
 import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -31,37 +32,39 @@ public class Binder {
         }
         throw new UnsupportedOperationException();
     }
-    
+
     /**
      * @param clazz class
      * @param text text
+     * @param error action if error(allow null:retry that text is "0")
      * @return value
      */
-    Object conv(Class<?> clazz, String text) {
-        Function<Function<String, Object>, Object> convert = f -> Try.s(() -> f.apply(text), e -> f.apply("0")).get();
+    Object convert(String text, Class<?> clazz, Function<Exception, Object> error) {
+        Function<Function<String, Object>, Object> toNumber = f -> Try
+                .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error).get();
         if (clazz == String.class) {
-            return text;
+            return text == null ? error == null ? "" : error.apply(null) : text;
         }
         if (clazz == byte.class || clazz == Byte.class) {
-            return convert.apply(Byte::valueOf);
+            return toNumber.apply(Byte::valueOf);
         }
         if (clazz == short.class || clazz == Short.class) {
-            return convert.apply(Short::valueOf);
+            return toNumber.apply(Short::valueOf);
         }
         if (clazz == int.class || clazz == Integer.class) {
-            return convert.apply(Integer::valueOf);
+            return toNumber.apply(Integer::valueOf);
         }
         if (clazz == long.class || clazz == Long.class) {
-            return convert.apply(Long::valueOf);
+            return toNumber.apply(Long::valueOf);
         }
         if (clazz == char.class || clazz == Character.class) {
-            return text.length() > 0 ? text.charAt(0) : '\0';
+            return text != null && text.length() > 0 ? text.charAt(0) : error == null ? '\0' : error.apply(null);
         }
         if (clazz == float.class || clazz == Float.class) {
-            return convert.apply(Float::valueOf);
+            return toNumber.apply(Float::valueOf);
         }
         if (clazz == double.class || clazz == Double.class) {
-            return convert.apply(Double::valueOf);
+            return toNumber.apply(Double::valueOf);
         }
         return text;
     }
@@ -69,18 +72,28 @@ public class Binder {
     /**
      * @param name name
      * @param clazz class
+     * @param parameterizedType Parameterized type
      * @return value
      */
-    public Object bind(String name, Class<?> clazz) {
-        if(clazz == null) {
+    public Object bind(String name, Class<?> clazz, Class<?>... parameterizedType) {
+        if (clazz == null) {
             return null;
         }
         List<String> values = parameters.get(name);
-        String nonNull = values == null ? "" : values.get(0);
+        String first = values == null || values.isEmpty() ? null : values.get(0);
+
+        // Array
         Class<?> component = clazz.getComponentType();
-        if(component != null) {
-            return values.stream().map(value -> conv(component, value)).toArray(n -> (Object[])Array.newInstance(component, n));
+        if (component != null) {
+            return values.stream().map(value -> convert(value, component, null)).toArray(n -> (Object[]) Array.newInstance(component, n));
         }
-        return conv(clazz, nonNull);
+
+        // Optional
+        if (clazz == Optional.class) {
+            Object value = convert(first, parameterizedType[0], e -> null);
+            return Optional.ofNullable(value);
+        }
+
+        return convert(first, clazz, null);
     }
 }

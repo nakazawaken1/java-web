@@ -1196,28 +1196,13 @@ public class Tool {
 
     /**
      * @param <T> value type
-     * @param value value
-     * @param consumer call if value is not null
-     * @param runnable call if value is null
-     */
-    public static <T> void let(T value, Consumer<T> consumer, Runnable runnable) {
-        if (value == null) {
-            runnable.run();
-        } else {
-            consumer.accept(value);
-        }
-    }
-
-    /**
-     * @param <T> value type
      * @param <R> return type
      * @param value value
      * @param converter call if value is not null
-     * @param supplier call if value is null
      * @return value
      */
-    public static <T, R> R val(T value, Function<T, R> converter, Supplier<R> supplier) {
-        return value == null ? supplier.get() : converter.apply(value);
+    public static <T, R> R val(T value, Function<T, R> converter) {
+        return converter.apply(value);
     }
 
     /**

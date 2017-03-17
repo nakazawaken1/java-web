@@ -3,6 +3,7 @@ package framework;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -62,38 +63,66 @@ public class TestBinder extends Tester {
 
         for (Class<?> c : Tool.array(byte.class, Byte.class, short.class, Short.class, int.class, Integer.class, long.class, Long.class, float.class,
                 Float.class, double.class, Double.class)) {
-            Class<?> boxed = Tool.val(boxedMap.get(c), i -> i, () -> c);
-            expect(c + ":1", from("a=1", "a", c)).toEqual(to(boxed, 1));
-            expect(c + ":", from("a=", "a", c)).toEqual(to(boxed, 0));
-            expect(c + ":a", from("a=a", "a", c)).toEqual(to(boxed, 0));
-            expect(c + ":" + maxValue(boxed, 0), from("a=" + maxValue(boxed, 0), "a", c))
-                    .toEqual(to(boxed, Try.s(() -> boxed.getField("MAX_VALUE").get(null)).get()));
-            if (boxed == Float.class || boxed == Double.class) {
-                expect(c + ":" + maxValue(boxed, 1), from("a=" + maxValue(boxed, 1), "a", c))
+            Class<?> boxed = Tool.val(boxedMap.get(c), i -> i == null ? c : i);
+            groupWith(c.getSimpleName(), prefix -> {
+                expect(prefix + ":1", from("a=1", "a", c)).toEqual(to(boxed, 1));
+                expect(prefix + ":empty", from("a=", "a", c)).toEqual(to(boxed, 0));
+                expect(prefix + ":null", from("b=", "a", c)).toEqual(to(boxed, 0));
+                expect(prefix + ":a", from("a=a", "a", c)).toEqual(to(boxed, 0));
+                expect(prefix + ":" + maxValue(boxed, 0), from("a=" + maxValue(boxed, 0), "a", c))
                         .toEqual(to(boxed, Try.s(() -> boxed.getField("MAX_VALUE").get(null)).get()));
-            } else {
-                expect(c + ":" + maxValue(boxed, 1), from("a=" + maxValue(boxed, 1), "a", c)).toEqual(to(boxed, 0));
-            }
+                if (boxed == Float.class || boxed == Double.class) {
+                    expect(prefix + ":" + maxValue(boxed, 1), from("a=" + maxValue(boxed, 1), "a", c))
+                            .toEqual(to(boxed, Try.s(() -> boxed.getField("MAX_VALUE").get(null)).get()));
+                } else {
+                    expect(prefix + ":" + maxValue(boxed, 1), from("a=" + maxValue(boxed, 1), "a", c)).toEqual(to(boxed, 0));
+                }
+            });
         }
 
-        {
-            Binder binder = new Binder(new Parser.Url().parse("a=1&b=2"));
-            expect("a,b", () -> Tool.map("a", binder.bind("a", int.class), "b", binder.bind("b", int.class))).toEqual(Tool.map("a", 1, "b", 2));
-        }
+        groupWith("Tuple", prefix -> {
+            expect(prefix + " a:int:1,b:int:2",
+                    () -> Tool.val(new Binder(new Parser.Url().parse("a=1&b=2")), binder -> Tuple.of(binder.bind("a", int.class), binder.bind("b", int.class))))
+                            .toEqual(Tuple.of(1, 2));
+            expect(prefix + " a:int:empty,b:int:2",
+                    () -> Tool.val(new Binder(new Parser.Url().parse("a=&b=2")), binder -> Tuple.of(binder.bind("a", int.class), binder.bind("b", int.class))))
+                            .toEqual(Tuple.of(0, 2));
+            expect(prefix + " a:int:null,b:int:2",
+                    () -> Tool.val(new Binder(new Parser.Url().parse("b=2")), binder -> Tuple.of(binder.bind("a", int.class), binder.bind("b", int.class))))
+                            .toEqual(Tuple.of(0, 2));
+        });
 
-        {
-            Binder binder = new Binder(new Parser.Url().parse("c=abc"));
-            Object result = Tool.map("c", 'a');
-            expect("char", () -> Tool.map("c", binder.bind("c", char.class))).toEqual(result);
-            expect("Character", () -> Tool.map("c", binder.bind("c", Character.class))).toEqual(result);
-        }
+        groupWith("char", prefix -> {
+            expect(prefix, () -> new Binder(new Parser.Url().parse("c=abc")).bind("c", char.class)).toEqual('a');
+            expect(prefix + ":empty", () -> new Binder(new Parser.Url().parse("c=")).bind("c", char.class)).toEqual('\0');
+            expect(prefix + ":null", () -> new Binder(new Parser.Url().parse("a=abc")).bind("c", char.class)).toEqual('\0');
+            expect(prefix + ":Optional", () -> new Binder(new Parser.Url().parse("c=abc")).bind("c", Optional.class, char.class)).toEqual(Optional.of('a'));
+            expect(prefix + ":Optional:empty", () -> new Binder(new Parser.Url().parse("c=")).bind("c", Optional.class, char.class)).toEqual(Optional.empty());
+            expect(prefix + ":Optional:null", () -> new Binder(new Parser.Url().parse("a=abc")).bind("c", Optional.class, char.class))
+                    .toEqual(Optional.empty());
+        });
+        groupWith("Character", prefix -> {
+            expect(prefix, () -> new Binder(new Parser.Url().parse("c=abc")).bind("c", Character.class)).toEqual('a');
+            expect(prefix + ":empty", () -> new Binder(new Parser.Url().parse("c=")).bind("c", Character.class)).toEqual('\0');
+            expect(prefix + ":null", () -> new Binder(new Parser.Url().parse("a=abc")).bind("c", Character.class)).toEqual('\0');
+            expect(prefix + ":Optional", () -> new Binder(new Parser.Url().parse("c=abc")).bind("c", Optional.class, Character.class))
+                    .toEqual(Optional.of('a'));
+            expect(prefix + ":Optional:empty", () -> new Binder(new Parser.Url().parse("c=")).bind("c", Optional.class, Character.class))
+                    .toEqual(Optional.empty());
+            expect(prefix + ":Optional:null", () -> new Binder(new Parser.Url().parse("a=abc")).bind("c", Optional.class, Character.class))
+                    .toEqual(Optional.empty());
+        });
 
-        {
-            Binder binder = new Binder(new Parser.Url().parse("s=abc"));
-            Object result = Tool.map("s", "abc");
-            expect("string", () -> Tool.map("s", binder.bind("s", String.class))).toEqual(result);
-        }
+        groupWith("String", prefix -> {
+            expect(prefix, () -> new Binder(new Parser.Url().parse("s=abc")).bind("s", String.class)).toEqual("abc");
+            expect(prefix + ":empty", () -> new Binder(new Parser.Url().parse("s=")).bind("s", String.class)).toEqual("");
+            expect(prefix + ":null", () -> new Binder(new Parser.Url().parse("a=def")).bind("s", String.class)).toEqual("");
+            expect(prefix + ":Optional", () -> new Binder(new Parser.Url().parse("s=abc")).bind("s", Optional.class, String.class)).toEqual(Optional.of("abc"));
+            expect(prefix + ":Optional:empty", () -> new Binder(new Parser.Url().parse("s=")).bind("s", Optional.class, String.class)).toEqual(Optional.of(""));
+            expect(prefix + ":Optional:null", () -> new Binder(new Parser.Url().parse("a=def")).bind("s", Optional.class, String.class))
+                    .toEqual(Optional.empty());
+        });
 
-        expect("array", () -> new Binder(new Parser.Url().parse("a=abc&a=def")).bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
+        expect("Array", () -> new Binder(new Parser.Url().parse("a=abc&a=def")).bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
     }
 }

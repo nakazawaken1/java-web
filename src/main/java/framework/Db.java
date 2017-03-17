@@ -2067,7 +2067,7 @@ public class Db implements AutoCloseable {
             }
         }
         if(type == LocalDate.class) {
-            optional = Tool.val(rs.getDate(name), v -> Optional.of(v.toLocalDate()), () -> Optional.empty());
+            optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
         }
         try {
             Object value = optional.orElseGet(Try.s(() -> rs.getObject(name)));

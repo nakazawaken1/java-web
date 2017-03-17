@@ -150,6 +150,18 @@ public class Tester {
     }
 
     /**
+     * grouping
+     * 
+     * @param name group name
+     * @param action tests
+     */
+    public void groupWith(String name, Consumer<String> action) {
+        stack.push(stack.peek().add(new Tester(stack, name)));
+        action.accept(name);
+        stack.pop();
+    }
+
+    /**
      * set before action
      * 
      * @param action before action
