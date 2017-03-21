@@ -1,6 +1,7 @@
 package framework;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,7 +40,7 @@ public class Binder {
      * @param error action if error(allow null:retry that text is "0")
      * @return value
      */
-    Object convert(String text, Class<?> clazz, Function<Exception, Object> error) {
+    Object convert(String text, Type clazz, Function<Exception, Object> error) {
         Function<Function<String, Object>, Object> toNumber = f -> Try
                 .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error).get();
         if (clazz == String.class) {
@@ -75,7 +76,7 @@ public class Binder {
      * @param parameterizedType Parameterized type
      * @return value
      */
-    public Object bind(String name, Class<?> clazz, Class<?>... parameterizedType) {
+    public Object bind(String name, Class<?> clazz, Type... parameterizedType) {
         if (clazz == null) {
             return null;
         }

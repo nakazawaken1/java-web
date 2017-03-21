@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 import framework.Config;
 import framework.Db;
 import framework.Lazy;
+import framework.Reflector;
 import framework.Tool;
 import framework.Tuple;
 
@@ -84,13 +85,14 @@ public @interface Job {
                                         logger.info(name + " : job next start at " + firstStart);
                                         scheduler.get().schedule(new Runnable() {
                                             ZonedDateTime start = firstStart;
+
                                             @Override
                                             public void run() {
                                                 logger.info(name + " : job start - " + start);
                                                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                                                     try {
                                                         method.setAccessible(true);
-                                                        method.invoke(Modifier.isStatic(method.getModifiers()) ? null : c.newInstance(),
+                                                        method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(c),
                                                                 Stream.of(method.getParameters()).map(p -> {
                                                                     Class<?> type = p.getType();
                                                                     if (type == ZonedDateTime.class) {
@@ -110,8 +112,7 @@ public @interface Job {
                                                                     }
                                                                     return null;
                                                                 }).toArray());
-                                                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                                                            | InstantiationException e) {
+                                                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                                                         logger.log(Level.WARNING, name + " : job error", e);
                                                     }
                                                 }

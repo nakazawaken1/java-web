@@ -374,7 +374,7 @@ public class Tester {
          * @throws IllegalAccessException access error
          */
         public Runner(Class<? extends Tester> testClass) throws InstantiationException, IllegalAccessException {
-            tester = testClass.newInstance();
+            tester = Reflector.instance(testClass);
         }
 
         /*

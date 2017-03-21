@@ -405,40 +405,36 @@ public class Db implements AutoCloseable {
      */
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, key -> {
-            try {
-                Type type = Type.fromUrl(Config.find(Config.db + key).orElseThrow(RuntimeException::new));
-                Class<?> c = Class.forName(Config.find(Config.db_datasource_class + key).orElse(type.dataSource));
-                DataSource ds = (DataSource) c.newInstance();
-                Config.find(Config.db + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
-                    if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
-                        List<String> list = new ArrayList<>();
-                        for (String s : value.split("\\s*;\\s*")) {
-                            String[] a = s.split("\\s*=\\s*", 2);
-                            if ("user".equalsIgnoreCase(a[0])) {
-                                if (a.length > 1) {
-                                    c.getMethod("setUser", String.class).invoke(ds, a[1]);
-                                }
-                            } else {
-                                list.add(s);
+            Type type = Type.fromUrl(Config.find(Config.db + key).orElseThrow(RuntimeException::new));
+            String name = Config.find(Config.db_datasource_class + key).orElse(type.dataSource);
+            Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
+            DataSource ds = Reflector.instance(c);
+            Config.find(Config.db + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
+                if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
+                    List<String> list = new ArrayList<>();
+                    for (String s : value.split("\\s*;\\s*")) {
+                        String[] a = s.split("\\s*=\\s*", 2);
+                        if ("user".equalsIgnoreCase(a[0])) {
+                            if (a.length > 1) {
+                                c.getMethod("setUser", String.class).invoke(ds, a[1]);
                             }
-                        }
-                        value = String.join("; ", list);
-                    }
-                    for (String method : Tool.array("setURL", "setUrl")) {
-                        try {
-                            c.getMethod(method, String.class).invoke(ds, value);
-                            break;
-                        } catch (NoSuchMethodException e) {
-                            continue;
+                        } else {
+                            list.add(s);
                         }
                     }
-                }));
-                Tool.getLogger().info("DataSource created #" + ds);
-                return ds;
-            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-                Tool.getLogger().log(Level.WARNING, "cannot get dataSource", e);
-                throw new RuntimeException(e);
-            }
+                    value = String.join("; ", list);
+                }
+                for (String method : Tool.array("setURL", "setUrl")) {
+                    try {
+                        c.getMethod(method, String.class).invoke(ds, value);
+                        break;
+                    } catch (NoSuchMethodException e) {
+                        continue;
+                    }
+                }
+            }));
+            Tool.getLogger().info("DataSource created #" + ds);
+            return ds;
         });
     }
 
@@ -501,7 +497,7 @@ public class Db implements AutoCloseable {
                 connection.commit();
             }
             connection.close();
-            logger.config("Connection dropped #" + connection.hashCode() + " " +(isRollback ? "rollback" : "commit"));
+            logger.config("Connection dropped #" + connection.hashCode() + " " + (isRollback ? "rollback" : "commit"));
             connection = null;
         } catch (SQLException e) {
             logger.log(Level.WARNING, "Connection close error", e);
@@ -2029,18 +2025,17 @@ public class Db implements AutoCloseable {
     @SuppressWarnings("unchecked")
     public <T extends S, S> Stream<S> find(T model, String... targetColumns) {
         List<Field> fields;
-        Class<?> c = model.getClass();
+        Class<T> c = (Class<T>) model.getClass();
         if (targetColumns == null || targetColumns.length <= 0) {
             targetColumns = Tool.array("*");
             fields = Stream.of(c.getDeclaredFields()).filter(f -> !Modifier.isTransient(f.getModifiers())).peek(f -> f.setAccessible(true))
                     .collect(Collectors.toList());
         } else {
-            fields = Stream.of(targetColumns).map(Try.f(s -> c.getDeclaredField(s))).peek(f -> f.setAccessible(true)).collect(Collectors.toList());
+            fields = Stream.of(targetColumns).map(s -> Reflector.field(c, s)).filter(Optional::isPresent).map(Optional::get).collect(Collectors.toList());
         }
-        return select(targetColumns).from(getTableName(model)).rows().map(rs -> {
-            return fields.stream().collect(Try.s(() -> (T) c.newInstance()), Try.c((o, f) -> setFieldValue(o, f, rs, getColumnName(f))), (a, b) -> {
-            });
-        });
+        return select(targetColumns).from(getTableName(model)).rows()
+                .map(rs -> fields.stream().collect(() -> Reflector.instance(c), Try.c((o, f) -> setFieldValue(o, f, rs, getColumnName(f))), (a, b) -> {
+                }));
     }
 
     /**
@@ -2049,32 +2044,27 @@ public class Db implements AutoCloseable {
      * @param field field
      * @param rs ResultSet
      * @param name column name
-     * @throws SQLException 
      */
     @SuppressWarnings("unchecked")
-    public static <T extends Enum<T>> void setFieldValue(Object instance, Field field, ResultSet rs, String name) throws SQLException {
-        Class<?> type = field.getType();
-        boolean isOptional = type == Optional.class;
-        if(isOptional) {
-            type = (Class<?>)((ParameterizedType)field.getGenericType()).getActualTypeArguments()[0];
-        }
-        Optional<Object> optional = Optional.empty();
-        if (Enum.class.isAssignableFrom(type)) {
-            if (IntSupplier.class.isAssignableFrom(type)) {
-                optional = Optional.of(type.getEnumConstants()[rs.getInt(name)]);
-            } else {
-                optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
+    public static <T extends Enum<T>> void setFieldValue(Object instance, Field field, ResultSet rs, String name) {
+        Class<?> baseType = field.getType();
+        boolean isOptional = baseType == Optional.class;
+        Class<?> type = isOptional ? (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0] : baseType;
+        Try.r(() -> {
+            Optional<Object> optional = Optional.empty();
+            if (Enum.class.isAssignableFrom(type)) {
+                if (IntSupplier.class.isAssignableFrom(type)) {
+                    optional = Optional.of(type.getEnumConstants()[rs.getInt(name)]);
+                } else {
+                    optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
+                }
             }
-        }
-        if(type == LocalDate.class) {
-            optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
-        }
-        try {
+            if (type == LocalDate.class) {
+                optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
+            }
             Object value = optional.orElseGet(Try.s(() -> rs.getObject(name)));
             field.set(instance, isOptional ? Optional.ofNullable(value) : value);
-        } catch (IllegalArgumentException | IllegalAccessException e) {
-            e.printStackTrace();
-        }
+        }).run();
     }
 
     /**
@@ -2195,7 +2185,7 @@ public class Db implements AutoCloseable {
     public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
         Tuple<Field[], List<String>> pair = getFields(clazz);
         return Try.f(rs -> {
-            T object = clazz.newInstance();
+            T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
             IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
                 int index = pair.r.indexOf(name.toUpperCase());

@@ -15,7 +15,6 @@ import framework.Try;
 import framework.Xml;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
-import framework.annotation.Param;
 import framework.annotation.Route;
 import framework.annotation.Route.Method;
 
@@ -47,7 +46,7 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Response db_settings(Db db, @Param Optional<String> sql) throws SQLException {
+    Response db_settings(Db db, Optional<String> sql) throws SQLException {
         return Response.writeTemplate("table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
@@ -80,7 +79,7 @@ public class Main {
      */
     @Route
     @Only
-    Response add(@Param int a, @Param Optional<Integer> b) {
+    Response add(int a, Optional<Integer> b) {
         return Response.write(out -> out.println(a + " + " + b + " = " + (a + b.orElse(0))));
     }
 
@@ -104,7 +103,7 @@ public class Main {
      * @return response
      */
     @Route(Method.POST)
-    Response login(Session session, @Param Optional<String> loginId, @Param Optional<String> password) {
+    Response login(Session session, Optional<String> loginId, Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
             return Response.redirect("index.html");

@@ -271,7 +271,7 @@ public class Server implements Servlet {
             }
             try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                 try {
-                    ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : pair.l.newInstance(),
+                    ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
                             Stream.of(method.getParameters()).map(p -> {
                                 Class<?> type = p.getType();
                                 if (Request.class.isAssignableFrom(type)) {
@@ -286,10 +286,9 @@ public class Server implements Servlet {
                                 if (Db.class.isAssignableFrom(type)) {
                                     return db.get();
                                 }
-                                if (p.getAnnotation(Param.class) != null) {
-                                    return parseValue(type, p, request.getFirstParameter(p.getName()));
-                                }
-                                return null;
+                                Type types = p.getParameterizedType();
+                                return new Binder(request.getParameters()).bind(p.getName(), type,
+                                        types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
                             }).toArray())).flush();
                     return;
                 } catch (InvocationTargetException e) {
@@ -298,7 +297,7 @@ public class Server implements Servlet {
                         throw (RuntimeException) t;
                     }
                     throw new RuntimeException(t);
-                } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
+                } catch (IllegalAccessException | IllegalArgumentException e) {
                     throw new RuntimeException(e);
                 } catch (RuntimeException e) {
                     throw e;
@@ -333,48 +332,6 @@ public class Server implements Servlet {
         }
 
         throw new FileNotFoundException(request.getPath());
-    }
-
-    /**
-     * @param type value type
-     * @param p parameter
-     * @param value string value
-     * @return value
-     */
-    static Object parseValue(Type type, Parameter p, String value) {
-        if (type == String.class) {
-            return value;
-        }
-        if (type == boolean.class || type == Boolean.class) {
-            return Tool.optional(value, Boolean::parseBoolean).orElse(false);
-        }
-        if (type == byte.class || type == Byte.class) {
-            return Tool.optional(value, Byte::parseByte).orElse((byte)0);
-        }
-        if (type == short.class || type == Short.class) {
-            return Tool.optional(value, Short::parseShort).orElse((short)0);
-        }
-        if (type == int.class || type == Integer.class) {
-            return Tool.optional(value, Integer::parseInt).orElse(0);
-        }
-        if (type == long.class || type == Long.class) {
-            return Tool.optional(value, Long::parseLong).orElse(0L);
-        }
-        if (type == float.class || type == Float.class) {
-            return Tool.optional(value, Float::parseFloat).orElse(0F);
-        }
-        if (type == double.class || type == Double.class) {
-            return Tool.optional(value, Double::parseDouble).orElse(0.);
-        }
-        if (type == char.class || type == Character.class) {
-            return Tool.optional(value, s -> s.charAt(0)).orElse('\0');
-        }
-        if (type == Optional.class) {
-            Type valueType = ((ParameterizedType) p.getParameterizedType()).getActualTypeArguments()[0];
-            return Optional.ofNullable(valueType == String.class ? value : parseValue(valueType, null, value))
-                    .filter(i -> !(i instanceof String) || !((String) i).isEmpty());
-        }
-        return p == null ? null : Try.s(((Class<?>)type)::newInstance).get();
     }
 
     /**
