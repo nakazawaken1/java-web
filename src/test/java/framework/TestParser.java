@@ -15,7 +15,7 @@ public class TestParser extends Tester {
     /**
      * from
      */
-    Function<String, Object> from = s -> Tool.json(new Parser.Url().parse(s));
+    Function<String, Object> from = s -> Tool.json(new Parser.Url().parse(s.substring("Parser:".length())));
 
     /**
      * @param values values
@@ -26,12 +26,14 @@ public class TestParser extends Tester {
     }
 
     {
-        expectWith(null, from).toEqual(to());
-        expectWith("", from).toEqual(to());
-        expectWith("a=1", from).toEqual(to("a", Arrays.asList("1")));
-        expectWith("a=1&a=2", from).toEqual(to("a", Arrays.asList("1", "2")));
-        expectWith("a=&a=2", from).toEqual(to("a", Arrays.asList("", "2")));
-        expectWith("a=&a=2=3", from).toEqual(to("a", Arrays.asList("", "2=3")));
-        expectWith("a=1%262", from).toEqual(to("a", Arrays.asList("1&2")));
+        groupWith("Parser", g -> {
+            expectWith(g + ":null", n -> Tool.json(new Parser.Url().parse(null))).toEqual(to());
+            expectWith(g + ":empty", n -> Tool.json(new Parser.Url().parse(""))).toEqual(to());
+            expectWith(g + ":a=1", from).toEqual(to("a", Arrays.asList("1")));
+            expectWith(g + ":a=1&a=2", from).toEqual(to("a", Arrays.asList("1", "2")));
+            expectWith(g + ":a=&a=2", from).toEqual(to("a", Arrays.asList("", "2")));
+            expectWith(g + ":a=&a=2=3", from).toEqual(to("a", Arrays.asList("", "2=3")));
+            expectWith(g + ":a=1%262", from).toEqual(to("a", Arrays.asList("1&2")));
+        });
     }
 }
