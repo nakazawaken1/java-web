@@ -1,20 +1,28 @@
 package framework;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import framework.annotation.Required;
 
 /**
  * value object builder
+ * 
  * @param <VALUE> value type
  * @param <BUILDER> builder type
  */
 public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VALUE, BUILDER>> implements Supplier<VALUE> {
     /**
+     * target field names
+     */
+    Enum<?>[] names;
+    /**
      * target fields
      */
-    Enum<?>[] fields;
+    Field[] fields;
     /**
      * target class
      */
@@ -33,10 +41,11 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      * @param clazz target class
      */
     public AbstractBuilder(Class<? extends Enum<?>> eClass, Class<VALUE> clazz) {
-        this.fields = eClass.getEnumConstants();
+        this.names = eClass.getEnumConstants();
+        this.fields = Stream.of(names).map(i -> Reflector.field(clazz, i.name())).filter(Optional::isPresent).map(Optional::get).toArray(Field[]::new);
         this.clazz = clazz;
-        this.values = new Object[fields.length];
-        this.sets = new boolean[fields.length];
+        this.values = new Object[names.length];
+        this.sets = new boolean[names.length];
     }
 
     /**
@@ -53,39 +62,51 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     }
 
     /**
+     * @param name field
+     * @param value value
+     * @return builder
+     */
+    @SuppressWarnings("unchecked")
+    public BUILDER set(String name, Object value) {
+        Stream.of(names).filter(i -> i.name().equals(name)).findFirst().map(Enum::ordinal).ifPresent(i -> {
+            values[i] = value;
+            sets[i] = true;
+        });
+        return (BUILDER) this;
+    }
+
+    /**
      * @param value source object
      * @return builder
      */
     @SuppressWarnings("unchecked")
     public BUILDER copy(VALUE value) {
-        for (Enum<?> i : fields) {
+        for (Enum<?> i : names) {
             try {
-                set(i, clazz.getField(i.name()).get(value));
-            } catch (IllegalArgumentException | IllegalAccessException | SecurityException | NoSuchFieldException e) {
+                set(i, fields[i.ordinal()].get(value));
+            } catch (IllegalArgumentException | IllegalAccessException e) {
                 throw new InternalError(e);
             }
         }
         return (BUILDER) this;
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see java.util.function.Supplier#get()
      */
-    @SuppressWarnings("unchecked")
     @Override
     public VALUE get() {
-        for (Enum<?> i : fields) {
-            try {
-                if (clazz.getField(i.name()).getAnnotation(Required.class) != null && !sets[i.ordinal()]) {
-                    throw new IllegalArgumentException(clazz.getName() + '.' + i.name() + " mast set a value.");
-                }
-            } catch (NoSuchFieldException | SecurityException e) {
-                throw new InternalError(e);
+        for (Enum<?> i : names) {
+            if (fields[i.ordinal()].getAnnotation(Required.class) != null && !sets[i.ordinal()]) {
+                throw new IllegalArgumentException(clazz.getName() + '.' + i.name() + " mast set a value.");
             }
         }
         try {
-            return (VALUE) clazz.getDeclaredConstructors()[0].newInstance(values);
-        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | SecurityException e) {
+            return (VALUE) Reflector.constructor(clazz, Stream.of(fields).map(Field::getType).toArray(Class[]::new)).orElseThrow(IllegalArgumentException::new)
+                    .newInstance(values);
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
             throw new InternalError(e);
         }
     }

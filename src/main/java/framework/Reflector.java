@@ -2,6 +2,7 @@ package framework;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,6 +21,11 @@ public class Reflector {
      * constructor cache{class, arguments hash : constructor}
      */
     static Map<Tuple<Class<?>, Integer>, Constructor<?>> constructors = new HashMap<>();
+
+    /**
+     * constructor cache{class, arguments hash : method}
+     */
+    static Map<Tuple<Class<?>, Integer>, Method> methods = new HashMap<>();
 
     /**
      * constructor cache{class : {field name : field}}
@@ -46,7 +52,6 @@ public class Reflector {
                 return result;
             })));
         } catch (RuntimeException e) {
-            Tool.getLogger().log(Level.INFO, "constructor error", e);
             return Optional.empty();
         }
     }
@@ -72,6 +77,17 @@ public class Reflector {
      */
     public static <T> T instance(Class<T> clazz) {
         return constructor(clazz).map(Try.f(Constructor::newInstance)).orElse(null);
+    }
+
+    /**
+     * call no args constructor
+     * 
+     * @param <T> target type
+     * @param clazz target class
+     * @return instance
+     */
+    public static <T> T instance(String clazz) {
+        return instance(Reflector.<T>clazz(clazz).orElseThrow(RuntimeException::new));
     }
 
     /**
@@ -117,5 +133,23 @@ public class Reflector {
      */
     public static String mappingName(Field field) {
         return Optional.ofNullable(field.getAnnotation(Mapping.class)).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
+    }
+    
+    /**
+     * @param clazz class
+     * @param name name
+     * @param args argument types
+     * @return method
+     */
+    public static Optional<Method> method(Class<?> clazz, String name, Class<?>... args) {
+        try {
+            return Optional.ofNullable(methods.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> {
+                Method result = pair.l.getDeclaredMethod(name, args);
+                result.setAccessible(true);
+                return result;
+            })));
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
     }
 }

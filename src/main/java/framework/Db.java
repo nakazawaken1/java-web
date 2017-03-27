@@ -2032,38 +2032,46 @@ public class Db implements AutoCloseable {
         } else {
             fields = Stream.of(targetColumns).map(s -> Reflector.field(c, s)).filter(Optional::isPresent).map(Optional::get).collect(Collectors.toList());
         }
-        return select(targetColumns).from(getTableName(model)).rows().map(
-                rs -> fields.stream().collect(() -> Reflector.instance(c), Try.biC((o, f) -> setFieldValue(o, f, rs, Reflector.mappingName(f))), (a, b) -> {
-                }));
+        if (Reflector.constructor(c).isPresent()) {
+            return select(targetColumns).from(getTableName(model)).rows().map(rs -> fields.stream().collect(() -> Reflector.instance(c),
+                    Try.biC((o, f) -> f.set(o, convert(f, rs, Reflector.mappingName(f)))), (a, b) -> {
+                    }));
+        } else {
+            return select(targetColumns).from(getTableName(model)).rows()
+                    .map(rs -> fields.stream().<AbstractBuilder<S, ?>>collect(() -> Reflector.instance(c.getName() + "$Builder"),
+                            Try.biC((b, f) -> b.set(f.getName(), convert(f, rs, Reflector.mappingName(f)))), (a, b) -> {
+                            }).get());
+        }
     }
 
     /**
+     * db value to java value
+     * 
      * @param <T> enum type
-     * @param instance instance
      * @param field field
      * @param rs ResultSet
      * @param name column name
+     * @return java value
+     * @throws SQLException
      */
     @SuppressWarnings("unchecked")
-    public static <T extends Enum<T>> void setFieldValue(Object instance, Field field, ResultSet rs, String name) {
+    public static <T extends Enum<T>> Object convert(Field field, ResultSet rs, String name) throws SQLException {
         Class<?> baseType = field.getType();
         boolean isOptional = baseType == Optional.class;
         Class<?> type = isOptional ? (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0] : baseType;
-        Try.r(() -> {
-            Optional<Object> optional = Optional.empty();
-            if (Enum.class.isAssignableFrom(type)) {
-                if (IntSupplier.class.isAssignableFrom(type)) {
-                    optional = Optional.of(type.getEnumConstants()[rs.getInt(name)]);
-                } else {
-                    optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
-                }
+        Optional<Object> optional = Optional.empty();
+        if (Enum.class.isAssignableFrom(type)) {
+            if (IntSupplier.class.isAssignableFrom(type)) {
+                optional = Optional.of(type.getEnumConstants()[rs.getInt(name)]);
+            } else {
+                optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
-            if (type == LocalDate.class) {
-                optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
-            }
-            Object value = optional.orElseGet(Try.s(() -> rs.getObject(name)));
-            field.set(instance, isOptional ? Optional.ofNullable(value) : value);
-        }).run();
+        }
+        if (type == LocalDate.class) {
+            optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
+        }
+        Object value = optional.orElseGet(Try.s(() -> rs.getObject(name)));
+        return isOptional ? Optional.ofNullable(value) : value;
     }
 
     /**
@@ -2175,7 +2183,7 @@ public class Db implements AutoCloseable {
             T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
             IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
-                Optional.ofNullable(map.get(name)).ifPresent(field -> setFieldValue(object, field, rs, name));
+                Optional.ofNullable(map.get(name)).ifPresent(Try.c(field -> field.set(object, convert(field, rs, name))));
             });
             return object;
         });
