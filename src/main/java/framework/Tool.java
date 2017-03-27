@@ -27,10 +27,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.DayOfWeek;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,6 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -55,6 +58,9 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -65,17 +71,19 @@ import javax.crypto.CipherOutputStream;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.Version;
-import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
-import org.codehaus.jackson.annotate.JsonMethod;
-import org.codehaus.jackson.map.JsonSerializer;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig.Feature;
-import org.codehaus.jackson.map.SerializerProvider;
-import org.codehaus.jackson.map.module.SimpleModule;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import framework.Try.TryTriConsumer;
 
@@ -280,7 +288,7 @@ public class Tool {
                 writer.print(text.substring(0, begin));
                 if (replacer != null) {
                     String tag = text.substring(begin + prefix.length(), end).trim();
-                    Try.c(replacer).accept(writer, tag, prefix);
+                    Try.triC(replacer).accept(writer, tag, prefix);
                 }
                 text = text.substring(end + suffix.length());
                 loop = true;
@@ -509,6 +517,7 @@ public class Tool {
 
     /**
      * build map{String: Object}
+     * 
      * @param <T> value type
      *
      * @param keyValues key, value, key, value...
@@ -516,7 +525,7 @@ public class Tool {
      */
     @SafeVarargs
     public static <T> Map<String, T> jsonMap(T... keyValues) {
-        if(keyValues == null) {
+        if (keyValues == null) {
             return null;
         }
         Map<String, T> map = new LinkedHashMap<>();
@@ -539,73 +548,122 @@ public class Tool {
         Map<K, V> map = new LinkedHashMap<>();
         map.put(key, value);
         for (int i = 0; i + 1 < keyValues.length; i += 2) {
-            map.put((K)keyValues[i], (V)keyValues[i + 1]);
+            map.put((K) keyValues[i], (V) keyValues[i + 1]);
         }
         return map;
     }
 
     /**
-     * @param o object
-     * @return json
+     * @param <K> key type
+     * @param <V> value type
+     * @return map
+     */
+    public static <K, V> Map<K, V> map() {
+        return new LinkedHashMap<>();
+    }
+
+    /**
+     * @param <K> key type
+     * @param <V> value type
+     * @param keyValues key, value,...
+     * @return map
      */
     @SuppressWarnings("unchecked")
-    public static String json(Object o) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.setVisibility(JsonMethod.FIELD, Visibility.PUBLIC_ONLY);
-        mapper.configure(Feature.FAIL_ON_EMPTY_BEANS, false);
-        mapper.registerModule(new SimpleModule("optional", Version.unknownVersion())
-                .<Optional<?>>addSerializer((Class<Optional<?>>) Optional.empty().getClass(), new JsonSerializer<Optional<?>>() {
-                    @Override
-                    public void serialize(Optional<?> value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                        json.writeObject(value.orElse(null));
-                    }
-                }).addSerializer(LocalDate.class, new JsonSerializer<LocalDate>() {
-                    @Override
-                    public void serialize(LocalDate value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                        if (value == null) {
-                            json.writeNull();
-                        } else {
-                            json.writeString(value.toString());
-                        }
-                    }
-                }));
-        try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(o instanceof Stream ? ((Stream<?>) o).toArray() : o);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    public static <K, V> Map<K, V> map(Object[] keyValues) {
+        Map<K, V> map = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            map.put((K) keyValues[i], (V) keyValues[i + 1]);
         }
+        return map;
+    }
+
+    /**
+     * JSON writer
+     */
+    @SuppressWarnings("rawtypes")
+    static ObjectMapper jsonMapper = Tool.peek(new ObjectMapper(), mapper -> {
+        mapper.setVisibility(PropertyAccessor.ALL, Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.FIELD, Visibility.NON_PRIVATE);
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.setSerializationInclusion(Include.NON_NULL);
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        mapper.registerModule(new SimpleModule().addSerializer(Optional.class, new JsonSerializer<Optional>() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public void serialize(Optional value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeObject(value.orElse(null));
+            }
+        }).addSerializer(OptionalInt.class, new JsonSerializer<OptionalInt>() {
+            @Override
+            public void serialize(OptionalInt value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeObject(value.orElse(0));
+            }
+        }).addSerializer(OptionalLong.class, new JsonSerializer<OptionalLong>() {
+            @Override
+            public void serialize(OptionalLong value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeObject(value.orElse(0));
+            }
+        }).addSerializer(OptionalDouble.class, new JsonSerializer<OptionalDouble>() {
+            @Override
+            public void serialize(OptionalDouble value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeObject(value.orElse(0));
+            }
+        }).addSerializer(Stream.class, new JsonSerializer<Stream>() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public void serialize(Stream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeStartArray();
+                value.forEachOrdered(Try.c(json::writeObject));
+                json.writeEndArray();
+            }
+        }).addSerializer(IntStream.class, new JsonSerializer<IntStream>() {
+            @Override
+            public void serialize(IntStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeStartArray();
+                value.forEachOrdered(Try.intC(json::writeNumber));
+                json.writeEndArray();
+            }
+        }).addSerializer(LongStream.class, new JsonSerializer<LongStream>() {
+            @Override
+            public void serialize(LongStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeStartArray();
+                value.forEachOrdered(Try.longC(json::writeNumber));
+                json.writeEndArray();
+            }
+        }).addSerializer(DoubleStream.class, new JsonSerializer<DoubleStream>() {
+            @Override
+            public void serialize(DoubleStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                json.writeStartArray();
+                value.forEachOrdered(Try.doubleC(json::writeNumber));
+                json.writeEndArray();
+            }
+        }).addSerializer(Temporal.class, new JsonSerializer<Temporal>() {
+            @Override
+            public void serialize(Temporal value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
+                if (value == null) {
+                    json.writeNull();
+                } else {
+                    json.writeString(value.toString());
+                }
+            }
+        }));
+    });
+
+    /**
+     * @param o object
+     * @return JSON
+     */
+    public static String json(Object o) {
+        return Try.f(jsonMapper::writeValueAsString).apply(o);
     }
 
     /**
      * @param o object
      * @param out OutputStream
      */
-    @SuppressWarnings("unchecked")
     public static void json(Object o, OutputStream out) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.setVisibility(JsonMethod.FIELD, Visibility.PUBLIC_ONLY);
-        mapper.configure(Feature.FAIL_ON_EMPTY_BEANS, false);
-        mapper.registerModule(new SimpleModule("optional", Version.unknownVersion())
-                .<Optional<?>>addSerializer((Class<Optional<?>>) Optional.empty().getClass(), new JsonSerializer<Optional<?>>() {
-                    @Override
-                    public void serialize(Optional<?> value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                        json.writeObject(value.orElse(null));
-                    }
-                }).addSerializer(LocalDate.class, new JsonSerializer<LocalDate>() {
-                    @Override
-                    public void serialize(LocalDate value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                        if (value == null) {
-                            json.writeNull();
-                        } else {
-                            json.writeString(value.toString());
-                        }
-                    }
-                }));
-        try {
-            mapper.writerWithDefaultPrettyPrinter().writeValue(out, o instanceof Stream ? ((Stream<?>) o).toArray() : o);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        Try.<OutputStream, Object>biC(jsonMapper::writeValue).accept(out, o);
     }
 
     /**
@@ -667,7 +725,7 @@ public class Tool {
      */
     public static long nextMillis(final String text, final ZonedDateTime from) {
         Objects.requireNonNull(from);
-        if(Objects.requireNonNull(text).length() <= 0) {
+        if (Objects.requireNonNull(text).length() <= 0) {
             return 0;
         }
         String value = text.trim().toUpperCase();
@@ -724,7 +782,8 @@ public class Tool {
                     ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
                     List<String> values = Arrays.asList(value.split("[^0-9]"));
                     Collections.reverse(values);
-                    next = Tool.zip(fields.stream(), values.stream().map(Long::valueOf)).peek(i -> field[0] = i.l).reduce(next, (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
+                    next = Tool.zip(fields.stream(), values.stream().map(Long::valueOf)).peek(i -> field[0] = i.l).reduce(next,
+                            (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
                     if (start.isAfter(next)) {
                         next = next.plus(1, units[fields.indexOf(field[0])]);
                     }
@@ -801,19 +860,7 @@ public class Tool {
      * @return sha256
      */
     public static String hash(String text) {
-        return hex(digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256"));
-    }
-
-    /**
-     * @param bytes bytes
-     * @return hex string
-     */
-    public static String hex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02X", b));
-        }
-        return result.toString();
+        return DatatypeConverter.printHexBinary(digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256"));
     }
 
     /**
@@ -874,7 +921,7 @@ public class Tool {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return hex(bytes.toByteArray());
+        return DatatypeConverter.printHexBinary(bytes.toByteArray());
     }
 
     /**

@@ -24,7 +24,7 @@ public interface Parser {
      */
     default Map<String, List<String>> parse(String text) {
         if(text == null || text.length() <= 0) {
-            return Tool.jsonMap();
+            return Tool.map();
         }
         return parseImpl(text);
     }

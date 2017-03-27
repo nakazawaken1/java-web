@@ -114,7 +114,7 @@ public class Account implements Serializable {
      */
     public static Optional<Account> loginWithDb(String loginId, String password) {
         try (Db db = Db.connect()) {
-            return db.queryFile("login.sql", Tool.jsonMap("id", loginId, "password", password)).findFirst().map(Try
+            return db.queryFile("login.sql", Tool.map("id", loginId, "password", password)).findFirst().map(Try
                     .f(rs -> new Account(loginId, rs.getString(1), Tool.string(rs.getString(2)).map(User::fromString).map(Tool::array).orElse(Tool.array()))));
         }
     }

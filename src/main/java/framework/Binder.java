@@ -17,7 +17,7 @@ public class Binder {
     Map<String, List<String>> parameters;
 
     /**
-     * @param parameters
+     * @param parameters parameters
      */
     public Binder(Map<String, List<String>> parameters) {
         this.parameters = parameters;
@@ -29,7 +29,7 @@ public class Binder {
      */
     public static Map<String, Object> toMap(Map<String, List<String>> parameters) {
         if (parameters == null || parameters.isEmpty()) {
-            return Tool.jsonMap();
+            return Tool.map();
         }
         throw new UnsupportedOperationException();
     }

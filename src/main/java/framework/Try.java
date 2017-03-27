@@ -7,10 +7,14 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
+import java.util.function.LongConsumer;
+import java.util.function.ObjDoubleConsumer;
 import java.util.function.ObjIntConsumer;
+import java.util.function.ObjLongConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -145,6 +149,76 @@ public class Try {
 
     /**
      * throwable consumer
+     */
+    @FunctionalInterface
+    public interface TryLongConsumer {
+        /**
+         * @param t object
+         * @throws Exception exception
+         */
+        void accept(long t) throws Exception;
+    }
+
+    /**
+     * @param consumer throwable consumer
+     * @param error error action
+     * @return consumer
+     */
+    public static LongConsumer longC(TryLongConsumer consumer, ObjLongConsumer<Exception> error) {
+        return t -> {
+            try {
+                consumer.accept(t);
+            } catch (Exception e) {
+                error.accept(e, t);
+            }
+        };
+    }
+
+    /**
+     * @param consumer throwable consumer
+     * @return consumer
+     */
+    public static LongConsumer longC(TryLongConsumer consumer) {
+        return longC(consumer, (e, a) -> catcher.accept(e));
+    }
+
+    /**
+     * throwable consumer
+     */
+    @FunctionalInterface
+    public interface TryDoubleConsumer {
+        /**
+         * @param t object
+         * @throws Exception exception
+         */
+        void accept(double t) throws Exception;
+    }
+
+    /**
+     * @param consumer throwable consumer
+     * @param error error action
+     * @return consumer
+     */
+    public static DoubleConsumer doubleC(TryDoubleConsumer consumer, ObjDoubleConsumer<Exception> error) {
+        return t -> {
+            try {
+                consumer.accept(t);
+            } catch (Exception e) {
+                error.accept(e, t);
+            }
+        };
+    }
+
+    /**
+     * @param consumer throwable consumer
+     * @return consumer
+     */
+    public static DoubleConsumer doubleC(TryDoubleConsumer consumer) {
+        return doubleC(consumer, (e, a) -> catcher.accept(e));
+    }
+
+    /**
+     * throwable consumer
      *
      * @param <T> first object type
      * @param <U> second object type
@@ -166,7 +240,7 @@ public class Try {
      * @param error error action
      * @return consumer
      */
-    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer, TriConsumer<Exception, T, U> error) {
+    public static <T, U> BiConsumer<T, U> biC(TryBiConsumer<T, U> consumer, TriConsumer<Exception, T, U> error) {
         return (t, u) -> {
             try {
                 consumer.accept(t, u);
@@ -182,8 +256,8 @@ public class Try {
      * @param consumer throwable consumer
      * @return consumer
      */
-    public static <T, U> BiConsumer<T, U> c(TryBiConsumer<T, U> consumer) {
-        return c(consumer, (e, t, u) -> catcher.accept(e));
+    public static <T, U> BiConsumer<T, U> biC(TryBiConsumer<T, U> consumer) {
+        return biC(consumer, (e, t, u) -> catcher.accept(e));
     }
 
     /**
@@ -248,7 +322,7 @@ public class Try {
      * @param <U> other object type
      * @param <V> other object type
      */
-    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer, QuadConsumer<Exception, T, U, V> error) {
+    public static <T, U, V> TriConsumer<T, U, V> triC(TryTriConsumer<T, U, V> consumer, QuadConsumer<Exception, T, U, V> error) {
         return (t, u, v) -> {
             try {
                 consumer.accept(t, u, v);
@@ -265,8 +339,8 @@ public class Try {
      * @param <U> other object type
      * @param <V> other object type
      */
-    public static <T, U, V> TriConsumer<T, U, V> c(TryTriConsumer<T, U, V> consumer) {
-        return c(consumer, (e, t, u, v) -> catcher.accept(e));
+    public static <T, U, V> TriConsumer<T, U, V> triC(TryTriConsumer<T, U, V> consumer) {
+        return triC(consumer, (e, t, u, v) -> catcher.accept(e));
     }
 
     /**
@@ -410,6 +484,56 @@ public class Try {
      */
     public static <R> IntFunction<R> intF(TryIntFunction<R> function) {
         return intF(function, (e, i) -> catcher.accept(e));
+    }
+
+    /**
+     * throwable function
+     * 
+     * @param <T> first argument type
+     * @param <U> second argument type
+     * @param <R> return type
+     */
+    @FunctionalInterface
+    public interface TryBiFunction<T, U, R> {
+        /**
+         * @param t first argument
+         * @param u second argument
+         * @return value
+         * @throws Exception exception
+         */
+        R apply(T t, U u) throws Exception;
+    }
+
+    /**
+     * @param <T> first argument type
+     * @param <U> second argument type
+     * @param <R> return type
+     * @param function throwable function
+     * @param error error action
+     * @return BiFunction
+     */
+    public static <T, U, R> BiFunction<T, U, R> biF(TryBiFunction<T, U, R> function, TriFunction<Exception, T, U, R> error) {
+        return (t, u) -> {
+            try {
+                return function.apply(t, u);
+            } catch (Exception e) {
+                return error.apply(e, t, u);
+            }
+        };
+    }
+
+    /**
+     * @param <T> first argument type
+     * @param <U> second argument type
+     * @param <R> return type
+     * @param function throwable function
+     * @return BiFunction
+     */
+    public static <T, U, R> BiFunction<T, U, R> biF(TryBiFunction<T, U, R> function) {
+        return biF(function, (e, t, u) -> {
+            catcher.accept(e);
+            return null;
+        });
     }
 
     /**

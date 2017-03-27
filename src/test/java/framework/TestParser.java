@@ -2,16 +2,11 @@ package framework;
 
 import java.util.Arrays;
 import java.util.function.Function;
-import java.util.logging.Logger;
 
 /**
  * Parser test
  */
 public class TestParser extends Tester {
-    /**
-     * logger
-     */
-    Logger logger = Tool.getLogger();
     /**
      * from
      */
@@ -22,7 +17,7 @@ public class TestParser extends Tester {
      * @return json
      */
     Object to(Object... values) {
-        return Tool.json(Tool.jsonMap(values));
+        return Tool.json(Tool.map(values));
     }
 
     {

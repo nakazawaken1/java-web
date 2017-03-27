@@ -49,7 +49,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
-import framework.annotation.DbMap;
+import framework.annotation.Mapping;
 import framework.annotation.Help;
 import framework.annotation.Id;
 import framework.annotation.InitialData;
@@ -960,7 +960,7 @@ public class Db implements AutoCloseable {
             List<Tuple<String, InitialData>> modelDatas = new ArrayList<>();
             Config.app_model_packages.stream().forEach(p -> {
                 try (Stream<Class<?>> classes = Tool.getClasses(p)) {
-                    classes.map(c -> Tuple.of(c.getAnnotation(DbMap.class), c)).filter(t -> t.l != null)
+                    classes.map(c -> Tuple.of(c.getAnnotation(Mapping.class), c)).filter(t -> t.l != null)
                             .map(t -> Tuple.<String, Class<?>>of(Tool.string(t.l.value()).orElseGet(() -> t.r.getSimpleName()).toLowerCase(), t.r))
                             .peek(t -> Optional.ofNullable(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
                                     .ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
@@ -2028,13 +2028,12 @@ public class Db implements AutoCloseable {
         Class<T> c = (Class<T>) model.getClass();
         if (targetColumns == null || targetColumns.length <= 0) {
             targetColumns = Tool.array("*");
-            fields = Stream.of(c.getDeclaredFields()).filter(f -> !Modifier.isTransient(f.getModifiers())).peek(f -> f.setAccessible(true))
-                    .collect(Collectors.toList());
+            fields = Reflector.fields(c).values().stream().filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
         } else {
             fields = Stream.of(targetColumns).map(s -> Reflector.field(c, s)).filter(Optional::isPresent).map(Optional::get).collect(Collectors.toList());
         }
-        return select(targetColumns).from(getTableName(model)).rows()
-                .map(rs -> fields.stream().collect(() -> Reflector.instance(c), Try.c((o, f) -> setFieldValue(o, f, rs, getColumnName(f))), (a, b) -> {
+        return select(targetColumns).from(getTableName(model)).rows().map(
+                rs -> fields.stream().collect(() -> Reflector.instance(c), Try.biC((o, f) -> setFieldValue(o, f, rs, Reflector.mappingName(f))), (a, b) -> {
                 }));
     }
 
@@ -2113,17 +2112,18 @@ public class Db implements AutoCloseable {
     static <T> T modelAction(QuadFunction<String, String[], Integer, Object[], T> action, Object model, String... targetColumns) {
         List<String> names = new ArrayList<>();
         List<Object> values = new ArrayList<>();
-        List<String> keys = Stream.of(model.getClass().getDeclaredFields()).filter(f -> f.getAnnotation(Id.class) != null).map(Try.f(f -> {
-            String name = f.getName();
-            names.add(name);
-            values.add(f.get(model));
-            return name;
-        })).collect(Collectors.toList());
+        List<String> keys = Reflector.fields(model.getClass()).entrySet().stream().filter(pair -> pair.getValue().getAnnotation(Id.class) != null)
+                .map(Try.f(pair -> {
+                    String name = pair.getKey();
+                    names.add(name);
+                    values.add(pair.getValue().get(model));
+                    return name;
+                })).collect(Collectors.toList());
         if (targetColumns == null || targetColumns.length <= 0) {
-            Stream.of(model.getClass().getDeclaredFields()).map(f -> Tuple.of(getColumnName(f), f)).filter(t -> !keys.contains(t.l))
-                    .filter(t -> !Modifier.isTransient(t.r.getModifiers())).forEach(Try.c(t -> {
-                        names.add(t.l);
-                        values.add(t.r.get(model));
+            Reflector.fields(model.getClass()).entrySet().stream().filter(t -> !keys.contains(t.getKey()))
+                    .filter(t -> !Modifier.isTransient(t.getValue().getModifiers())).forEach(Try.c(t -> {
+                        names.add(t.getKey());
+                        values.add(t.getValue().get(model));
                     }));
         } else {
             for (String name : targetColumns) {
@@ -2131,7 +2131,7 @@ public class Db implements AutoCloseable {
                     continue;
                 }
                 names.add(name);
-                Try.r(() -> values.add(model.getClass().getDeclaredField(name).get(model))).run();
+                values.add(Try.s(() -> Reflector.field(model.getClass(), name).orElse(null).get(model)).get());
             }
         }
         return action.apply(getTableName(model), names.toArray(new String[names.size()]), keys.size(), values.toArray());
@@ -2144,7 +2144,7 @@ public class Db implements AutoCloseable {
     public static String getTableName(Object model) {
         Class<?> start = model instanceof Class ? (Class<?>) model : model.getClass();
         for (Class<?> c = start; c != Object.class; c = c.getSuperclass()) {
-            DbMap name = c.getAnnotation(DbMap.class);
+            Mapping name = c.getAnnotation(Mapping.class);
             if (name != null) {
                 String value = name.value();
                 if (Tool.string(value).isPresent()) {
@@ -2153,14 +2153,6 @@ public class Db implements AutoCloseable {
             }
         }
         return start.getSimpleName().toLowerCase();
-    }
-
-    /**
-     * @param field field
-     * @return column name
-     */
-    public static String getColumnName(Field field) {
-        return Optional.ofNullable(field.getAnnotation(DbMap.class)).map(DbMap::value).orElseGet(field::getName);
     }
 
     /**
@@ -2173,45 +2165,19 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * field cache
-     */
-    static Map<Class<?>, Tuple<Field[], List<String>>> fieldCache = new HashMap<>();
-
-    /**
      * @param <T> taget class type
      * @param clazz target class
      * @return object
      */
     public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
-        Tuple<Field[], List<String>> pair = getFields(clazz);
+        Map<String, Field> map = Reflector.fields(clazz);
         return Try.f(rs -> {
             T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
             IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
-                int index = pair.r.indexOf(name.toUpperCase());
-                if (index >= 0) {
-                    try {
-                        pair.l[index].set(object, rs.getObject(name));
-                    } catch (IllegalArgumentException | IllegalAccessException | SQLException e) {
-                        throw new InternalError(e);
-                    }
-                }
+                Optional.ofNullable(map.get(name)).ifPresent(field -> setFieldValue(object, field, rs, name));
             });
             return object;
-        });
-    }
-
-    /**
-     * @param clazz target class
-     * @return fields(field array, field name list)
-     */
-    private static Tuple<Field[], List<String>> getFields(Class<?> clazz) {
-        return fieldCache.computeIfAbsent(clazz, c -> {
-            Field[] fields = c.getDeclaredFields();
-            for (Field field : fields) {
-                field.setAccessible(true);
-            }
-            return Tuple.of(fields, Stream.of(fields).map(Field::getName).map(String::toUpperCase).collect(Collectors.toList()));
         });
     }
 
@@ -2220,11 +2186,9 @@ public class Db implements AutoCloseable {
      * @return SQL
      */
     public String createSql(Class<?> clazz) {
-        Tuple<Field[], List<String>> pair = getFields(clazz);
         List<Column> primary = new ArrayList<>();
         List<Column> columns = new ArrayList<>();
-        pair.r.forEach(Tool.withIndex((name, i) -> {
-            Field f = pair.l[i];
+        Reflector.fields(clazz).forEach((name, f) -> {
             if (Modifier.isTransient(f.getModifiers())) {
                 return;
             }
@@ -2241,7 +2205,7 @@ public class Db implements AutoCloseable {
             } else {
                 columns.add(c);
             }
-        }));
+        });
         return createSql(getTableName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream()).toArray(Column[]::new));
     }
 
@@ -2253,7 +2217,7 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * @param table
+     * @param table table
      * @param data data
      */
     public void insert(String table, InitialData data) {

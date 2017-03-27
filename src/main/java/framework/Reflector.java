@@ -10,6 +10,8 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import framework.annotation.Mapping;
+
 /**
  * reflection object cache
  */
@@ -75,7 +77,7 @@ public class Reflector {
     /**
      * @param <T> target type
      * @param clazz class
-     * @return Class<T>
+     * @return Class&lt;T&gt;
      */
     @SuppressWarnings("unchecked")
     public static <T> Optional<Class<T>> clazz(String clazz) {
@@ -104,8 +106,16 @@ public class Reflector {
      * @param clazz class
      * @return Stream of field name and instance
      */
-    public static Stream<Map.Entry<String, Field>> fields(Class<?> clazz) {
-        return Stream.of(fields.computeIfAbsent(clazz,
-                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Field::getName, f -> f))));
+    public static Map<String, Field> fields(Class<?> clazz) {
+        return fields.computeIfAbsent(clazz,
+                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Reflector::mappingName, f -> f)));
+    }
+    
+    /**
+     * @param field target field
+     * @return name
+     */
+    public static String mappingName(Field field) {
+        return Optional.ofNullable(field.getAnnotation(Mapping.class)).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
     }
 }
