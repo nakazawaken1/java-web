@@ -16,7 +16,7 @@ public @interface Route {
      * @return allowed method(not check if empty)
      */
     Method[] value() default {};
-    
+
     /**
      * @return path
      */

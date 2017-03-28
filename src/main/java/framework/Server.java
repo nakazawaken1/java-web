@@ -67,6 +67,7 @@ import com.sun.net.httpserver.HttpsServer;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.Response.ResponseCreator;
+import framework.annotation.Content;
 import framework.annotation.Job;
 import framework.annotation.Only;
 import framework.annotation.Route;
@@ -249,7 +250,16 @@ public class Server implements Servlet {
         }
 
         /* action */
-        Tuple<Class<?>, Method> pair = table.get(request.getPath());
+        Optional<String> mime;
+        String action = request.getPath();
+        int index = action.lastIndexOf('.');
+        if (index + 5 >= action.length()) {
+            mime = Optional.ofNullable(Tool.getContentType(action));
+            action = action.substring(0, index);
+        } else {
+            mime = Optional.empty();
+        }
+        Tuple<Class<?>, Method> pair = table.get(action);
         if (pair != null) {
             Method method = pair.r;
             Route http = method.getAnnotation(Route.class);
@@ -269,7 +279,7 @@ public class Server implements Servlet {
             }
             try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                 try {
-                    ((Response) method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
+                    Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
                             Stream.of(method.getParameters()).map(p -> {
                                 Class<?> type = p.getType();
                                 if (Request.class.isAssignableFrom(type)) {
@@ -287,7 +297,21 @@ public class Server implements Servlet {
                                 Type types = p.getParameterizedType();
                                 return new Binder(request.getParameters()).bind(p.getName(), type,
                                         types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
-                            }).toArray())).flush();
+                            }).toArray());
+                    if (response instanceof Response) {
+                        ((Response) response).flush();
+                    } else {
+                        Content content = method.getAnnotation(Content.class);
+                        String[] accept = request.getHeaders().get("accept").stream()
+                                .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase())).toArray(String[]::new);
+                        if (!mime.isPresent()) {
+                            mime = content == null ? Stream.of(accept).findFirst()
+                                    : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
+                        }
+                        Tool.ifPresentOr(mime, m -> Response.write(w -> w.write(Tool.json(response))).contentType(m).flush(), () -> {
+                            throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
+                        });
+                    }
                     return;
                 } catch (InvocationTargetException e) {
                     Throwable t = e.getCause();

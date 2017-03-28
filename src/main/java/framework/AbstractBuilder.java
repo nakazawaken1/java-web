@@ -99,7 +99,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     @Override
     public VALUE get() {
         for (Enum<?> i : names) {
-            if (fields[i.ordinal()].getAnnotation(Required.class) != null && !sets[i.ordinal()]) {
+            if (Optional.ofNullable(fields[i.ordinal()].getAnnotation(Required.class)).filter(a -> a.value().length <= 0).isPresent() && !sets[i.ordinal()]) {
                 throw new IllegalArgumentException(clazz.getName() + '.' + i.name() + " mast set a value.");
             }
         }
