@@ -66,7 +66,6 @@ import com.sun.net.httpserver.HttpsServer;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
-import framework.Response.ResponseCreator;
 import framework.annotation.Content;
 import framework.annotation.Job;
 import framework.annotation.Only;
@@ -152,10 +151,10 @@ public class Server implements Servlet {
      * setup
      *
      * @param applicationGetter applicationGetter
-     * @param responseCreator responseCreator
+     * @param response response
      */
     @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
-    void setup(Lazy<Application> applicationGetter, Supplier<ResponseCreator> responseCreator) {
+    void setup(Lazy<Application> applicationGetter, Supplier<Response> response) {
 
         /* check to enabled of method parameters name */
         try {
@@ -177,7 +176,7 @@ public class Server implements Servlet {
 
         /* setup for response creator */
         if (Response.create == null) {
-            Response.create = responseCreator;
+            Response.create = response;
         }
 
         /* setup routing */
@@ -253,7 +252,7 @@ public class Server implements Servlet {
         Optional<String> mime;
         String action = request.getPath();
         int index = action.lastIndexOf('.');
-        if (index + 5 >= action.length()) {
+        if (index >= 0 && index + 5 >= action.length()) {
             mime = Optional.ofNullable(Tool.getContentType(action));
             action = action.substring(0, index);
         } else {
@@ -261,70 +260,72 @@ public class Server implements Servlet {
         }
         Tuple<Class<?>, Method> pair = table.get(action);
         if (pair != null) {
-            Method method = pair.r;
-            Route http = method.getAnnotation(Route.class);
-            if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
-                Response.error(400).flush();
-                return;
-            }
-            Only only = method.getAnnotation(Only.class);
-            boolean forbidden = only != null && !session.get().isLoggedIn();
-            if (!forbidden && only != null && only.value().length > 0) {
-                forbidden = !session.get().getAccount().hasAnyRole(only.value());
-            }
-            if (forbidden) {
-                session.get().setAttr("alert", Message.alert_forbidden);
-                Response.redirect(application.getContextPath()).flush();
-                return;
-            }
-            try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-                try {
-                    Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
-                            Stream.of(method.getParameters()).map(p -> {
-                                Class<?> type = p.getType();
-                                if (Request.class.isAssignableFrom(type)) {
-                                    return request;
-                                }
-                                if (Session.class.isAssignableFrom(type)) {
-                                    return session.get();
-                                }
-                                if (Application.class.isAssignableFrom(type)) {
-                                    return application;
-                                }
-                                if (Db.class.isAssignableFrom(type)) {
-                                    return db.get();
-                                }
-                                Type types = p.getParameterizedType();
-                                return new Binder(request.getParameters()).bind(p.getName(), type,
-                                        types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
-                            }).toArray());
-                    if (response instanceof Response) {
-                        ((Response) response).flush();
-                    } else {
-                        Content content = method.getAnnotation(Content.class);
-                        String[] accept = request.getHeaders().get("accept").stream()
-                                .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase())).toArray(String[]::new);
-                        if (!mime.isPresent()) {
-                            mime = content == null ? Stream.of(accept).findFirst()
-                                    : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
-                        }
-                        Tool.ifPresentOr(mime, m -> Response.write(w -> w.write(Tool.json(response))).contentType(m).flush(), () -> {
-                            throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
-                        });
-                    }
-                    return;
-                } catch (InvocationTargetException e) {
-                    Throwable t = e.getCause();
-                    if (t instanceof RuntimeException) {
-                        throw (RuntimeException) t;
-                    }
-                    throw new RuntimeException(t);
-                } catch (IllegalAccessException | IllegalArgumentException e) {
-                    throw new RuntimeException(e);
-                } catch (RuntimeException e) {
-                    throw e;
+            do {
+                Method method = pair.r;
+                Route http = method.getAnnotation(Route.class);
+                if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
+                    break;
                 }
-            }
+                Only only = method.getAnnotation(Only.class);
+                boolean forbidden = only != null && !session.get().isLoggedIn();
+                if (!forbidden && only != null && only.value().length > 0) {
+                    forbidden = !session.get().getAccount().hasAnyRole(only.value());
+                }
+                if (forbidden) {
+                    session.get().setAttr("alert", Message.alert_forbidden);
+                    Response.redirect(application.getContextPath()).flush();
+                    return;
+                }
+                try (Lazy<Db> db = new Lazy<>(Db::connect)) {
+                    try {
+                        Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
+                                Stream.of(method.getParameters()).map(p -> {
+                                    Class<?> type = p.getType();
+                                    if (Request.class.isAssignableFrom(type)) {
+                                        return request;
+                                    }
+                                    if (Session.class.isAssignableFrom(type)) {
+                                        return session.get();
+                                    }
+                                    if (Application.class.isAssignableFrom(type)) {
+                                        return application;
+                                    }
+                                    if (Db.class.isAssignableFrom(type)) {
+                                        return db.get();
+                                    }
+                                    Type types = p.getParameterizedType();
+                                    return new Binder(request.getParameters()).bind(p.getName(), type,
+                                            types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
+                                }).toArray());
+                        if (response instanceof Response) {
+                            ((Response) response).flush();
+                        } else {
+                            Content content = method.getAnnotation(Content.class);
+                            String[] accept = request.getHeaders().get("accept").stream()
+                                    .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase()))
+                                    .toArray(String[]::new);
+                            if (!mime.isPresent()) {
+                                mime = content == null ? Stream.of(accept).findFirst()
+                                        : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
+                            }
+                            Tool.ifPresentOr(mime, m -> Response.write(w -> w.write(Tool.json(response))).contentType(m).flush(), () -> {
+                                throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
+                            });
+                        }
+                        return;
+                    } catch (InvocationTargetException e) {
+                        Throwable t = e.getCause();
+                        if (t instanceof RuntimeException) {
+                            throw (RuntimeException) t;
+                        }
+                        throw new RuntimeException(t);
+                    } catch (IllegalAccessException | IllegalArgumentException e) {
+                        throw new RuntimeException(e);
+                    } catch (RuntimeException e) {
+                        throw e;
+                    }
+                }
+            } while (false);
         }
 
         /* static file */
@@ -342,14 +343,14 @@ public class Server implements Servlet {
             }, (e, i) -> false)).isPresent()) {
                 Response.redirect(Tool.trim(null, application.getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
             } else {
-                Response.file(request.getPath()).flush();
+                Response.of(Paths.get(request.getPath())).flush();
             }
             return;
         }
 
         /* */
         if (Arrays.asList(".css", ".js").contains(request.getExtension())) {
-            Response.text("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
+            Response.of("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
             return;
         }
 

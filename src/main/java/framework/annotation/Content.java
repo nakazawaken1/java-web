@@ -86,4 +86,29 @@ public @interface Content {
      * application/octet-stream
      */
     String OCTET = "application/octet-stream";
+    
+    /**
+     * application/vnd.ms-excel
+     */
+    String XLS = "application/vnd.ms-excel";
+    
+    /**
+     * application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+     */
+    String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    
+    /**
+     * application/vnd.ms-excel.sheet.macroenabled.12
+     */
+    String XLSM = "application/vnd.ms-excel.sheet.macroenabled.12";
+    
+    /**
+     * application/msword
+     */
+    String DOC = "application/msword";
+    
+    /**
+     * application/vnd.openxmlformats-officedocument.wordprocessingml.document
+     */
+    String DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 }

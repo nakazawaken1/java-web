@@ -1,5 +1,6 @@
 package app.controller;
 
+import java.nio.file.Paths;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -30,12 +31,12 @@ public class Main {
      * @param request request
      * @return response
      */
-    @Route(path = "index.html")
-    Response index(Session session, Request request) {
+    @Route
+    Object index(Session session, Request request) {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
         }
-        return Response.file(request.getPath());
+        return Response.of(Paths.get(request.getPath()));
     }
 
     /**
@@ -47,7 +48,7 @@ public class Main {
     @Route
     @Only(Administrator.class)
     Response db_settings(Db db, Optional<String> sql) throws SQLException {
-        return Response.writeTemplate("table.html", (out, name, prefix) -> {
+        return Response.of(new Response.Template("table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
             }
@@ -60,7 +61,7 @@ public class Main {
                 }
                 out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
             }));
-        });
+        }));
     }
 
     /**
@@ -90,9 +91,9 @@ public class Main {
     @Route
     Response info(Session session) {
         if (session.isLoggedIn()) {
-            return Response.template("logged_in.html");
+            return Response.file("/template/logged_in.html");
         } else {
-            return Response.text("");
+            return Response.of("");
         }
     }
 
@@ -129,7 +130,7 @@ public class Main {
      */
     @Route
     Response alert(Session session) {
-        return Response.text(session.flash("alert"));
+        return Response.of(session.flash("alert"));
     }
 
     /**
