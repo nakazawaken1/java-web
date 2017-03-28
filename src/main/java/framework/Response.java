@@ -25,16 +25,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.sun.net.httpserver.HttpExchange;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import framework.Try.TryBiConsumer;
 import framework.Try.TryRunnable;
 import framework.Try.TryTriConsumer;
+import framework.annotation.Content;
 
 /**
  * Response
  */
 @SuppressWarnings("restriction")
-@SuppressFBWarnings("UWF_UNWRITTEN_FIELD")
 public abstract class Response {
 
     /**
@@ -55,15 +53,22 @@ public abstract class Response {
         @Override
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
             HttpServletResponse response = ((Request.ForServlet) Request.current().get()).servletResponse;
-            response.setCharacterEncoding(charset.name());
-            Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
-            if (headers != null) {
-                headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
-            }
-            Tool.string(response.getContentType()).ifPresent(contentType -> response.setContentType(contentType + ";charset=" + charset));
-            response.setStatus(status);
-            if (content != null) {
-                writeBody.accept(Try.s(response::getOutputStream));
+            Runnable action = () -> {
+                response.setCharacterEncoding(charset.name());
+                Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
+                if (headers != null) {
+                    headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
+                }
+                Tool.string(response.getContentType()).ifPresent(contentType -> response.setContentType(contentType + ";charset=" + charset));
+                response.setStatus(status);
+            };
+            if (content == null) {
+                action.run();
+            } else {
+                writeBody.accept(Try.s(() -> {
+                    action.run();
+                    return response.getOutputStream();
+                }));
             }
         }
 
@@ -290,11 +295,14 @@ public abstract class Response {
      */
     void flush() {
         logger.info(toString());
+        boolean[] cancel = { false };
         writeResponse(Try.c(out -> {
-            for (Tuple<Class<?>, TryBiConsumer<Response, Supplier<OutputStream>>> pair : writers) {
+            for (Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>> pair : writers) {
                 if (pair.l.isAssignableFrom(content.getClass())) {
-                    pair.r.accept(this, out);
-                    break;
+                    pair.r.accept(this, out, cancel);
+                    if (!cancel[0]) {
+                        break;
+                    }
                 }
             }
         }));
@@ -353,18 +361,20 @@ public abstract class Response {
     /**
      * body writer
      */
-    static final List<Tuple<Class<?>, TryBiConsumer<Response, Supplier<OutputStream>>>> writers = Arrays
-            .asList(Tuple.of(String.class, (r, out) -> out.get().write(((String) r.content).getBytes(charset))), Tuple.of(Writer.class, (r, out) -> {
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get()))) {
-                    ((Writer) r.content).write(writer);
+    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays.asList(
+            Tuple.of(String.class, (response, out, cancel) -> out.get().write(((String) response.content).getBytes(charset))),
+            Tuple.of(Writer.class, (response, out, cancel) -> {
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
+                    ((Writer) response.content).write(writer);
                 }
-            }), Tuple.of(Output.class, (r, out) -> ((Output) r.content).output(out.get())), Tuple.of(Path.class, (r, out) -> {
-                Path path = (Path) r.content;
+            }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
+            Tuple.of(Path.class, (response, out, cancel) -> {
+                Path path = (Path) response.content;
                 String file = path.toString();
-                r.contentType(Tool.getContentType(file));
+                response.contentType(Tool.getContentType(file));
                 InputStream in = (file.startsWith(File.separator) ? Config.toURL(file) : Config.toURL(Config.app_view_folder.text(), file)).get().openStream();
                 if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get()))) {
+                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
                         Function<Formatter, Formatter.Result> exclude;
                         Function<Object, String> escape;
                         if (file.endsWith(".js")) {
@@ -377,17 +387,17 @@ public abstract class Response {
                             exclude = Formatter::excludeForHtml;
                             escape = Formatter::htmlEscape;
                         }
-                        try (Formatter formatter = new Formatter(exclude, escape, r.map, r.values)) {
+                        try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
                             lines.forEach(line -> writer.println(formatter.format(line)));
                         }
                     }
                 } else {
                     Tool.copy(in, out.get(), new byte[1024]);
                 }
-            }), Tuple.of(Template.class, (r, out) -> {
-                Template template = (Template) r.content;
-                r.contentType(Tool.getContentType(template.name));
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get()));
+            }), Tuple.of(Template.class, (response, out, cancel) -> {
+                Template template = (Template) response.content;
+                response.contentType(Tool.getContentType(template.name));
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset));
                         Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), template.name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                     lines.map(formatter::format).forEach(line -> {
@@ -395,5 +405,27 @@ public abstract class Response {
                         writer.println();
                     });
                 }
+            }), Tuple.of(Object.class, (response, out, cancel) -> {
+                Runnable other = Try.r(() -> {
+                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
+                        if (response.content instanceof Stream) {
+                            ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
+                        } else if (response.content instanceof Optional) {
+                            ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
+                        } else {
+                            writer.print(Tool.dump(response.content));
+                        }
+                    }
+                });
+                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
+                    switch (contentType) {
+                    case Content.JSON:
+                        Tool.json(response.content, out.get());
+                        break;
+                    default:
+                        other.run();
+                        break;
+                    }
+                }), other);
             }));
 }

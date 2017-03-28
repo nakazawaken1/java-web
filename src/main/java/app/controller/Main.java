@@ -36,7 +36,7 @@ public class Main {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
         }
-        return Response.of(Paths.get(request.getPath()));
+        return Paths.get(request.getPath());
     }
 
     /**
@@ -47,8 +47,8 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Response db_settings(Db db, Optional<String> sql) throws SQLException {
-        return Response.of(new Response.Template("table.html", (out, name, prefix) -> {
+    Object db_settings(Db db, Optional<String> sql) throws SQLException {
+        return new Response.Template("table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
             }
@@ -61,7 +61,7 @@ public class Main {
                 }
                 out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
             }));
-        }));
+        });
     }
 
     /**
@@ -69,7 +69,7 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Response db_console() {
+    Object db_console() {
         return Response.redirect("http://localhost:" + Config.app_h2_port.integer());
     }
 
@@ -80,7 +80,7 @@ public class Main {
      */
     @Route
     @Only
-    Response add(int a, Optional<Integer> b) {
+    Object add(int a, Optional<Integer> b) {
         return Response.write(out -> out.println(a + " + " + b + " = " + (a + b.orElse(0))));
     }
 
@@ -89,11 +89,11 @@ public class Main {
      * @return response
      */
     @Route
-    Response info(Session session) {
+    Object info(Session session) {
         if (session.isLoggedIn()) {
             return Response.file("/template/logged_in.html");
         } else {
-            return Response.of("");
+            return "";
         }
     }
 
@@ -104,7 +104,7 @@ public class Main {
      * @return response
      */
     @Route(Method.POST)
-    Response login(Session session, Optional<String> loginId, Optional<String> password) {
+    Object login(Session session, Optional<String> loginId, Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
             return Response.redirect("index.html");
@@ -119,7 +119,7 @@ public class Main {
      * @return response
      */
     @Route
-    Response logout(Session session) {
+    Object logout(Session session) {
         session.logout();
         return Response.redirect("login.html");
     }
@@ -129,8 +129,8 @@ public class Main {
      * @return response
      */
     @Route
-    Response alert(Session session) {
-        return Response.of(session.flash("alert"));
+    Object alert(Session session) {
+        return session.flash("alert");
     }
 
     /**
@@ -140,7 +140,7 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Response config_default() {
+    Object config_default() {
         return Response.write(Config::printDefault).contentType("text/plain;charset=UTF-8");
     }
 
@@ -151,7 +151,7 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Response config_current() {
+    Object config_current() {
         return Response.write(Config::printCurrent).contentType("text/plain;charset=UTF-8");
     }
 }

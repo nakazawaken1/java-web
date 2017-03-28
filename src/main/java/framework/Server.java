@@ -308,7 +308,7 @@ public class Server implements Servlet {
                                 mime = content == null ? Stream.of(accept).findFirst()
                                         : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
                             }
-                            Tool.ifPresentOr(mime, m -> Response.write(w -> w.write(Tool.json(response))).contentType(m).flush(), () -> {
+                            Tool.ifPresentOr(mime, m -> Response.of(response).contentType(m).flush(), () -> {
                                 throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
                             });
                         }
