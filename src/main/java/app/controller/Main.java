@@ -1,6 +1,5 @@
 package app.controller;
 
-import java.nio.file.Paths;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -36,7 +35,7 @@ public class Main {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
         }
-        return Paths.get(request.getPath());
+        return Response.file(request.getPath());
     }
 
     /**
@@ -91,7 +90,7 @@ public class Main {
     @Route
     Object info(Session session) {
         if (session.isLoggedIn()) {
-            return Response.file("/template/logged_in.html");
+            return Response.template("logged_in.html");
         } else {
             return "";
         }

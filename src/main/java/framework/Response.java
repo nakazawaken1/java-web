@@ -1,6 +1,5 @@
 package framework;
 
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -19,26 +18,21 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.servlet.http.HttpServletResponse;
-
-import com.sun.net.httpserver.HttpExchange;
-
-import framework.Try.TryRunnable;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
 
 /**
  * Response
  */
-@SuppressWarnings("restriction")
 public abstract class Response {
 
     /**
-     * creator
+     * instance creator
      */
-    static Supplier<Response> create;
+    static Supplier<Response> factory;
 
     /**
      * logger
@@ -46,79 +40,9 @@ public abstract class Response {
     transient final Logger logger = Tool.getLogger();
 
     /**
-     * For servlet
-     */
-    static class ForServlet extends Response {
-
-        @Override
-        public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
-            HttpServletResponse response = ((Request.ForServlet) Request.current().get()).servletResponse;
-            Runnable action = () -> {
-                response.setCharacterEncoding(charset.name());
-                Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
-                if (headers != null) {
-                    headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
-                }
-                Tool.string(response.getContentType()).ifPresent(contentType -> response.setContentType(contentType + ";charset=" + charset));
-                response.setStatus(status);
-            };
-            if (content == null) {
-                action.run();
-            } else {
-                writeBody.accept(Try.s(() -> {
-                    action.run();
-                    return response.getOutputStream();
-                }));
-            }
-        }
-
-        @Override
-        public String toString() {
-            return Request.current()
-                    .map(i -> i.getId()
-                            + Optional.of(((Request.ForServlet) i).servletResponse).map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse(""))
-                    .orElse("");
-        }
-    }
-
-    /**
-     * For server
-     */
-    static class ForServer extends Response {
-
-        @Override
-        public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
-            HttpExchange exchange = ((Request.ForServer) Request.current().get()).exchange;
-            TryRunnable action = () -> {
-                Session.current().map(s -> (Session.ForServer) s).ifPresent(Session.ForServer::save);
-                Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
-                if (headers != null) {
-                    headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));
-                }
-                exchange.sendResponseHeaders(status, 0L);
-            };
-            if (content == null) {
-                Try.r(action).run();
-            } else {
-                writeBody.accept(Try.s(() -> {
-                    action.run();
-                    return exchange.getResponseBody();
-                }));
-            }
-            exchange.close();
-        }
-
-        @Override
-        public String toString() {
-            return Request.current().map(i -> ((Request.ForServer) i).exchange)
-                    .map(r -> "-> " + r.getResponseCode() + " " + r.getResponseHeaders().get("Content-Type")).orElse("");
-        }
-    }
-
-    /**
      * encoding
      */
-    static Charset charset = StandardCharsets.UTF_8;
+    Charset charset = StandardCharsets.UTF_8;
 
     /**
      * attributes
@@ -138,7 +62,7 @@ public abstract class Response {
     /**
      * http status code
      */
-    int status;
+    int status = 200;
 
     /**
      * content
@@ -150,7 +74,7 @@ public abstract class Response {
      * @return response
      */
     public static Response of(Object content) {
-        return Tool.peek(create.get(), r -> r.content = content);
+        return Tool.peek(factory.get(), r -> r.content = content);
     }
 
     /**
@@ -159,7 +83,7 @@ public abstract class Response {
      * @return response
      */
     public static Response redirect(String path, int status) {
-        return create.get().status(status).addHeader("Location", path);
+        return factory.get().status(status).addHeader("Location", path);
     }
 
     /**
@@ -175,7 +99,7 @@ public abstract class Response {
      * @return response
      */
     public static Response error(int status) {
-        return create.get().status(status);
+        return factory.get().status(status);
     }
 
     /**
@@ -199,7 +123,15 @@ public abstract class Response {
      * @return response
      */
     public static Response file(String file) {
-        return of(Paths.get(file));
+        return of(Paths.get(Config.app_view_folder.text(), file));
+    }
+
+    /**
+     * @param file file
+     * @return response
+     */
+    public static Response template(String file) {
+        return of(Paths.get(Config.app_template_folder.text(), file));
     }
 
     /**
@@ -258,12 +190,7 @@ public abstract class Response {
         if (headers == null) {
             headers = new HashMap<>();
         }
-        List<String> list = headers.get(name);
-        if (list == null) {
-            list = new ArrayList<>();
-            headers.put(name, list);
-        }
-        list.add(value);
+        Tool.addValue(headers, name, value);
         return this;
     }
 
@@ -276,10 +203,17 @@ public abstract class Response {
         if (headers == null) {
             headers = new HashMap<>();
         }
-        List<String> list = new ArrayList<>();
-        list.add(value);
-        headers.put(name, list);
+        Tool.setValue(headers, name, value);
         return this;
+    }
+
+    /**
+     * @param contentType content type
+     * @param charset charset
+     * @return self
+     */
+    public Response contentType(String contentType, Charset charset) {
+        return setHeader("Content-Type", setCharset(contentType, charset));
     }
 
     /**
@@ -291,10 +225,41 @@ public abstract class Response {
     }
 
     /**
+     * @param charset charset
+     * @return self
+     */
+    public Response charset(Charset charset) {
+        this.charset = charset;
+        return this;
+    }
+
+    /**
+     * @param contentType contentType
+     * @param charset charset
+     * @return contentType with charset
+     */
+    public static String setCharset(String contentType, Charset charset) {
+        if(!Tool.string(contentType).isPresent() || charset == null) {
+            return contentType;
+        }
+        boolean[] unset = { true };
+        String result = Stream.of(contentType.split("\\s*;\\s*"))
+                .map(part -> {
+                    if(Tool.splitAt(part, "\\s*=\\s*", 0).equalsIgnoreCase("charset")) {
+                        unset[0] = false;
+                        return "charset=" + charset.name();
+                    } else {
+                        return part;
+                    }
+                })
+                .collect(Collectors.joining("; "));
+        return unset[0] ? result + "; charset=" + charset.name() : result;
+    }
+
+    /**
      * write response
      */
     void flush() {
-        logger.info(toString());
         boolean[] cancel = { false };
         writeResponse(Try.c(out -> {
             for (Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>> pair : writers) {
@@ -306,6 +271,7 @@ public abstract class Response {
                 }
             }
         }));
+        logger.info(toString());
     }
 
     /**
@@ -362,9 +328,9 @@ public abstract class Response {
      * body writer
      */
     static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays.asList(
-            Tuple.of(String.class, (response, out, cancel) -> out.get().write(((String) response.content).getBytes(charset))),
+            Tuple.of(String.class, (response, out, cancel) -> out.get().write(((String) response.content).getBytes(response.charset))),
             Tuple.of(Writer.class, (response, out, cancel) -> {
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
                     ((Writer) response.content).write(writer);
                 }
             }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
@@ -372,9 +338,9 @@ public abstract class Response {
                 Path path = (Path) response.content;
                 String file = path.toString();
                 response.contentType(Tool.getContentType(file));
-                InputStream in = (file.startsWith(File.separator) ? Config.toURL(file) : Config.toURL(Config.app_view_folder.text(), file)).get().openStream();
+                InputStream in = Config.toURL(file).get().openStream();
                 if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
+                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
                         Function<Formatter, Formatter.Result> exclude;
                         Function<Object, String> escape;
                         if (file.endsWith(".js")) {
@@ -397,7 +363,7 @@ public abstract class Response {
             }), Tuple.of(Template.class, (response, out, cancel) -> {
                 Template template = (Template) response.content;
                 response.contentType(Tool.getContentType(template.name));
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset));
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset));
                         Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), template.name).get().openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                     lines.map(formatter::format).forEach(line -> {
@@ -407,7 +373,7 @@ public abstract class Response {
                 }
             }), Tuple.of(Object.class, (response, out, cancel) -> {
                 Runnable other = Try.r(() -> {
-                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), charset))) {
+                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
                         if (response.content instanceof Stream) {
                             ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
                         } else if (response.content instanceof Optional) {
@@ -418,7 +384,7 @@ public abstract class Response {
                     }
                 });
                 Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
-                    switch (contentType) {
+                    switch (Tool.splitAt(contentType, "\\s*;", 0)) {
                     case Content.JSON:
                         Tool.json(response.content, out.get());
                         break;

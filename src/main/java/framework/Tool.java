@@ -167,6 +167,16 @@ public class Tool {
     }
 
     /**
+     * get long integer
+     *
+     * @param value value
+     * @return long integer
+     */
+    public static Optional<Long> longInteger(Object value) {
+        return optional(value, Long::parseLong);
+    }
+
+    /**
      * get optional
      * 
      * @param <T> object type
@@ -1261,5 +1271,57 @@ public class Tool {
     public static <T> T peek(T value, Consumer<T> consumer) {
         consumer.accept(value);
         return value;
+    }
+    
+    /**
+     * @param text text
+     * @param separator separator(regex)
+     * @param index index(allow negative)
+     * @return part text
+     */
+    public static String splitAt(String text, String separator, int index) {
+        if(!string(text).isPresent()) {
+            return text;
+        }
+        String[] parts = text.split(separator);
+        return parts[index < 0 ? parts.length + index : index];
+    }
+
+    /**
+     * @param map map
+     * @param name name
+     * @param value value
+     * @return values
+     */
+    public static List<String> addValue(Map<String, List<String>> map, String name, String value) {
+        List<String> list = map.get(name);
+        if (list == null) {
+            list = new ArrayList<>();
+            map.put(name, list);
+        }
+        list.add(value);
+        return list;
+    }
+
+    /**
+     * @param map map
+     * @param name name
+     * @param value value
+     * @return self
+     */
+    public static List<String> setValue(Map<String, List<String>> map, String name, String value) {
+        List<String> list = new ArrayList<>();
+        list.add(value);
+        map.put(name, list);
+        return list;
+    }
+
+    /**
+     * @param map map
+     * @param name name
+     * @return first value
+     */
+    public static Optional<String> getFirstValue(Map<String, List<String>> map, String name) {
+        return Optional.ofNullable(map.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
     }
 }

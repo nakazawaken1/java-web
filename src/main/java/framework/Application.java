@@ -1,21 +1,46 @@
 package framework;
 
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.stream.Stream;
 
-import javax.servlet.ServletContext;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.Db.Setup;
+import framework.annotation.Content;
+import framework.annotation.Job;
+import framework.annotation.Only;
+import framework.annotation.Route;
 
 /**
  * application scoped object
  */
-public interface Application extends Attributes<Object> {
+public abstract class Application implements Attributes<Object> {
 
     /**
      * singleton
      */
-    Lazy<Application> CURRENT = new Lazy<>(null);
+    static Application CURRENT;
+
+    /**
+     * routing table{path: {class: method}}
+     */
+    static SortedMap<String, Tuple<Class<?>, Method>> table;
 
     /**
      * getters
@@ -26,158 +51,218 @@ public interface Application extends Attributes<Object> {
      * @return singleton
      */
     static Optional<Application> current() {
-        return Optional.ofNullable(CURRENT.get());
-    }
-
-    /**
-     * For Servlet
-     */
-    class ForServlet implements Application {
-        @Override
-        public String toString() {
-            return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
-
-        }
-
-        /**
-         * application scope object
-         */
-        transient final ServletContext raw;
-
-        /**
-         * constructor
-         * 
-         * @param raw application scope object
-         */
-        ForServlet(ServletContext raw) {
-            this.raw = raw;
-        }
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see framework.Attributes#names()
-         */
-        @Override
-        public Stream<String> names() {
-            return Tool.stream(raw.getAttributeNames());
-        }
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see framework.Attributes#getAttr(java.lang.String)
-         */
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> raw.getAttribute(name)));
-        }
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see framework.Attributes#setAttr(java.lang.String, java.lang.Object)
-         */
-        @Override
-        public void setAttr(String name, Object value) {
-            raw.setAttribute(name, value);
-        }
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see framework.Attributes#removeAttr(java.lang.String)
-         */
-        @Override
-        public void removeAttr(String name) {
-            raw.removeAttribute(name);
-        }
-
-        /**
-         * @param relativePath relative path from htdocs
-         * @return full path
-         */
-        @Override
-        public String toRealPath(String relativePath) {
-            return raw.getRealPath(relativePath);
-        }
-
-        /**
-         * @return context path
-         */
-        @Override
-        public String getContextPath() {
-            return Tool.suffix(raw.getContextPath(), "/");
-        }
-    }
-
-    /**
-     * For Server
-     */
-    class ForServer implements Application {
-        /**
-         * Context path
-         */
-        String contextPath;
-        /**
-         * Attributes
-         */
-        Map<String, Object> attributes = new ConcurrentHashMap<>();
-
-        /**
-         * @param contextPath context path
-         */
-        ForServer(String contextPath) {
-            this.contextPath = contextPath;
-        }
-
-        @Override
-        public String toString() {
-            return "real path: " + toRealPath("") + ", context path: " + getContextPath();
-
-        }
-
-        @Override
-        public Stream<String> names() {
-            return attributes.keySet().stream();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
-        }
-
-        @Override
-        public void setAttr(String name, Object value) {
-            attributes.put(name, value);
-        }
-
-        @Override
-        public void removeAttr(String name) {
-            attributes.remove(name);
-        }
-
-        @Override
-        public String toRealPath(String relativePath) {
-            return Config.toURL(relativePath).toString();
-        }
-
-        @Override
-        public String getContextPath() {
-            return contextPath;
-        }
+        return Optional.ofNullable(CURRENT);
     }
 
     /**
      * @param relativePath relative path from htdocs
      * @return full path
      */
-    String toRealPath(String relativePath);
+    abstract String toRealPath(String relativePath);
 
     /**
      * @return context path
      */
-    String getContextPath();
+    abstract String getContextPath();
+
+    /**
+     * setup
+     *
+     * @param factory response factory
+     */
+    @SuppressFBWarnings({ "LI_LAZY_INIT_STATIC" })
+    void setup(Supplier<Response> factory) {
+
+        /* check to enabled of method parameters name */
+        try {
+            if (!"factory".equals(Application.class.getDeclaredMethod("setup", Supplier.class).getParameters()[0].getName())) {
+                throw new RuntimeException("must to enable compile option `-parameters`");
+            }
+        } catch (NoSuchMethodException | SecurityException e) {
+            throw new InternalError(e);
+        }
+
+        /* log setup */
+        Config.startupLog();
+
+        Tool.getLogger().info(Application.current().get().toString());
+
+        /* setup for response creator */
+        if (Response.factory == null) {
+            Response.factory = factory;
+        }
+
+        /* setup routing */
+        if (table == null) {
+            table = new TreeMap<>();
+            Config.app_controller_packages.stream().forEach(p -> {
+                try (Stream<Class<?>> cs = Tool.getClasses(p)) {
+                    cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
+                            .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
+                                Class<?> c = trio.l;
+                                Method m = trio.r.l;
+                                String left = Optional.ofNullable(c.getAnnotation(Route.class))
+                                        .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
+                                String right = Tool.string(trio.r.r.path()).orElse(m.getName());
+                                m.setAccessible(true);
+                                map.put(left + right, Tuple.of(c, m));
+                            }, Map::putAll);
+                }
+            });
+            Tool.getLogger().info(Tool.print(writer -> {
+                writer.println("---- routing ----");
+                table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
+            }));
+        }
+
+        /* database setup */
+        Db.setup(Config.db_setup.enumOf(Setup.class));
+
+        /* job scheduler setup */
+        List<Class<?>> cs = new ArrayList<>();
+        Config.app_job_packages.stream().forEach(p -> {
+            try (Stream<Class<?>> classes = Tool.getClasses(p)) {
+                classes.forEach(cs::add);
+            }
+        });
+        Job.Scheduler.setup(cs.toArray(new Class<?>[cs.size()]));
+    }
+
+    /**
+     * shutdown
+     */
+    void shutdown() {
+        try {
+            Job.Scheduler.shutdown();
+            Db.cleanup();
+            Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver));
+        } catch (Exception e) {
+            Tool.getLogger().log(Level.WARNING, "destroy error", e);
+        }
+        Config.shutdownLog();
+    }
+
+    /**
+     * request handle
+     *
+     * @param request request
+     * @param session session
+     */
+    void handle(Request request, Lazy<Session> session) {
+        Tool.getLogger().info(request.toString());
+
+        /* no slash root access */
+        if (request.getPath() == null) {
+            Response.redirect(getContextPath(), 301).flush();
+            return;
+        }
+
+        /* action */
+        Optional<String> mime;
+        String action = request.getPath();
+        int index = action.lastIndexOf('.');
+        if (index >= 0 && index + 5 >= action.length()) {
+            mime = Optional.ofNullable(Tool.getContentType(action));
+            action = action.substring(0, index);
+        } else {
+            mime = Optional.empty();
+        }
+        Tuple<Class<?>, Method> pair = table.get(action);
+        if (pair != null) {
+            do {
+                Method method = pair.r;
+                Route http = method.getAnnotation(Route.class);
+                if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
+                    break;
+                }
+                Only only = method.getAnnotation(Only.class);
+                boolean forbidden = only != null && !session.get().isLoggedIn();
+                if (!forbidden && only != null && only.value().length > 0) {
+                    forbidden = !session.get().getAccount().hasAnyRole(only.value());
+                }
+                if (forbidden) {
+                    session.get().setAttr("alert", Message.alert_forbidden);
+                    Response.redirect(getContextPath()).flush();
+                    return;
+                }
+                try (Lazy<Db> db = new Lazy<>(Db::connect)) {
+                    try {
+                        Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
+                                Stream.of(method.getParameters()).map(p -> {
+                                    Class<?> type = p.getType();
+                                    if (Request.class.isAssignableFrom(type)) {
+                                        return request;
+                                    }
+                                    if (Session.class.isAssignableFrom(type)) {
+                                        return session.get();
+                                    }
+                                    if (Application.class.isAssignableFrom(type)) {
+                                        return this;
+                                    }
+                                    if (Db.class.isAssignableFrom(type)) {
+                                        return db.get();
+                                    }
+                                    Type types = p.getParameterizedType();
+                                    return new Binder(request.getParameters()).bind(p.getName(), type,
+                                            types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
+                                }).toArray());
+                        if (response instanceof Response) {
+                            ((Response) response).flush();
+                        } else {
+                            Content content = method.getAnnotation(Content.class);
+                            String[] accept = request.getHeaders().get("accept").stream()
+                                    .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase()))
+                                    .toArray(String[]::new);
+                            if (!mime.isPresent()) {
+                                mime = content == null ? Stream.of(accept).findFirst()
+                                        : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
+                            }
+                            Tool.ifPresentOr(mime, m -> Response.of(response).contentType(m).flush(), () -> {
+                                throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
+                            });
+                        }
+                        return;
+                    } catch (InvocationTargetException e) {
+                        Throwable t = e.getCause();
+                        if (t instanceof RuntimeException) {
+                            throw (RuntimeException) t;
+                        }
+                        throw new RuntimeException(t);
+                    } catch (IllegalAccessException | IllegalArgumentException e) {
+                        throw new RuntimeException(e);
+                    } catch (RuntimeException e) {
+                        throw e;
+                    }
+                }
+            } while (false);
+        }
+
+        /* static file */
+        Optional<URL> url = Config.toURL(Config.app_view_folder.text(), request.getPath());
+        if (url.isPresent()) {
+            if (!url.filter(Try.p(i -> {
+                switch (i.getProtocol()) {
+                case "file":
+                    return !new File(i.toURI()).isDirectory();
+                case "jar":
+                    return !((JarURLConnection) i.openConnection()).getJarEntry().isDirectory();
+                default:
+                    return false;
+                }
+            }, (e, i) -> false)).isPresent()) {
+                Response.redirect(Tool.trim(null, getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
+            } else {
+                Response.file(request.getPath()).flush();
+            }
+            return;
+        }
+
+        /* */
+        if (Arrays.asList(".css", ".js").contains(request.getExtension())) {
+            Response.of("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
+            return;
+        }
+
+        throw new RuntimeException("not found: " + request.getPath());
+    }
 }

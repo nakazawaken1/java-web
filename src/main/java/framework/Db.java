@@ -2052,7 +2052,7 @@ public class Db implements AutoCloseable {
      * @param rs ResultSet
      * @param name column name
      * @return java value
-     * @throws SQLException
+     * @throws SQLException SQL error
      */
     @SuppressWarnings("unchecked")
     public static <T extends Enum<T>> Object convert(Field field, ResultSet rs, String name) throws SQLException {
