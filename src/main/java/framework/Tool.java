@@ -409,13 +409,10 @@ public class Tool {
         return Config.toURL(location).map(Try.f(i -> {
             boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
             if ("jar".equals(i.getProtocol())) {
-                Logger.getGlobal().info("jar inside");
                 return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
             } else if (isDirectory) {
-                Logger.getGlobal().info("folder");
                 return getResourcesFromFolder(new File(i.getFile()));
             } else {
-                Logger.getGlobal().info("jar file");
                 return getResourcesFromJar("", new JarFile(i.getFile()));
             }
         })).orElse(Stream.empty());
@@ -1272,7 +1269,7 @@ public class Tool {
         consumer.accept(value);
         return value;
     }
-    
+
     /**
      * @param text text
      * @param separator separator(regex)
@@ -1280,7 +1277,7 @@ public class Tool {
      * @return part text
      */
     public static String splitAt(String text, String separator, int index) {
-        if(!string(text).isPresent()) {
+        if (!string(text).isPresent()) {
             return text;
         }
         String[] parts = text.split(separator);
@@ -1323,5 +1320,23 @@ public class Tool {
      */
     public static Optional<String> getFirstValue(Map<String, List<String>> map, String name) {
         return Optional.ofNullable(map.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
+    }
+
+    /**
+     * @param text text
+     * @return cut text
+     */
+    public static String cutLog(String text) {
+        int max = Config.app_eval_log_max_letters.integer();
+        return Optional.ofNullable(text).map(i -> {
+            int index = i.indexOf('\r');
+            if (index < 0) {
+                index = i.indexOf('\n');
+            }
+            if (index >= 0) {
+                return i.substring(0, index);
+            }
+            return i.length() < max ? i : i.substring(0, max);
+        }).map(i -> i + " ...").orElse(null);
     }
 }

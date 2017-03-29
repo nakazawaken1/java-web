@@ -295,12 +295,6 @@ public class Standalone {
         }
 
         @Override
-        public String toString() {
-            return "real path: " + toRealPath("") + ", context path: " + getContextPath();
-
-        }
-
-        @Override
         public Stream<String> names() {
             return attributes.keySet().stream();
         }
@@ -319,11 +313,6 @@ public class Standalone {
         @Override
         public void removeAttr(String name) {
             attributes.remove(name);
-        }
-
-        @Override
-        public String toRealPath(String relativePath) {
-            return Config.toURL(relativePath).toString();
         }
 
         @Override
@@ -896,7 +885,7 @@ public class Standalone {
         @Override
         public String toString() {
             return Request.current().map(i -> ((RequestImpl) i).exchange)
-                    .map(r -> "-> " + r.getResponseCode() + " " + r.getResponseHeaders().get("Content-Type")).orElse("");
+                    .map(r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().get("Content-Type")).orElse("")).orElse("");
         }
     }
 }

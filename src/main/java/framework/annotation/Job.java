@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -136,7 +137,7 @@ public @interface Job {
          * shutdown
          */
         public static void shutdown() {
-            scheduler.get().shutdown();
+            Optional.ofNullable(scheduler.get()).ifPresent(ScheduledExecutorService::shutdown);
         }
     }
 }

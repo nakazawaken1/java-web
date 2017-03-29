@@ -95,11 +95,6 @@ public class ServletImpl implements javax.servlet.Servlet {
      * Application implementation
      */
     static class ApplicationImpl extends Application {
-        @Override
-        public String toString() {
-            return "real path: " + raw.getRealPath("") + ", context path: " + raw.getContextPath();
-
-        }
 
         /**
          * application scope object
@@ -156,15 +151,6 @@ public class ServletImpl implements javax.servlet.Servlet {
         @Override
         public void removeAttr(String name) {
             raw.removeAttribute(name);
-        }
-
-        /**
-         * @param relativePath relative path from htdocs
-         * @return full path
-         */
-        @Override
-        public String toRealPath(String relativePath) {
-            return raw.getRealPath(relativePath);
         }
 
         /**
@@ -413,7 +399,6 @@ public class ServletImpl implements javax.servlet.Servlet {
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
             HttpServletResponse response = ((RequestImpl) Request.current().get()).servletResponse;
             Runnable action = () -> {
-                response.setCharacterEncoding(charset.name());
                 Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
@@ -432,9 +417,8 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public String toString() {
-            return Request.current()
-                    .map(i -> i.getId() + Optional.of(((RequestImpl) i).servletResponse).map(r -> "-> " + r.getStatus() + " " + r.getContentType()).orElse(""))
-                    .orElse("");
+            return Request.current().map(i -> (RequestImpl) i).map(i -> "-> " + i.servletRequest.getProtocol() + " " + i.servletResponse.getStatus() + " "
+                    + Tool.string(i.servletResponse.getContentType()).orElse("")).orElse("");
         }
     }
 }

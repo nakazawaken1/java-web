@@ -237,7 +237,15 @@ public enum Config {
      * model packages
      */
     @Help("model packages")
-    app_model_packages("app.model"),;
+    app_model_packages("app.model"),
+    
+    /**
+     * eval log max output letters
+     */
+    @Help("eval log max output letters")
+    app_eval_log_max_letters(100),
+    
+    ;
 
     /**
      * logger
@@ -400,8 +408,8 @@ public enum Config {
      * @return url
      */
     public static Optional<URL> toURL(String... relativePath) {
-        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i, "/")).collect(Collectors.joining("/"));
-        return Optional.ofNullable(Thread.currentThread().getContextClassLoader().getResource(path));
+        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
+        return Optional.ofNullable(Optional.ofNullable(Thread.currentThread().getContextClassLoader().getResource(path)).orElseGet(() -> ClassLoader.getSystemResource(path)));
     }
 
     /**

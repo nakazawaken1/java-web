@@ -55,15 +55,14 @@ public abstract class Application implements Attributes<Object> {
     }
 
     /**
-     * @param relativePath relative path from htdocs
-     * @return full path
-     */
-    abstract String toRealPath(String relativePath);
-
-    /**
      * @return context path
      */
     abstract String getContextPath();
+
+    @Override
+    public String toString() {
+        return "real path: " + Tool.val(Config.toURL("framework").get().toString(), s -> s.substring(0, s.length() - "framework".length())) + ", context path: " + getContextPath();
+    }
 
     /**
      * setup
@@ -257,12 +256,13 @@ public abstract class Application implements Attributes<Object> {
             return;
         }
 
-        /* */
+        /* no content */
         if (Arrays.asList(".css", ".js").contains(request.getExtension())) {
-            Response.of("/*" + request.getPath() + " not found*/").contentType(Tool.getContentType(request.getPath())).flush();
+            Response.error(204).flush();
             return;
         }
 
-        throw new RuntimeException("not found: " + request.getPath());
+        Tool.getLogger().info("not found: " + Tool.suffix(Config.app_view_folder.text(), "/") + request.getPath());
+        Response.error(404).flush();
     }
 }
