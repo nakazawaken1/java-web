@@ -880,7 +880,7 @@ public class Standalone {
         @Override
         public String toString() {
             return Request.current().map(i -> ((RequestImpl) i).exchange)
-                    .map(r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().get("Content-Type")).orElse("")).orElse("");
+                    .map(r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().getFirst("Content-Type")).orElse("")).orElse("");
         }
     }
 }

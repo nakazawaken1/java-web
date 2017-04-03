@@ -1,11 +1,9 @@
 package framework;
 
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.net.JarURLConnection;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -349,49 +347,45 @@ public abstract class Response {
                 }
             }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
                     Tuple.of(Path.class, (response, out, cancel) -> {
-                        String file = ((Path) response.content).toString();
+                        String file = ((Path) response.content).toString().replace('\\', '/');
                         Optional<URL> url = Config.toURL(file);
                         if (url.isPresent()) {
-                            if (url.filter(Try.p(i -> {
-                                switch (i.getProtocol()) {
-                                case "file":
-                                    return !new File(i.toURI()).isDirectory();
-                                case "jar":
-                                    return !((JarURLConnection) i.openConnection()).getJarEntry().isDirectory();
-                                default:
-                                    return false;
-                                }
-                            }, (e, i) -> false)).isPresent()) {
-                                response.contentType(Tool.getContentType(file),
-                                        response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                                InputStream in = url.get().openStream();
-                                if (Config.app_format_include_regex.stream().anyMatch(file::matches)
-                                        && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                                    try (Stream<String> lines = Tool.lines(in);
-                                            PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                                        Function<Formatter, Formatter.Result> exclude;
-                                        Function<Object, String> escape;
-                                        if (file.endsWith(".js")) {
-                                            exclude = Formatter::excludeForScript;
-                                            escape = Formatter::scriptEscape;
-                                        } else if (file.endsWith(".css")) {
-                                            exclude = Formatter::excludeForStyle;
-                                            escape = null;
-                                        } else {
-                                            exclude = Formatter::excludeForHtml;
-                                            escape = Formatter::htmlEscape;
+                            try (InputStream in = url.get().openStream()) {
+                                if (Try.s(() -> in.available() >= 0, e -> false).get()) {
+                                    response.contentType(Tool.getContentType(file),
+                                            response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                                    if (Config.app_format_include_regex.stream().anyMatch(file::matches)
+                                            && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
+                                        try (Stream<String> lines = Tool.lines(in);
+                                                PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                                            Function<Formatter, Formatter.Result> exclude;
+                                            Function<Object, String> escape;
+                                            if (file.endsWith(".js")) {
+                                                exclude = Formatter::excludeForScript;
+                                                escape = Formatter::scriptEscape;
+                                            } else if (file.endsWith(".css")) {
+                                                exclude = Formatter::excludeForStyle;
+                                                escape = null;
+                                            } else {
+                                                exclude = Formatter::excludeForHtml;
+                                                escape = Formatter::htmlEscape;
+                                            }
+                                            try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
+                                                lines.forEach(line -> writer.println(formatter.format(line)));
+                                            }
                                         }
-                                        try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
-                                            lines.forEach(line -> writer.println(formatter.format(line)));
-                                        }
+                                    } else {
+                                        Tool.copy(in, out.get(), new byte[1024]);
                                     }
                                 } else {
-                                    Tool.copy(in, out.get(), new byte[1024]);
+                                    String prefix = Paths.get(Config.app_document_root_folder.text()).toString().replace('\\', '/');
+                                    String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
+                                    Tool.getLogger().info(file + " : " + path);
+                                    response.setHeader("Location",
+                                            Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
+                                            .status(301);
+                                    out.get();
                                 }
-                            } else {
-                                response.setHeader("Location",
-                                        Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(file, "/") + "index.html").status(301);
-                                out.get();
                             }
                             return;
                         }
@@ -400,7 +394,7 @@ public abstract class Response {
                         if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
                             response.status(204);
                         } else {
-                            Tool.getLogger().info("not found: " + Tool.suffix(Config.app_document_root_folder.text(), "/") + Tool.trim("/", file, null));
+                            Tool.getLogger().info("not found: " + Tool.trim("/", file, null));
                             response.status(404);
                         }
                         out.get();
