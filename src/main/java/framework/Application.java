@@ -1,13 +1,10 @@
 package framework;
 
-import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.net.JarURLConnection;
-import java.net.URL;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,7 +58,8 @@ public abstract class Application implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "real path: " + Tool.val(Config.toURL("framework").get().toString(), s -> s.substring(0, s.length() - "framework".length())) + ", context path: " + getContextPath();
+        return "real path: " + Tool.val(Config.toURL("framework").get().toString(), s -> s.substring(0, s.length() - "framework".length())) + ", context path: "
+                + getContextPath();
     }
 
     /**
@@ -237,32 +235,6 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* static file */
-        Optional<URL> url = Config.toURL(Config.app_view_folder.text(), request.getPath());
-        if (url.isPresent()) {
-            if (!url.filter(Try.p(i -> {
-                switch (i.getProtocol()) {
-                case "file":
-                    return !new File(i.toURI()).isDirectory();
-                case "jar":
-                    return !((JarURLConnection) i.openConnection()).getJarEntry().isDirectory();
-                default:
-                    return false;
-                }
-            }, (e, i) -> false)).isPresent()) {
-                Response.redirect(Tool.trim(null, getContextPath(), "/") + Tool.suffix(request.getPath(), "/") + "index.html", 301).flush();
-            } else {
-                Response.file(request.getPath()).flush();
-            }
-            return;
-        }
-
-        /* no content */
-        if (Arrays.asList(".css", ".js").contains(request.getExtension())) {
-            Response.error(204).flush();
-            return;
-        }
-
-        Tool.getLogger().info("not found: " + Tool.suffix(Config.app_view_folder.text(), "/") + request.getPath());
-        Response.error(404).flush();
+        Response.file(request.getPath()).flush();
     }
 }

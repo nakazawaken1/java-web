@@ -22,7 +22,6 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.el.ELContext;
 import javax.el.ELProcessor;
@@ -33,11 +32,6 @@ import javax.el.PropertyNotWritableException;
  * formatter with el, config, message
  */
 public class Formatter implements AutoCloseable {
-
-    /**
-     * logger
-     */
-    transient private static final Logger logger = Logger.getLogger(Formatter.class.getCanonicalName());
 
     /**
      * current formatter
@@ -472,7 +466,7 @@ public class Formatter implements AutoCloseable {
                     value = Tool.string(result).orElse(null);
                     type = "raw " + type;
                 }
-                logger.config("[" + type + "] " + s + " -> " + Tool.cutLog(value));
+                Tool.getLogger().config("[" + type + "] " + s + " -> " + Tool.cutLog(value));
                 return value;
             };
             String key = s.substring(prefix, s.length() - suffix);
@@ -609,7 +603,7 @@ public class Formatter implements AutoCloseable {
                     }
                     return getResult.apply(Tool.string(el.eval(key)).orElse(""), "el");
                 } catch (Exception e) {
-                    logger.log(Level.WARNING, "el error", e);
+                    Tool.getLogger().log(Level.WARNING, "el error", e);
                     return s;
                 }
             }

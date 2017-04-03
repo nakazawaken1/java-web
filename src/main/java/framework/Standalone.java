@@ -848,11 +848,6 @@ public class Standalone {
         public Map<String, List<String>> getParameters() {
             return parameters;
         }
-
-        @Override
-        public int getId() {
-            return hashCode();
-        }
     }
 
     /**

@@ -270,13 +270,6 @@ public class ServletImpl implements javax.servlet.Servlet {
         }
 
         /**
-         * @return request id
-         */
-        public int getId() {
-            return servletRequest.hashCode();
-        }
-
-        /**
          * @return http method
          */
         @Override
@@ -403,6 +396,7 @@ public class ServletImpl implements javax.servlet.Servlet {
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
                 }
+                charset.ifPresent(c -> response.setCharacterEncoding(c.name()));
                 response.setStatus(status);
             };
             if (content == null) {

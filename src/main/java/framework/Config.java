@@ -123,7 +123,7 @@ public enum Config {
      * htdocs folder
      */
     @Help("htdocs folder")
-    app_view_folder("view/"),
+    app_document_root_folder("view/"),
 
     /**
      * template folder

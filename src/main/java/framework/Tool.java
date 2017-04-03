@@ -1329,14 +1329,57 @@ public class Tool {
     public static String cutLog(String text) {
         int max = Config.app_eval_log_max_letters.integer();
         return Optional.ofNullable(text).map(i -> {
+            boolean suffix = false;
             int index = i.indexOf('\r');
             if (index < 0) {
                 index = i.indexOf('\n');
             }
             if (index >= 0) {
-                return i.substring(0, index);
+                i = i.substring(0, index);
+                suffix = true;
             }
-            return i.length() < max ? i : i.substring(0, max);
-        }).map(i -> i + " ...").orElse(null);
+            if(i.length() > max) {
+                i = i.substring(0, max);
+                suffix = true;
+            }
+            return i + (suffix ? " ..." : "");
+        }).orElse(null);
+    }
+
+    /**
+     * @param path path
+     * @return file name(without extension)
+     */
+    public static String getName(String path) {
+        if(path == null) {
+            return null;
+        }
+        int start = path.lastIndexOf('/');
+        if(start < 0) {
+            start = path.lastIndexOf('\\');
+            if(start < 0) {
+                start = 0;
+            }
+        }
+        int end = path.lastIndexOf('.');
+        if(end < 0 || start > end) {
+            end = path.length();
+        }
+        return path.substring(start, end);
+    }
+
+    /**
+     * @param path path
+     * @return extension
+     */
+    public static String getExtension(String path) {
+        if(path == null) {
+            return null;
+        }
+        int index = path.lastIndexOf('.');
+        if(index < 0 || path.lastIndexOf('/') > index || path.lastIndexOf('\\') > index) {
+            return "";
+        }
+        return path.substring(index);
     }
 }

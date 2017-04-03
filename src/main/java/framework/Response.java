@@ -1,9 +1,12 @@
 package framework;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.JarURLConnection;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -21,6 +24,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
 
@@ -42,7 +46,7 @@ public abstract class Response {
     /**
      * encoding
      */
-    Charset charset = StandardCharsets.UTF_8;
+    Optional<Charset> charset = Optional.empty();
 
     /**
      * attributes
@@ -62,6 +66,7 @@ public abstract class Response {
     /**
      * http status code
      */
+    @SuppressFBWarnings("URF_UNREAD_FIELD")
     int status = 200;
 
     /**
@@ -73,6 +78,7 @@ public abstract class Response {
      * @param content content
      * @return response
      */
+    @SuppressFBWarnings("UWF_UNWRITTEN_FIELD")
     public static Response of(Object content) {
         return Tool.peek(factory.get(), r -> r.content = content);
     }
@@ -115,7 +121,7 @@ public abstract class Response {
      * @return response
      */
     public static Response write(Writer writer) {
-        return of(writer);
+        return of(writer).charset(StandardCharsets.UTF_8);
     }
 
     /**
@@ -123,7 +129,7 @@ public abstract class Response {
      * @return response
      */
     public static Response file(String file) {
-        return of(Paths.get(Config.app_view_folder.text(), file));
+        return of(Paths.get(Config.app_document_root_folder.text(), file));
     }
 
     /**
@@ -131,7 +137,7 @@ public abstract class Response {
      * @return response
      */
     public static Response template(String file) {
-        return of(Paths.get(Config.app_template_folder.text(), file));
+        return of(Paths.get(Config.app_template_folder.text(), file)).charset(StandardCharsets.UTF_8);
     }
 
     /**
@@ -229,8 +235,15 @@ public abstract class Response {
      * @return self
      */
     public Response charset(Charset charset) {
-        this.charset = charset;
+        this.charset = Optional.ofNullable(charset);
         return this;
+    }
+
+    /**
+     * @return charset
+     */
+    public Charset charset() {
+        return charset.orElse(StandardCharsets.UTF_8);
     }
 
     /**
@@ -239,20 +252,18 @@ public abstract class Response {
      * @return contentType with charset
      */
     public static String setCharset(String contentType, Charset charset) {
-        if(!Tool.string(contentType).isPresent() || charset == null) {
+        if (!Tool.string(contentType).isPresent() || charset == null) {
             return contentType;
         }
         boolean[] unset = { true };
-        String result = Stream.of(contentType.split("\\s*;\\s*"))
-                .map(part -> {
-                    if(Tool.splitAt(part, "\\s*=\\s*", 0).equalsIgnoreCase("charset")) {
-                        unset[0] = false;
-                        return "charset=" + charset.name();
-                    } else {
-                        return part;
-                    }
-                })
-                .collect(Collectors.joining("; "));
+        String result = Stream.of(contentType.split("\\s*;\\s*")).map(part -> {
+            if (Tool.splitAt(part, "\\s*=\\s*", 0).equalsIgnoreCase("charset")) {
+                unset[0] = false;
+                return "charset=" + charset.name();
+            } else {
+                return part;
+            }
+        }).collect(Collectors.joining("; "));
         return unset[0] ? result + "; charset=" + charset.name() : result;
     }
 
@@ -327,71 +338,105 @@ public abstract class Response {
     /**
      * body writer
      */
-    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays.asList(
-            Tuple.of(String.class, (response, out, cancel) -> out.get().write(((String) response.content).getBytes(response.charset))),
-            Tuple.of(Writer.class, (response, out, cancel) -> {
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
+    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays
+            .asList(Tuple.of(String.class, (response, out, cancel) -> {
+                response.contentType(Content.HTML, response.charset.orElse(null));
+                out.get().write(((String) response.content).getBytes(response.charset()));
+            }), Tuple.of(Writer.class, (response, out, cancel) -> {
+                response.contentType(Content.HTML, response.charset.orElse(null));
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
                     ((Writer) response.content).write(writer);
                 }
             }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
-            Tuple.of(Path.class, (response, out, cancel) -> {
-                Path path = (Path) response.content;
-                String file = path.toString();
-                response.contentType(Tool.getContentType(file));
-                InputStream in = Config.toURL(file).get().openStream();
-                if (Config.app_format_include_regex.stream().anyMatch(file::matches) && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
-                    try (Stream<String> lines = Tool.lines(in); PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
-                        Function<Formatter, Formatter.Result> exclude;
-                        Function<Object, String> escape;
-                        if (file.endsWith(".js")) {
-                            exclude = Formatter::excludeForScript;
-                            escape = Formatter::scriptEscape;
-                        } else if (file.endsWith(".css")) {
-                            exclude = Formatter::excludeForStyle;
-                            escape = null;
+                    Tuple.of(Path.class, (response, out, cancel) -> {
+                        String file = ((Path) response.content).toString();
+                        Optional<URL> url = Config.toURL(file);
+                        if (url.isPresent()) {
+                            if (url.filter(Try.p(i -> {
+                                switch (i.getProtocol()) {
+                                case "file":
+                                    return !new File(i.toURI()).isDirectory();
+                                case "jar":
+                                    return !((JarURLConnection) i.openConnection()).getJarEntry().isDirectory();
+                                default:
+                                    return false;
+                                }
+                            }, (e, i) -> false)).isPresent()) {
+                                response.contentType(Tool.getContentType(file),
+                                        response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                                InputStream in = url.get().openStream();
+                                if (Config.app_format_include_regex.stream().anyMatch(file::matches)
+                                        && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
+                                    try (Stream<String> lines = Tool.lines(in);
+                                            PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                                        Function<Formatter, Formatter.Result> exclude;
+                                        Function<Object, String> escape;
+                                        if (file.endsWith(".js")) {
+                                            exclude = Formatter::excludeForScript;
+                                            escape = Formatter::scriptEscape;
+                                        } else if (file.endsWith(".css")) {
+                                            exclude = Formatter::excludeForStyle;
+                                            escape = null;
+                                        } else {
+                                            exclude = Formatter::excludeForHtml;
+                                            escape = Formatter::htmlEscape;
+                                        }
+                                        try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
+                                            lines.forEach(line -> writer.println(formatter.format(line)));
+                                        }
+                                    }
+                                } else {
+                                    Tool.copy(in, out.get(), new byte[1024]);
+                                }
+                            } else {
+                                response.setHeader("Location",
+                                        Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(file, "/") + "index.html").status(301);
+                                out.get();
+                            }
+                            return;
+                        }
+
+                        /* no content */
+                        if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
+                            response.status(204);
                         } else {
-                            exclude = Formatter::excludeForHtml;
-                            escape = Formatter::htmlEscape;
+                            Tool.getLogger().info("not found: " + Tool.suffix(Config.app_document_root_folder.text(), "/") + Tool.trim("/", file, null));
+                            response.status(404);
                         }
-                        try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
-                            lines.forEach(line -> writer.println(formatter.format(line)));
+                        out.get();
+                    }), Tuple.of(Template.class, (response, out, cancel) -> {
+                        Template template = (Template) response.content;
+                        response.contentType(Tool.getContentType(template.name), response.charset());
+                        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
+                                Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), template.name).get().openStream());
+                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
+                            lines.map(formatter::format).forEach(line -> {
+                                Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
+                                writer.println();
+                            });
                         }
-                    }
-                } else {
-                    Tool.copy(in, out.get(), new byte[1024]);
-                }
-            }), Tuple.of(Template.class, (response, out, cancel) -> {
-                Template template = (Template) response.content;
-                response.contentType(Tool.getContentType(template.name));
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset));
-                        Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), template.name).get().openStream());
-                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
-                    lines.map(formatter::format).forEach(line -> {
-                        Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
-                        writer.println();
-                    });
-                }
-            }), Tuple.of(Object.class, (response, out, cancel) -> {
-                Runnable other = Try.r(() -> {
-                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset))) {
-                        if (response.content instanceof Stream) {
-                            ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
-                        } else if (response.content instanceof Optional) {
-                            ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
-                        } else {
-                            writer.print(Tool.dump(response.content));
-                        }
-                    }
-                });
-                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
-                    switch (Tool.splitAt(contentType, "\\s*;", 0)) {
-                    case Content.JSON:
-                        Tool.json(response.content, out.get());
-                        break;
-                    default:
-                        other.run();
-                        break;
-                    }
-                }), other);
-            }));
+                    }), Tuple.of(Object.class, (response, out, cancel) -> {
+                        Runnable other = Try.r(() -> {
+                            response.contentType(Content.TEXT, response.charset());
+                            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                                if (response.content instanceof Stream) {
+                                    ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
+                                } else if (response.content instanceof Optional) {
+                                    ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
+                                } else {
+                                    writer.print(Tool.dump(response.content));
+                                }
+                            }
+                        });
+                        Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
+                            switch (Tool.splitAt(contentType, "\\s*;", 0)) {
+                            case Content.JSON:
+                                Tool.json(response.content, out.get());
+                                break;
+                            default:
+                                other.run();
+                                break;
+                            }
+                        }), other);
+                    }));
 }

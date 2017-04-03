@@ -50,7 +50,9 @@ public abstract class Request implements Attributes<Object> {
     /**
      * @return request id
      */
-    public abstract int getId();
+    public int getId() {
+        return hashCode();
+    }
 
     /**
      * @return path
@@ -61,28 +63,14 @@ public abstract class Request implements Attributes<Object> {
      * @return file name(without extension)
      */
     public String getName() {
-        String path = getPath();
-        int start = path.lastIndexOf('/');
-        if(start < 0) {
-            start = 0;
-        }
-        int end = path.lastIndexOf('.');
-        if(end < 0 || start > end) {
-            end = path.length();
-        }
-        return path.substring(start, end);
+        return Tool.getName(getPath());
     }
     
     /**
      * @return extension(with period)
      */
     public String getExtension() {
-        String path = getPath();
-        int start = path.lastIndexOf('.');
-        if(start < 0 || path.lastIndexOf('/') > start) {
-            return "";
-        }
-        return path.substring(start);
+        return Tool.getExtension(getPath());
     }
 
     /**

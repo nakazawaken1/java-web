@@ -1,5 +1,6 @@
 package app.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -129,7 +130,7 @@ public class Main {
      */
     @Route
     Object alert(Session session) {
-        return session.flash("alert");
+        return Response.of(session.flash("alert")).charset(StandardCharsets.UTF_8);
     }
 
     /**
