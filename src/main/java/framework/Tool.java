@@ -84,6 +84,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 import framework.Try.TryTriConsumer;
 
@@ -91,21 +92,6 @@ import framework.Try.TryTriConsumer;
  * utility
  */
 public class Tool {
-
-    /**
-     * Carriage Return
-     */
-    public static final String CR = "\r";
-
-    /**
-     * Line Feed
-     */
-    public static final String LF = "\n";
-
-    /**
-     * Carriage Return and Line Feed
-     */
-    public static final String CRLF = CR + LF;
 
     /**
      * not empty string
@@ -406,7 +392,7 @@ public class Tool {
      * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
-        return Config.toURL(location).map(Try.f(i -> {
+        return Config.toURLs(location).flatMap(Try.f(i -> {
             boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
             if ("jar".equals(i.getProtocol())) {
                 return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
@@ -415,7 +401,7 @@ public class Tool {
             } else {
                 return getResourcesFromJar("", new JarFile(i.getFile()));
             }
-        })).orElse(Stream.empty());
+        }));
     }
 
     /**
@@ -585,7 +571,7 @@ public class Tool {
     }
 
     /**
-     * JSON writer
+     * JSON Mapper
      */
     @SuppressWarnings("rawtypes")
     static ObjectMapper jsonMapper = Tool.peek(new ObjectMapper(), mapper -> {
@@ -658,6 +644,11 @@ public class Tool {
     });
 
     /**
+     * XML Mapper
+     */
+    static XmlMapper xmlMapper = new XmlMapper();
+
+    /**
      * @param o object
      * @return JSON
      */
@@ -671,6 +662,22 @@ public class Tool {
      */
     public static void json(Object o, OutputStream out) {
         Try.<OutputStream, Object>biC(jsonMapper::writeValue).accept(out, o);
+    }
+
+    /**
+     * @param o object
+     * @return XML
+     */
+    public static String xml(Object o) {
+        return Try.f(xmlMapper::writeValueAsString).apply(o);
+    }
+
+    /**
+     * @param o object
+     * @param out OutputStream
+     */
+    public static void xml(Object o, OutputStream out) {
+        Try.<OutputStream, Object>biC(xmlMapper::writeValue).accept(out, o);
     }
 
     /**
@@ -1338,7 +1345,7 @@ public class Tool {
                 i = i.substring(0, index);
                 suffix = true;
             }
-            if(i.length() > max) {
+            if (i.length() > max) {
                 i = i.substring(0, max);
                 suffix = true;
             }
@@ -1351,18 +1358,18 @@ public class Tool {
      * @return file name(without extension)
      */
     public static String getName(String path) {
-        if(path == null) {
+        if (path == null) {
             return null;
         }
         int start = path.lastIndexOf('/');
-        if(start < 0) {
+        if (start < 0) {
             start = path.lastIndexOf('\\');
-            if(start < 0) {
+            if (start < 0) {
                 start = 0;
             }
         }
         int end = path.lastIndexOf('.');
-        if(end < 0 || start > end) {
+        if (end < 0 || start > end) {
             end = path.length();
         }
         return path.substring(start, end);
@@ -1373,11 +1380,11 @@ public class Tool {
      * @return extension
      */
     public static String getExtension(String path) {
-        if(path == null) {
+        if (path == null) {
             return null;
         }
         int index = path.lastIndexOf('.');
-        if(index < 0 || path.lastIndexOf('/') > index || path.lastIndexOf('\\') > index) {
+        if (index < 0 || path.lastIndexOf('/') > index || path.lastIndexOf('\\') > index) {
             return "";
         }
         return path.substring(index);

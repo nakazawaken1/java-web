@@ -14,10 +14,10 @@ public @interface InitialData {
     /**
      * @return field names(for insert table(?))
      */
-    String field();
+    String field() default "";
 
     /**
      * @return values(for insert table(...) values(?))
      */
-    String[] values();
+    String[] value();
 }

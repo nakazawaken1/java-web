@@ -1,0 +1,1 @@
+SELECT configuration_id, name, CONVERT(VARCHAR(1000), value) value, CONVERT(VARCHAR(1000), minimum) minimum, CONVERT(VARCHAR(1000), maximum) maximum, CONVERT(VARCHAR(1000), value_in_use) value_in_use, description, is_dynamic, is_advanced FROM sys.configurations

@@ -17,19 +17,94 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
+import framework.annotation.Letters;
 
 /**
  * Response
  */
 public abstract class Response {
+    /**
+     * HTTP Status
+     */
+    @SuppressWarnings("javadoc")
+    public enum Status {
+        OK(200),
+        Created(201),
+        Accepted(202),
+        NonAuthoritative_Information(203),
+        No_Content(204),
+        Reset_Content(205),
+        Partial_Content(206),
+        Multiple_Choices(300),
+        Moved_Permamently(301),
+        Found(302),
+        See_Other(303),
+        Not_Modified(304),
+        Use_Proxy(305),
+        Temporary_Rediret(307),
+        Permanent_Redirect(308),
+        Bad_Request(400),
+        Unauthorized(401),
+        Payment_Required(402),
+        Forbidden(403),
+        Not_Found(404),
+        Method_Not_Allowed(405),
+        Not_Acceptable(406),
+        Proxy_Authentication_Required(407),
+        Request_Timeout(408),
+        conflict(409),
+        Gone(410),
+        Length_Required(411),
+        Precondition_Failed(412),
+        Payload_Too_large(413),
+        URI_Too_Long(414),
+        Unsupported_Media_Type(415),
+        Range_Not_Satisfiable(416),
+        Expectation_Failed(417),
+        Misdirected_Request(421),
+        Internal_Server_Error(500),
+        Not_Implemented(501),
+        Bad_Gateway(502),
+        Service_Unavailable(503),
+        Gateway_Timeout(504),
+        HTTP_Version_Not_Supported(505);
+
+        /**
+         * Status code
+         */
+        int code;
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.lang.Enum#toString()
+         */
+        @Override
+        public String toString() {
+            // _ -> space, AbcDef -> Abc-Def
+            IntFunction<IntStream> m = c -> (Letters.ALPHABET_UPPERS.indexOf(c) >= 0 ? IntStream.of('-', c) : IntStream.of(c));
+            Function<String, StringBuilder> mapper = i -> IntStream.concat(IntStream.of(i.charAt(0)), i.chars().skip(1).flatMap(m)).collect(StringBuilder::new,
+                    (s, c) -> s.append((char) c), (a, b) -> a.append(b));
+            return code + " " + Stream.of(name().split("_")).map(mapper).collect(Collectors.joining(" "));
+        }
+
+        /**
+         * @param code Status code
+         */
+        Status(int code) {
+            this.code = code;
+        }
+    }
 
     /**
      * instance creator
@@ -65,7 +140,7 @@ public abstract class Response {
      * http status code
      */
     @SuppressFBWarnings("URF_UNREAD_FIELD")
-    int status = 200;
+    Status status = Status.OK;
 
     /**
      * content
@@ -86,7 +161,7 @@ public abstract class Response {
      * @param status status code
      * @return response
      */
-    public static Response redirect(String path, int status) {
+    public static Response redirect(String path, Status status) {
         return factory.get().status(status).addHeader("Location", path);
     }
 
@@ -95,14 +170,14 @@ public abstract class Response {
      * @return response
      */
     public static Response redirect(String path) {
-        return redirect(path, 302);
+        return redirect(path, Status.Found);
     }
 
     /**
      * @param status status code
      * @return response
      */
-    public static Response error(int status) {
+    public static Response error(Status status) {
         return factory.get().status(status);
     }
 
@@ -142,7 +217,7 @@ public abstract class Response {
      * @param status status
      * @return status
      */
-    public Response status(int status) {
+    public Response status(Status status) {
         this.status = status;
         return this;
     }
@@ -351,7 +426,8 @@ public abstract class Response {
                         Optional<URL> url = Config.toURL(file);
                         if (url.isPresent()) {
                             try (InputStream in = url.get().openStream()) {
-                                if (Try.s(() -> in.available() >= 0, e -> false).get()) {
+                                if (!("file".equals(url.get().getProtocol()) && Paths.get(url.get().toURI()).toFile().isDirectory())
+                                        && Try.s(() -> in.available() >= 0, e -> false).get()) {
                                     response.contentType(Tool.getContentType(file),
                                             response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
                                     if (Config.app_format_include_regex.stream().anyMatch(file::matches)
@@ -383,7 +459,7 @@ public abstract class Response {
                                     Tool.getLogger().info(file + " : " + path);
                                     response.setHeader("Location",
                                             Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
-                                            .status(301);
+                                            .status(Status.Moved_Permamently);
                                     out.get();
                                 }
                             }
@@ -392,10 +468,10 @@ public abstract class Response {
 
                         /* no content */
                         if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
-                            response.status(204);
+                            response.status(Status.No_Content);
                         } else {
                             Tool.getLogger().info("not found: " + Tool.trim("/", file, null));
-                            response.status(404);
+                            response.status(Status.Not_Found);
                         }
                         out.get();
                     }), Tuple.of(Template.class, (response, out, cancel) -> {
@@ -426,6 +502,9 @@ public abstract class Response {
                             switch (Tool.splitAt(contentType, "\\s*;", 0)) {
                             case Content.JSON:
                                 Tool.json(response.content, out.get());
+                                break;
+                            case Content.XML:
+                                Tool.xml(response.content, out.get());
                                 break;
                             default:
                                 other.run();

@@ -1,12 +1,15 @@
 package framework;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -20,22 +23,27 @@ public class Reflector {
     /**
      * constructor cache{class, arguments hash : constructor}
      */
-    static Map<Tuple<Class<?>, Integer>, Constructor<?>> constructors = new HashMap<>();
+    static Map<Tuple<Class<?>, Integer>, Constructor<?>> constructors = new ConcurrentHashMap<>();
 
     /**
-     * constructor cache{class, arguments hash : method}
+     * method cache{class, arguments hash : method}
      */
-    static Map<Tuple<Class<?>, Integer>, Method> methods = new HashMap<>();
+    static Map<Tuple<Class<?>, Integer>, Method> methods = new ConcurrentHashMap<>();
 
     /**
-     * constructor cache{class : {field name : field}}
+     * field cache{class : {field name : field}}
      */
-    static Map<Class<?>, Map<String, Field>> fields = new HashMap<>();
+    static Map<Class<?>, Map<String, Field>> fields = new ConcurrentHashMap<>();
 
     /**
-     * constructor cache{class : instance}
+     * mapping field cache{class : {mapping field name : field}}
      */
-    static Map<Class<?>, Object> instances = new HashMap<>();
+    static Map<Class<?>, Map<String, Field>> mappingFields = new ConcurrentHashMap<>();
+
+    /**
+     * instance cache{class : instance}
+     */
+    static Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
     /**
      * @param <T> target type
@@ -111,11 +119,7 @@ public class Reflector {
      * @return field
      */
     public static Optional<Field> field(Class<?> clazz, String name) {
-        return Optional
-                .ofNullable(fields
-                        .computeIfAbsent(clazz,
-                                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Field::getName, f -> f)))
-                        .get(name));
+        return Optional.ofNullable(fields(clazz).get(name));
     }
 
     /**
@@ -124,17 +128,53 @@ public class Reflector {
      */
     public static Map<String, Field> fields(Class<?> clazz) {
         return fields.computeIfAbsent(clazz,
-                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Reflector::mappingName, f -> f)));
+                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Field::getName, f -> f)));
     }
-    
+
+    /**
+     * @param clazz class
+     * @param name field name
+     * @return field
+     */
+    public static Optional<Field> mappingField(Class<?> clazz, String name) {
+        return Optional.ofNullable(mappingFields(clazz).get(name));
+    }
+
+    /**
+     * @param clazz class
+     * @return Stream of field name and instance
+     */
+    public static Map<String, Field> mappingFields(Class<?> clazz) {
+        return mappingFields.computeIfAbsent(clazz,
+                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Reflector::mappingFieldName, f -> f)));
+    }
+
     /**
      * @param field target field
      * @return name
      */
-    public static String mappingName(Field field) {
-        return Optional.ofNullable(field.getAnnotation(Mapping.class)).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
+    public static String mappingFieldName(Field field) {
+        return Mapping.FIELD.apply(field).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
     }
-    
+
+    /**
+     * @param clazz instance or class
+     * @return table name
+     */
+    public static String mappingClassName(Object clazz) {
+        Class<?> start = clazz instanceof Class ? (Class<?>) clazz : clazz.getClass();
+        for (Class<?> c = start; c != Object.class; c = c.getSuperclass()) {
+            Mapping name = c.getAnnotation(Mapping.class);
+            if (name != null) {
+                String value = name.value();
+                if (Tool.string(value).isPresent()) {
+                    return value;
+                }
+            }
+        }
+        return start.getSimpleName().toLowerCase();
+    }
+
     /**
      * @param clazz class
      * @param name name
@@ -151,5 +191,22 @@ public class Reflector {
         } catch (RuntimeException e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * @param <T> Annotation type
+     * @param annotationClass annotation class
+     * @return field to annotation function
+     */
+    public static <T extends Annotation> Function<Field, Optional<T>> annotation(Class<T> annotationClass) {
+        return field -> Optional.ofNullable(field.getAnnotation(annotationClass));
+    }
+
+    /**
+     * @param annotationClass annotation class
+     * @return predicate
+     */
+    public static Predicate<Field> hasAnnotation(Class<? extends Annotation> annotationClass) {
+        return field -> field.getAnnotation(annotationClass) != null;
     }
 }

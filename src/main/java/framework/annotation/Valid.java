@@ -19,36 +19,36 @@ public @interface Valid {
     /**
      * default group
      */
-    public interface All {
+    interface All {
     }
 
     /**
      * group for creation
      */
-    public interface Create extends All {
+    interface Create extends All {
     }
 
     /**
      * group for read
      */
-    public interface Read extends All {
+    interface Read extends All {
     }
 
     /**
      * group for update
      */
-    public interface Update extends All {
+    interface Update extends All {
     }
 
     /**
      * group for deletion
      */
-    public interface Delete extends All {
+    interface Delete extends All {
     }
 
     /**
      * group for creation &amp; update
      */
-    public interface Save extends Create, Update {
+    interface Save extends Create, Update {
     }
 }

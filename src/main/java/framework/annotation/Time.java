@@ -34,7 +34,7 @@ public @interface Time {
     /**
      * unit
      */
-    public enum Unit {
+    enum Unit {
         /**
          * hours
          */

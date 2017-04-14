@@ -47,20 +47,21 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Object db_settings(Db db, Optional<String> sql) throws SQLException {
+    Object sql(Db db, Optional<String> sql) throws SQLException {
         return new Response.Template("table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
             }
             AtomicInteger columns = new AtomicInteger(-1);
-            db.query(sql.orElse(db.getBuilder().getVariablesSql()), null).forEach(Try.c(rs -> {
+            long rows = db.query(sql.orElseGet(() -> db.getSQL("system.variables.sql").get()), null).peek(Try.c(rs -> {
                 if (columns.compareAndSet(-1, 0)) {
                     ResultSetMetaData meta = rs.getMetaData();
                     columns.set(meta.getColumnCount());
                     out.println(new Xml("tr").child("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
                 }
                 out.println(new Xml("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
-            }));
+            })).count();
+            out.printf("<caption>%d rows %d columns</caption>", rows, columns.get());
         });
     }
 

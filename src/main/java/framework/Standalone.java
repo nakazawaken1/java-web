@@ -864,13 +864,13 @@ public class Standalone {
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));
                 }
-                exchange.sendResponseHeaders(status, contentLength);
+                exchange.sendResponseHeaders(status.code, contentLength);
             };
             if (content == null) {
                 Try.c(action).accept(-1L);
             } else {
                 writeBody.accept(Try.s(() -> {
-                    action.accept(Tool.getFirstValue(headers, "Content-Length").flatMap(Tool::longInteger).orElse(0L));
+                    action.accept(headers == null ? 0L : Tool.getFirstValue(headers, "Content-Length").flatMap(Tool::longInteger).orElse(0L));
                     return exchange.getResponseBody();
                 }));
             }

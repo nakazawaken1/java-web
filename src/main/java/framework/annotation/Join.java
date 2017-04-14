@@ -11,33 +11,34 @@ import java.util.function.Function;
 import framework.Reflector;
 
 /**
- * length limitation
+ * database mapping
  */
-@Target({ ElementType.PARAMETER, ElementType.FIELD })
+@Target({ ElementType.FIELD, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Size {
-    /**
-     * @return apply groups
-     */
-    Class<? extends Valid.All>[] groups() default {};
+public @interface Join {
 
     /**
-     * @return minimum length
+     * @return relation table
      */
-    int min() default 1;
+    String table() default "";
 
     /**
-     * @return maximum length
+     * @return from column(:ralation column)
      */
-    int value();
+    String[] from() default {};
 
     /**
-     * @return length is character count if empty, else byte count
+     * @return to column(:ralation column)
      */
-    String charset() default "";
+    String[] to() default {};
+
+    /**
+     * @return where(join by and)
+     */
+    String[] value() default {};
 
     /**
      * field annotation getter
      */
-    Function<Field, Optional<Size>> FIELD = Reflector.annotation(Size.class);
+    Function<Field, Optional<Join>> FIELD = Reflector.annotation(Join.class);
 }

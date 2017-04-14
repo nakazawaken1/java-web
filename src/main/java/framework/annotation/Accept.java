@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * accept type
  */
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target({ ElementType.METHOD, ElementType.TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Accept {
 
@@ -16,12 +16,12 @@ public @interface Accept {
      * @return accept mime type at request
      */
     String[] value() default {};
-    
+
     /**
      * application/x-www-form-urlencoded
      */
     String FORM = "application/x-www-form-urlencoded";
-    
+
     /**
      * multipart/form-data
      */

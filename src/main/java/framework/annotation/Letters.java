@@ -29,25 +29,60 @@ public @interface Letters {
     /**
      * 0 - 9
      */
-    static final String DIGITS = "0123456789";
+    String DIGITS = "0123456789";
 
     /**
      * 0 - 9 &amp; sign
      */
-    static final String INTEGER = "0123456789+-";
+    String INTEGER = "0123456789+-";
 
     /**
      * 0 - 9 &amp; sign &amp; period
      */
-    static final String REAL = "0123456789+-.";
+    String REAL = "0123456789+-.";
+
+    /**
+     * Carriage Return
+     */
+    String CR = "\r";
+
+    /**
+     * Line Feed
+     */
+    String LF = "\n";
+
+    /**
+     * Carriage Return and Line Feed
+     */
+    String CRLF = CR + LF;
+
+    /**
+     * mark characters
+     */
+    String MARKS = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
+    /**
+     * Upper case alphabet characters
+     */
+    String ALPHABET_UPPERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    /**
+     * Lower case alphabet characters
+     */
+    String ALPHABET_LOWERS = "abcdefghijklmnopqrstuvwxyz";
+
+    /**
+     * alphabet characters
+     */
+    String ALPHABETS = ALPHABET_UPPERS + ALPHABET_LOWERS;
 
     /**
      * katakana &amp; middle point &amp; space
      */
-    static final String KATAKANA = "アイウエオヴァィゥェォカキクケコガギグゲゴサシスセソザジズゼゾタチツテトダヂヅデドナニヌネノハヒフヘホバビブベボパピプペポマミムメモヤユヨャュョラリルレロワヲンヮー・　";
+    String KATAKANA = "アイウエオヴァィゥェォカキクケコガギグゲゴサシスセソザジズゼゾタチツテトダヂヅデドナニヌネノハヒフヘホバビブベボパピプペポマミムメモヤユヨャュョラリルレロワヲンヮー・　";
 
     /**
      * hiragana &amp; middle point &amp; space
      */
-    static final String HIRAGANA = "あいうえおぁぃぅぇぉかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよゃゅょらりるれろわをんゎー・　";
+    String HIRAGANA = "あいうえおぁぃぅぇぉかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよゃゅょらりるれろわをんゎー・　";
 }

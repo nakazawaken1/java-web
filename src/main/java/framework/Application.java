@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,6 +20,7 @@ import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
+import framework.Response.Status;
 import framework.annotation.Content;
 import framework.annotation.Job;
 import framework.annotation.Only;
@@ -58,8 +60,9 @@ public abstract class Application implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "real path: " + Tool.val(Config.toURL("framework").get().toString(), s -> s.substring(0, s.length() - "framework".length())) + ", context path: "
-                + getContextPath();
+        return "real path: "
+                + Tool.val(Tool.trim(null, Config.toURL("framework").get().toString(), "/"), s -> s.substring(0, s.length() - "framework".length()))
+                + ", context path: " + getContextPath();
     }
 
     /**
@@ -93,6 +96,8 @@ public abstract class Application implements Attributes<Object> {
         if (table == null) {
             table = new TreeMap<>();
             Config.app_controller_packages.stream().forEach(p -> {
+                Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(p.replace('.', '/')))
+                        .forEach(url -> Tool.getLogger().info("url: " + url));
                 try (Stream<Class<?>> cs = Tool.getClasses(p)) {
                     cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
                             .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
@@ -131,7 +136,7 @@ public abstract class Application implements Attributes<Object> {
     void shutdown() {
         try {
             Job.Scheduler.shutdown();
-            Db.cleanup();
+            Db.shutdown();
             Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver));
         } catch (Exception e) {
             Tool.getLogger().log(Level.WARNING, "destroy error", e);
@@ -149,22 +154,24 @@ public abstract class Application implements Attributes<Object> {
         Tool.getLogger().info(request.toString());
 
         /* no slash root access */
-        if (request.getPath() == null) {
-            Response.redirect(getContextPath(), 301).flush();
+        final String path = request.getPath();
+        if (path == null) {
+            Response.redirect(getContextPath(), Status.Moved_Permamently).flush();
             return;
         }
 
         /* action */
         Optional<String> mime;
-        String action = request.getPath();
-        int index = action.lastIndexOf('.');
-        if (index >= 0 && index + 5 >= action.length()) {
-            mime = Optional.ofNullable(Tool.getContentType(action));
-            action = action.substring(0, index);
+        final String action;
+        int index = path.lastIndexOf('.');
+        if (index >= 0 && index + 5 >= path.length()) {
+            mime = Optional.ofNullable(Tool.getContentType(path));
+            action = path.substring(0, index);
         } else {
             mime = Optional.empty();
+            action = path;
         }
-        Tuple<Class<?>, Method> pair = table.get(action);
+        final Tuple<Class<?>, Method> pair = table.get(action);
         if (pair != null) {
             do {
                 Method method = pair.r;
@@ -204,7 +211,7 @@ public abstract class Application implements Attributes<Object> {
                                             types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
                                 }).toArray());
                         if (response instanceof Response) {
-                            ((Response) response).flush();
+                            Tool.peek((Response) response, r -> r.charset.orElseGet(() -> Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null)).flush();
                         } else {
                             Content content = method.getAnnotation(Content.class);
                             String[] accept = request.getHeaders().get("accept").stream()
@@ -214,9 +221,10 @@ public abstract class Application implements Attributes<Object> {
                                 mime = content == null ? Stream.of(accept).findFirst()
                                         : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
                             }
-                            Tool.ifPresentOr(mime, m -> Response.of(response).contentType(m).flush(), () -> {
-                                throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
-                            });
+                            Tool.ifPresentOr(mime, m -> Response.of(response).contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null).flush(),
+                                    () -> {
+                                        throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
+                                    });
                         }
                         return;
                     } catch (InvocationTargetException e) {
@@ -235,6 +243,6 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* static file */
-        Response.file(request.getPath()).flush();
+        Response.file(path).flush();
     }
 }

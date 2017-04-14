@@ -397,7 +397,7 @@ public class ServletImpl implements javax.servlet.Servlet {
                     headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
                 }
                 charset.ifPresent(c -> response.setCharacterEncoding(c.name()));
-                response.setStatus(status);
+                response.setStatus(status.code);
             };
             if (content == null) {
                 action.run();

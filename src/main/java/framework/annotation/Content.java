@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * content type
  */
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target({ ElementType.METHOD, ElementType.TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Content {
 
@@ -26,7 +26,7 @@ public @interface Content {
      * text/html
      */
     String HTML = "text/html";
-    
+
     /**
      * application/xhtml+xml
      */
@@ -81,32 +81,32 @@ public @interface Content {
      * video/mpeg
      */
     String MPEG = "video/mpeg";
-    
+
     /**
      * application/octet-stream
      */
     String OCTET = "application/octet-stream";
-    
+
     /**
      * application/vnd.ms-excel
      */
     String XLS = "application/vnd.ms-excel";
-    
+
     /**
      * application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
      */
     String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    
+
     /**
      * application/vnd.ms-excel.sheet.macroenabled.12
      */
     String XLSM = "application/vnd.ms-excel.sheet.macroenabled.12";
-    
+
     /**
      * application/msword
      */
     String DOC = "application/msword";
-    
+
     /**
      * application/vnd.openxmlformats-officedocument.wordprocessingml.document
      */

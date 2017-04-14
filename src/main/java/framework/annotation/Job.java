@@ -67,7 +67,6 @@ public @interface Job {
          * @param classes target class
          */
         public static void setup(Class<?>... classes) {
-            Logger logger = Tool.getLogger();
             ZonedDateTime now = ZonedDateTime.now();
             for (Class<?> c : classes) {
                 Stream.of(c.getDeclaredMethods()).map(method -> Tuple.of(method, method.getAnnotation(Job.class))).filter(pair -> pair.r != null)
@@ -78,44 +77,43 @@ public @interface Job {
                                         if (scheduler.get() == null) {
                                             int n = Config.app_job_threads.integer();
                                             scheduler.set(Executors.newScheduledThreadPool(n));
-                                            logger.info(n + " job threads created");
+                                            Tool.getLogger().info(n + " job threads created");
                                         }
                                         String name = c.getName() + '.' + method.getName();
                                         long first = Tool.nextMillis(text, now);
                                         ZonedDateTime firstStart = now.plus(first, ChronoUnit.MILLIS);
-                                        logger.info(name + " : job next start at " + firstStart);
+                                        Tool.getLogger().info(name + " : job next start at " + firstStart);
                                         scheduler.get().schedule(new Runnable() {
                                             ZonedDateTime start = firstStart;
 
                                             @Override
                                             public void run() {
+                                                Logger logger = Tool.getLogger();
                                                 logger.info(name + " : job start - " + start);
                                                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-                                                    try {
-                                                        method.setAccessible(true);
-                                                        method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(c),
-                                                                Stream.of(method.getParameters()).map(p -> {
-                                                                    Class<?> type = p.getType();
-                                                                    if (type == ZonedDateTime.class) {
-                                                                        return start;
-                                                                    }
-                                                                    if (type == LocalDateTime.class) {
-                                                                        return start.toLocalDateTime();
-                                                                    }
-                                                                    if (type == OffsetDateTime.class) {
-                                                                        return start.toOffsetDateTime();
-                                                                    }
-                                                                    if (type == Date.class) {
-                                                                        return Date.from(start.toInstant());
-                                                                    }
-                                                                    if (Db.class.isAssignableFrom(type)) {
-                                                                        return db.get();
-                                                                    }
-                                                                    return null;
-                                                                }).toArray());
-                                                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                                                        logger.log(Level.WARNING, name + " : job error", e);
-                                                    }
+                                                    method.setAccessible(true);
+                                                    method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(c),
+                                                            Stream.of(method.getParameters()).map(p -> {
+                                                                Class<?> type = p.getType();
+                                                                if (type == ZonedDateTime.class) {
+                                                                    return start;
+                                                                }
+                                                                if (type == LocalDateTime.class) {
+                                                                    return start.toLocalDateTime();
+                                                                }
+                                                                if (type == OffsetDateTime.class) {
+                                                                    return start.toOffsetDateTime();
+                                                                }
+                                                                if (type == Date.class) {
+                                                                    return Date.from(start.toInstant());
+                                                                }
+                                                                if (Db.class.isAssignableFrom(type)) {
+                                                                    return db.get();
+                                                                }
+                                                                return null;
+                                                            }).toArray());
+                                                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                                                    logger.log(Level.WARNING, name + " : job error", e);
                                                 }
                                                 ZonedDateTime end = ZonedDateTime.now();
                                                 logger.info(name + " : job end - " + end + " (" + Duration.between(start, end) + ")");

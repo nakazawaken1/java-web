@@ -413,6 +413,15 @@ public enum Config {
     }
 
     /**
+     * @param relativePath relative path
+     * @return url
+     */
+    public static Stream<URL> toURLs(String... relativePath) {
+        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
+        return Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(path));
+    }
+
+    /**
      * get config value
      *
      * @return config value
@@ -587,8 +596,7 @@ public enum Config {
      */
     public static void printDefault(PrintWriter writer) {
         Stream.of(Config.values()).sorted((a, b) -> a.toString().compareToIgnoreCase(b.toString())).forEach(Try.c(i -> {
-            Optional.ofNullable(i.getClass().getField(i.name()).getAnnotation(Help.class)).map(Help::value).map(Stream::of).orElse(Stream.empty())
-                    .map(j -> "# " + j).forEach(writer::println);
+            Help.FIELD.apply(i.getClass().getField(i.name())).map(Help::value).map(Stream::of).orElse(Stream.empty()).map(j -> "# " + j).forEach(writer::println);
             writer.println(i.toString() + " = " + i.defaultValue.replace("\\", "\\\\"));
             writer.println();
         }));
@@ -602,8 +610,8 @@ public enum Config {
     public static void printCurrent(PrintWriter writer) {
         properties.entrySet().stream().sorted((a, b) -> ((String) a.getKey()).compareToIgnoreCase((String) b.getKey())).forEach(i -> {
             try {
-                Optional.ofNullable(Config.class.getField(((String) i.getKey()).replace('.', '_')).getAnnotation(Help.class)).map(Help::value).map(Stream::of)
-                        .orElse(Stream.empty()).map(j -> "# " + j).forEach(writer::println);
+                Help.FIELD.apply(Config.class.getField(((String) i.getKey()).replace('.', '_'))).map(Help::value).map(Stream::of).orElse(Stream.empty())
+                        .map(j -> "# " + j).forEach(writer::println);
             } catch (NoSuchFieldException | SecurityException e) {
                 logger.info(i.toString());
             }
