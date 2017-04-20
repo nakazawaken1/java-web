@@ -1,0 +1,126 @@
+<script type="text/javascript">
+window.onload = function() {
+  document.getElementById('spacer').style.height = document.getElementById('menu').clientHeight; 
+}
+</script>
+
+<style type="text/css">
+body, table, form {
+  padding: 0;
+  margin: 0;
+}
+
+table {
+  border-collapse: collapse;
+  border: 1px solid #e2e2e2;
+  table-layout: fixed;
+}
+
+table.full {
+  width: 100%;
+  min-width: 966px;
+}
+
+#menu {
+  padding: 4px;
+  background-color: #ffffee;
+  width: 100%;
+  position: fixed;
+}
+
+.left {
+  float: left;
+}
+.legend {
+  margin: 0 10px 0 auto;
+}
+.legend td {
+  padding: 3px;
+  border: 1px solid #999;
+}
+
+td {
+  word-break: break-all;
+}
+
+th {
+  border: 1px solid #e2e2e2;
+  font-weight: normal;
+}
+
+tr.header th {
+  text-align: center;
+  background-color: #eee;
+}
+
+th, td {
+  font-family: monospace;
+  font-size: 10pt;
+}
+
+tr.equal th, tr.change th, tr.insert th, tr.delete th, tr.skip th {
+  text-align: right;
+  color: #999;
+  background-color: #eee;
+}
+
+tr.skip th, tr.skip td {
+  text-align: center;
+  color: #999;
+  background-color: #eee;
+}
+
+tr.change th, tr.change td, td.g {
+  background-color: #e2ffe2;
+  color: #090;
+}
+
+tr.insert th, tr.insert td, td.b {
+  background-color: #e2e2ff;
+  color: #009;
+}
+
+tr.delete th, tr.delete td, td.r {
+  background-color: #ffe2e2;
+  color: #900;
+}
+
+b {
+  font-weight: normal;
+  background-color: #99ff99;
+  color: #009900;
+}
+
+.header th:not(.index) {
+width: 48%;
+}
+
+.header th.index {
+  width: 2%;
+}
+</style>
+
+<div id="menu">
+  <form method="post" class="left">
+    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${M[isFull ? 'diff.compact' : 'diff.full']}" /> <input type="submit" value="{back}" />
+  </form>
+
+  <table class="legend">
+    <tr>
+      <td class="g">{update}</td>
+      <td class="b">{insert}</td>
+      <td class="r">{delete}</td>
+    </tr>
+  </table>
+</div>
+<div id="spacer">
+</div>
+<table class="full">
+  <tr class="header">
+    <th class="index">{index}</th>
+    <th>{before}</th>
+    <th class="index">{index}</th>
+    <th>{after}</th>
+  </tr>
+  <!--{F:includeFor('parts/diff.html', diffs)}-->
+</table>

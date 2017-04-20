@@ -213,5 +213,10 @@
       <version>3.0.1</version>
       <scope>provided</scope>
     </dependency>
+    <dependency><!-- diff -->
+      <groupId>com.googlecode.java-diff-utils</groupId>
+      <artifactId>diffutils</artifactId>
+      <version>1.3.0</version>
+    </dependency>
   </dependencies>
 </project>

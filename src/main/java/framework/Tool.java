@@ -203,9 +203,18 @@ public class Tool {
     @SafeVarargs
     public static String dump(Object o, Set<Object>... hashes) {
         final Set<Object> cache = hashes.length > 0 ? hashes[0] : new HashSet<>();
+        if (o instanceof Iterable) {
+            StringBuilder s = new StringBuilder();
+            String separator = "\n,\n";
+            for (Object i : (Iterable<?>) o) {
+                s.append(separator).append(dump(i));
+            }
+            return "[\n" + s.substring(separator.length()) + "\n]";
+        }
         return Stream.of(o.getClass().getDeclaredFields()).map(field -> {
             String value = "null";
             try {
+                field.setAccessible(true);
                 Object object = field.get(o);
                 if (object != null) {
                     if (object.getClass().getMethod("toString").getDeclaringClass() != Object.class) {
@@ -1273,7 +1282,9 @@ public class Tool {
      * @return value
      */
     public static <T> T peek(T value, Consumer<T> consumer) {
-        consumer.accept(value);
+        if (consumer != null) {
+            consumer.accept(value);
+        }
         return value;
     }
 
@@ -1388,5 +1399,13 @@ public class Tool {
             return "";
         }
         return path.substring(index);
+    }
+
+    /**
+     * @param text text
+     * @return Character array
+     */
+    public static Character[] toCharacterArray(String text) {
+        return text.chars().mapToObj(j -> Character.valueOf((char) j)).toArray(Character[]::new);
     }
 }

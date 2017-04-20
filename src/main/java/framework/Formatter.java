@@ -54,6 +54,11 @@ public class Formatter implements AutoCloseable {
     int lastIndex;
 
     /**
+     * cache enabled
+     */
+    boolean isCache = true;
+
+    /**
      * index of {
      */
     Deque<Integer> braces = new LinkedList<>();
@@ -442,7 +447,34 @@ public class Formatter implements AutoCloseable {
      */
     public static String include(String path) {
         try {
-            return current.get().copy().format(Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream()));
+            Formatter formatter = current.get().copy();
+            boolean backup = formatter.isCache;
+            formatter.isCache = false;
+            return Tool.peek(formatter.format(Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream())),
+                    s -> formatter.isCache = backup);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @param path include file path
+     * @param list list
+     * @return content
+     */
+    public static String includeFor(String path, Iterable<?> list) {
+        try {
+            String text = Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream());
+            Formatter formatter = current.get().copy();
+            StringBuilder s = new StringBuilder();
+            boolean backup = formatter.isCache;
+            formatter.isCache = false;
+            list.forEach(i -> {
+                formatter.el.setValue("I", i);
+                s.append(formatter.format(text));
+            });
+            formatter.isCache = backup;
+            return s.toString();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -455,7 +487,7 @@ public class Formatter implements AutoCloseable {
      * @return result
      */
     String eval(String expression, int prefix, int suffix) {
-        return cache.computeIfAbsent(expression, s -> {
+        Function<String, String> get = s -> {
             boolean isEl = !(s.startsWith("{") && prefix == 1);
             boolean isEscape = !isEl || s.startsWith("${") && prefix == 2;
             BiFunction<Object, String, String> getResult = (result, type) -> {
@@ -532,9 +564,10 @@ public class Formatter implements AutoCloseable {
                                 Objects.requireNonNull(context);
                                 try {
                                     if (base != null && property instanceof String) {
+                                        Class<?> clazz = base.getClass();
                                         Method method;
                                         try {
-                                            method = new PropertyDescriptor((String) property, base.getClass()).getReadMethod();
+                                            method = new PropertyDescriptor((String) property, clazz).getReadMethod();
                                         } catch (IntrospectionException e) {
                                             method = null;
                                         }
@@ -542,7 +575,8 @@ public class Formatter implements AutoCloseable {
                                         if (method != null) {
                                             value = method.invoke(base);
                                         } else {
-                                            value = base.getClass().getDeclaredField((String) property).get(base);
+                                            value = Reflector.field(clazz, (String) property).map(Try.f(f -> f.get(base)))
+                                                    .orElseThrow(() -> new NoSuchFieldException(clazz.getSimpleName() + "." + property));
                                         }
                                         context.setPropertyResolved(true);
                                         return value;
@@ -591,6 +625,7 @@ public class Formatter implements AutoCloseable {
                         });
                         el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
+                        el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
                         el.defineBean("C", Config.properties);
                         el.defineBean("M", Message.messages);
                         el.defineBean("V", values == null ? new Object[] {} : values);
@@ -632,7 +667,8 @@ public class Formatter implements AutoCloseable {
                 }
             }
             return s;
-        });
+        };
+        return isCache ? cache.computeIfAbsent(expression, get) : Optional.ofNullable(cache.get(expression)).orElseGet(() -> get.apply(expression));
     }
 
     @Override
