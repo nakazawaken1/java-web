@@ -179,7 +179,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         SessionImpl(HttpSession session) {
             this.session = session;
-            session.setMaxInactiveInterval(Config.app_session_timeout_minutes.integer() * 60);
+            session.setMaxInactiveInterval(Sys.session_timeout_minutes * 60);
         }
 
         /*
@@ -392,7 +392,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
             HttpServletResponse response = ((RequestImpl) Request.current().get()).servletResponse;
             Runnable action = () -> {
-                Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> response.setHeader(i[0], i[1]));
+                Sys.headers.forEach((key, value) -> response.setHeader(key, value));
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
                 }

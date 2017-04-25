@@ -19,12 +19,13 @@ import java.util.logging.Level;
 import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import framework.Db.Setup;
 import framework.Response.Status;
 import framework.annotation.Content;
 import framework.annotation.Job;
+import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Route;
+import framework.annotation.Config.Injector;
 
 /**
  * application scoped object
@@ -61,7 +62,7 @@ public abstract class Application implements Attributes<Object> {
     @Override
     public String toString() {
         return "real path: "
-                + Tool.val(Tool.trim(null, Config.toURL("framework").get().toString(), "/"), s -> s.substring(0, s.length() - "framework".length()))
+                + Tool.val(Tool.trim(null, Tool.toURL("framework").get().toString(), "/"), s -> s.substring(0, s.length() - "framework".length()))
                 + ", context path: " + getContextPath();
     }
 
@@ -82,8 +83,9 @@ public abstract class Application implements Attributes<Object> {
             throw new InternalError(e);
         }
 
-        /* log setup */
-        Config.startupLog();
+        Sys.properties.putAll(Injector.inject(Sys.class));
+        LogHandler.startupLog();
+        Tool.getLogger().info("---- setting ----" + String.join(Letters.CRLF, Injector.dump(Sys.class, true)));
 
         Tool.getLogger().info(Application.current().get().toString());
 
@@ -95,7 +97,7 @@ public abstract class Application implements Attributes<Object> {
         /* setup routing */
         if (table == null) {
             table = new TreeMap<>();
-            Config.app_controller_packages.stream().forEach(p -> {
+            Sys.controller_packages.stream().forEach(p -> {
                 Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(p.replace('.', '/')))
                         .forEach(url -> Tool.getLogger().info("url: " + url));
                 try (Stream<Class<?>> cs = Tool.getClasses(p)) {
@@ -118,11 +120,11 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* database setup */
-        Db.setup(Config.db_setup.enumOf(Setup.class));
+        Db.setup(Sys.Db.setup);
 
         /* job scheduler setup */
         List<Class<?>> cs = new ArrayList<>();
-        Config.app_job_packages.stream().forEach(p -> {
+        Sys.job_packages.stream().forEach(p -> {
             try (Stream<Class<?>> classes = Tool.getClasses(p)) {
                 classes.forEach(cs::add);
             }
@@ -141,7 +143,7 @@ public abstract class Application implements Attributes<Object> {
         } catch (Exception e) {
             Tool.getLogger().log(Level.WARNING, "destroy error", e);
         }
-        Config.shutdownLog();
+        LogHandler.shutdownLog();
     }
 
     /**
@@ -185,7 +187,7 @@ public abstract class Application implements Attributes<Object> {
                     forbidden = !session.get().getAccount().hasAnyRole(only.value());
                 }
                 if (forbidden) {
-                    session.get().setAttr("alert", Message.alert_forbidden);
+                    session.get().setAttr("alert", Sys.Alert.forbidden);
                     Response.redirect(getContextPath()).flush();
                     return;
                 }

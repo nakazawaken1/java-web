@@ -28,6 +28,8 @@ import javax.el.ELProcessor;
 import javax.el.ELResolver;
 import javax.el.PropertyNotWritableException;
 
+import framework.annotation.Config;
+
 /**
  * formatter with el, config, message
  */
@@ -450,7 +452,7 @@ public class Formatter implements AutoCloseable {
             Formatter formatter = current.get().copy();
             boolean backup = formatter.isCache;
             formatter.isCache = false;
-            return Tool.peek(formatter.format(Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream())),
+            return Tool.peek(formatter.format(Tool.loadText(Tool.toURL(path).orElseThrow(FileNotFoundException::new).openStream())),
                     s -> formatter.isCache = backup);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -464,7 +466,7 @@ public class Formatter implements AutoCloseable {
      */
     public static String includeFor(String path, Iterable<?> list) {
         try {
-            String text = Tool.loadText(Config.toURL(path).orElseThrow(FileNotFoundException::new).openStream());
+            String text = Tool.loadText(Tool.toURL(path).orElseThrow(FileNotFoundException::new).openStream());
             Formatter formatter = current.get().copy();
             StringBuilder s = new StringBuilder();
             boolean backup = formatter.isCache;
@@ -626,8 +628,7 @@ public class Formatter implements AutoCloseable {
                         el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
                         el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
-                        el.defineBean("C", Config.properties);
-                        el.defineBean("M", Message.messages);
+                        el.defineBean("C", Sys.properties);
                         el.defineBean("V", values == null ? new Object[] {} : values);
                         el.defineBean("A", Application.current().orElse(null));
                         el.defineBean("S", Session.current().orElse(null));
@@ -660,7 +661,7 @@ public class Formatter implements AutoCloseable {
                 if (hasParameter) {
                     key = keys[0];
                 }
-                Optional<String> message = Message.find(key);
+                Optional<String> message = Config.Injector.get(key);
                 if (message.isPresent()) {
                     return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
                             "message");

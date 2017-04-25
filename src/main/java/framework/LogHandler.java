@@ -15,10 +15,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.ErrorManager;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
  * log handler
@@ -52,18 +55,11 @@ public class LogHandler extends Handler {
      * constructor
      * 
      * @param folder output folder
-     * @param filePattern log file pattern (DateTimeFormatter format, ll replace to log level, able to include folder)
+     * @param formatter log file formatter (DateTimeFormatter format, ll replace to log level, able to include folder)
      */
-    public LogHandler(String folder, String filePattern) {
+    public LogHandler(String folder, DateTimeFormatter formatter) {
         outMap = new ConcurrentHashMap<>();
         this.folder = folder;
-        DateTimeFormatter formatter;
-        try {
-            formatter = DateTimeFormatter.ofPattern(filePattern);
-        } catch (Exception e) {
-            reportError(null, e, ErrorManager.FORMAT_FAILURE);
-            formatter = DateTimeFormatter.ofPattern("yyyy-MM-ddTHH:mm:ss.SSS");
-        }
         this.formatter = formatter;
     }
 
@@ -145,6 +141,63 @@ public class LogHandler extends Handler {
                 i.remove();
             } catch (Exception e) {
                 reportError(null, e, ErrorManager.CLOSE_FAILURE);
+            }
+        }
+    }
+
+    /**
+     * for initialize
+     */
+    private static final AtomicBoolean first = new AtomicBoolean(true);
+
+    /**
+     * log handler
+     */
+    private static volatile Handler handler;
+
+    /**
+     * log initialize
+     */
+    public static void startupLog() {
+        try {
+            Sys.Log.exclude.stream().forEach(i -> Logger.getLogger(i).setLevel(Level.SEVERE));
+            Logger root = Logger.getLogger("");
+            Level level = Sys.Log.level;
+            root.setLevel(level);
+            boolean noEntry = true;
+            for (Handler i : root.getHandlers()) {
+                if (i instanceof ConsoleHandler && !(i.getFormatter() instanceof LogFormatter)) {
+                    i.setFormatter(new LogFormatter(Sys.Log.format));
+                    i.setLevel(level);
+                }
+                if (i instanceof LogHandler) {
+                    noEntry = false;
+                }
+            }
+            if (noEntry) {
+                if (first.compareAndSet(true, false)) {
+                    handler = new LogHandler(Sys.Log.folder, Sys.Log.file_pattern);
+                    handler.setLevel(level);
+                    handler.setFormatter(new LogFormatter(Sys.Log.format));
+                }
+                root.addHandler(handler);
+                Logger.getGlobal().config("addHandler: " + handler);
+            }
+        } catch (Throwable e) {
+            Logger.getGlobal().log(Level.WARNING, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * log finalize
+     */
+    public static void shutdownLog() {
+        Logger root = Logger.getLogger("");
+        for (Handler i : root.getHandlers()) {
+            if (i instanceof LogHandler) {
+                Logger.getGlobal().config("removeHandler: " + i);
+                i.close();
+                root.removeHandler(i);
             }
         }
     }

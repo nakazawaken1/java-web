@@ -103,7 +103,7 @@ public class Account implements Serializable {
      * @return account or empty if login failed
      */
     public static Optional<Account> loginWithConfig(String loginId, String password) {
-        return Config.app_accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst()
+        return Sys.accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst()
                 .map(a -> new Account(loginId, a[2], Tool.string(a[3]).map(User::fromString).map(Tool::array).orElse(Tool.array())));
     }
 

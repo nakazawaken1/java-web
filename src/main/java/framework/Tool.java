@@ -99,6 +99,24 @@ public class Tool {
     public static final Predicate<String> notEmpty = ((Predicate<String>) String::isEmpty).negate();
 
     /**
+     * @param relativePath relative path
+     * @return url
+     */
+    public static Optional<URL> toURL(String... relativePath) {
+        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
+        return Optional.ofNullable(Thread.currentThread().getContextClassLoader().getResource(path));
+    }
+
+    /**
+     * @param relativePath relative path
+     * @return url
+     */
+    public static Stream<URL> toURLs(String... relativePath) {
+        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
+        return Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(path));
+    }
+
+    /**
      * PrintStream to String
      *
      * @param action write to PrintStream
@@ -351,7 +369,7 @@ public class Tool {
      */
     public static boolean isTextContent(String file) {
         String lower = file.toLowerCase();
-        return Config.app_text_extensions.stream().anyMatch(lower::endsWith);
+        return Sys.text_extensions.stream().anyMatch(lower::endsWith);
     }
 
     /**
@@ -401,7 +419,7 @@ public class Tool {
      * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
-        return Config.toURLs(location).flatMap(Try.f(i -> {
+        return Tool.toURLs(location).flatMap(Try.f(i -> {
             boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
             if ("jar".equals(i.getProtocol())) {
                 return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
@@ -1345,7 +1363,7 @@ public class Tool {
      * @return cut text
      */
     public static String cutLog(String text) {
-        int max = Config.app_eval_log_max_letters.integer();
+        int max = Sys.eval_log_max_letters;
         return Optional.ofNullable(text).map(i -> {
             boolean suffix = false;
             int index = i.indexOf('\r');

@@ -1,13 +1,13 @@
 <form method="post">
   <table style="width: 100%">
     <tr>
-      <th>{before}</th>
-      <th>{after}</th>
+      <th>{sys.item.before}</th>
+      <th>{sys.item.after}</th>
     </tr>
     <tr>
       <td><textarea name="before" rows="50" style="width: 100%">${S.before}</textarea></td>
       <td><textarea name="after" rows="50" style="width: 100%">${S.after}</textarea></td>
     </tr>
   </table>
-  <input type="submit" value="{diff}" />
+  <input type="submit" value="{sys.item.diff}" />
 </form>

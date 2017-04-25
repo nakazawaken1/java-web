@@ -22,10 +22,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import framework.Config;
 import framework.Db;
 import framework.Lazy;
 import framework.Reflector;
+import framework.Sys;
 import framework.Tool;
 import framework.Tuple;
 
@@ -73,9 +73,9 @@ public @interface Job {
                         .forEach(pair -> {
                             Method method = pair.l;
                             Stream.of(pair.r.value().split("\\s*,\\s*")).filter(Tool.notEmpty)
-                                    .<String>map(j -> j.startsWith("job.") ? Config.find(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
+                                    .<String>map(j -> j.startsWith("job.") ? Config.Injector.<String>get(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
                                         if (scheduler.get() == null) {
-                                            int n = Config.app_job_threads.integer();
+                                            int n = Sys.job_threads;
                                             scheduler.set(Executors.newScheduledThreadPool(n));
                                             Tool.getLogger().info(n + " job threads created");
                                         }

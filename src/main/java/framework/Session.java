@@ -52,7 +52,7 @@ public abstract class Session implements Attributes<Serializable> {
      */
     public boolean login(String loginId, String password) {
         Optional<Account> a = Try
-                .s(() -> Tool.<Optional<Account>>invoke(Config.app_login_method.text(), Tool.array(String.class, String.class), loginId, password), e -> {
+                .s(() -> Tool.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
                     Tool.getLogger().warning(Tool.print(e::printStackTrace));
                     return Optional.<Account>empty();
                 }).get();

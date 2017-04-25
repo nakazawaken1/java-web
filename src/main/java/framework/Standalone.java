@@ -85,7 +85,7 @@ public class Standalone {
     public static void main(String[] args) {
 
         // setup
-        String contextPath = Config.app_context_path.text();
+        String contextPath = Sys.context_path;
         new ApplicationImpl(contextPath).setup(ResponseImpl::new);
         Logger logger = Tool.getLogger();
         Executor executor = Executors.newWorkStealingPool();
@@ -106,47 +106,45 @@ public class Standalone {
         };
 
         // start HTTP server
-        int httpPort = Config.app_http_port.integer();
-        if (httpPort > 0) {
+        Sys.http_port.ifPresent(port -> {
             try {
-                HttpServer http = HttpServer.create(new InetSocketAddress(httpPort), 0);
+                HttpServer http = HttpServer.create(new InetSocketAddress(port), 0);
                 http.setExecutor(executor);
                 http.createContext(contextPath, handler);
                 http.start();
-                logger.info("http server started on port " + httpPort);
+                logger.info("http server started on port " + port);
             } catch (IOException e) {
                 logger.log(Level.WARNING, "http sever setup error", e);
             }
-        }
+        });
 
         // start HTTPS server
-        int httpsPort = Config.app_https_port.integer();
-        if (httpsPort > 0) {
+        Sys.https_port.ifPresent(port -> {
             try {
-                HttpsServer https = HttpsServer.create(new InetSocketAddress(httpsPort), 0);
-                String keyPath = Config.app_https_key_file.get().orElse(null);
-                Stream<String> certPaths = Config.app_https_cert_files.stream();
+                HttpsServer https = HttpsServer.create(new InetSocketAddress(port), 0);
+                String keyPath = Sys.https_key_file.orElse(null);
+                Stream<String> certPaths = Sys.https_cert_files.stream();
                 https.setHttpsConfigurator(new HttpsConfigurator(createSSLContext(keyPath, certPaths)));
                 https.setExecutor(executor);
                 https.createContext(contextPath, handler);
                 https.start();
-                logger.info("https server started on port " + httpsPort);
+                logger.info("https server started on port " + port);
             } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException
                     | InvalidKeySpecException e) {
                 logger.log(Level.WARNING, "https server setup error", e);
             }
-        }
+        });
 
         // start H2 DB console
-        if (Config.app_h2_port.integer() > 0) {
+        Sys.h2_port.ifPresent(port -> {
             try {
                 File config = new File(Tool.suffix(System.getProperty("java.io.tmpdir"), File.separator) + ".h2.server.properties");
                 List<String> lines = new ArrayList<>();
-                lines.add("webAllowOthers=" + Config.app_h2_allow_remote.isTrue());
-                lines.add("webPort=" + Config.app_h2_port.text());
-                lines.add("webSSL=" + Config.app_h2_ssl.isTrue());
+                lines.add("webAllowOthers=" + Sys.h2_allow_remote);
+                lines.add("webPort=" + port);
+                lines.add("webSSL=" + Sys.h2_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Config.properties.entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
+                Sys.properties.entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
                         .map(p -> Tuple.of((String) p.getKey(), (String) p.getValue())).filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
                         .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\="))
                         .forEach(lines::add);
@@ -157,11 +155,11 @@ public class Standalone {
                 Tool.invoke(db, "start", Tool.array());
                 Runtime.getRuntime().addShutdownHook(
                         new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
-                logger.info("h2 console started on port " + Config.app_h2_port.integer());
+                logger.info("h2 console started on port " + port);
             } catch (Exception e) {
                 logger.log(Level.WARNING, "h2 error", e);
             }
-        }
+        });
 
         Runtime.getRuntime().addShutdownHook(new Thread(Application.current().get()::shutdown));
     }
@@ -329,7 +327,7 @@ public class Standalone {
         /**
          * session cookie name
          */
-        static final String NAME = Config.app_session_name.text();
+        static final String NAME = Sys.session_name;
 
         /**
          * session id
@@ -355,11 +353,11 @@ public class Standalone {
                     .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1].replaceFirst("\\..*$", "")).orElse(null)).orElse(null);
             if (id == null) {
                 id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
-                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id + Config.app_cluster_suffix.text(), null, -1, null,
+                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id + Sys.cluster_suffix, null, -1, null,
                         Application.current().map(Application::getContextPath).orElse(null), false, true));
             } else {
                 try (Db db = Db.connect()) {
-                    int timeout = Config.app_session_timeout_minutes.integer();
+                    int timeout = Sys.session_timeout_minutes;
                     if (timeout > 0) {
                         db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
                     }
@@ -577,7 +575,7 @@ public class Standalone {
                                         int n = in.read(bytes);
                                         files.put(filename, Tuple.of(Arrays.copyOfRange(bytes, 0, n), null));
                                     } else {
-                                        File f = File.createTempFile("upload", "file", Config.app_upload_folder.get().map(File::new).orElse(null));
+                                        File f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
                                         f.deleteOnExit();
                                         try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
                                             to.transferFrom(Channels.newChannel(in), 0, length);
@@ -672,7 +670,7 @@ public class Standalone {
                 File f = null;
                 for (;;) {
                     if (f == null && size >= fileSizeThreshold) {
-                        f = File.createTempFile("upload", "file", Config.app_upload_folder.get().map(File::new).orElse(null));
+                        f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
                         f.deleteOnExit();
                         out = new BufferedOutputStream(Files.newOutputStream(f.toPath()));
                         out.write(lines.toByteArray());
@@ -860,7 +858,7 @@ public class Standalone {
             HttpExchange exchange = ((RequestImpl) Request.current().get()).exchange;
             TryConsumer<Long> action = contentLength -> {
                 Session.current().map(s -> (SessionImpl) s).ifPresent(SessionImpl::save);
-                Config.app_headers.stream().map(i -> i.split("\\s*\\:\\s*", 2)).forEach(i -> exchange.getResponseHeaders().set(i[0], i[1]));
+                Sys.headers.forEach((key, value) -> exchange.getResponseHeaders().set(key, value));
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));
                 }

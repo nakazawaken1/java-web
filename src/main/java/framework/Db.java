@@ -50,6 +50,7 @@ import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.annotation.Mapping;
+import framework.annotation.Config;
 import framework.annotation.Help;
 import framework.annotation.Id;
 import framework.annotation.InitialData;
@@ -248,7 +249,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Enum.valueOf(Type.class, Config.getOrThrow(Config.db + suffix, SQLException::new).split(":")[1].toUpperCase());
+            Type type = Type.fromUrl(Config.Injector.<String>get("sys.db" + suffix).orElseThrow(SQLException::new));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -393,38 +394,37 @@ public class Db implements AutoCloseable {
      * @return data source
      */
     public static synchronized DataSource getDataSource(String suffix) {
-        return dataSourceMap.computeIfAbsent(suffix, key -> {
-            Type type = Type.fromUrl(Config.find(Config.db + key).orElseThrow(RuntimeException::new));
-            String name = Config.find(Config.db_datasource_class + key).orElse(type.dataSource);
+        return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
+            String url = Config.Injector.<String>get("sys.db" + key).orElseThrow(RuntimeException::new);
+            Type type = Type.fromUrl(url);
+            String name = Tool.string(Sys.properties.getProperty("sys.db.datasource_class")).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
-            Config.find(Config.db + key).filter(Tool.notEmpty).ifPresent(Try.c(value -> {
-                if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
-                    List<String> list = new ArrayList<>();
-                    for (String s : value.split("\\s*;\\s*")) {
-                        String[] a = s.split("\\s*=\\s*", 2);
-                        if ("user".equalsIgnoreCase(a[0])) {
-                            if (a.length > 1) {
-                                c.getMethod("setUser", String.class).invoke(ds, a[1]);
-                            }
-                        } else {
-                            list.add(s);
+            if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
+                List<String> list = new ArrayList<>();
+                for (String s : url.split("\\s*;\\s*")) {
+                    String[] a = s.split("\\s*=\\s*", 2);
+                    if ("user".equalsIgnoreCase(a[0])) {
+                        if (a.length > 1) {
+                            c.getMethod("setUser", String.class).invoke(ds, a[1]);
                         }
-                    }
-                    value = String.join("; ", list);
-                }
-                for (String method : Tool.array("setURL", "setUrl")) {
-                    try {
-                        c.getMethod(method, String.class).invoke(ds, value);
-                        break;
-                    } catch (NoSuchMethodException e) {
-                        continue;
+                    } else {
+                        list.add(s);
                     }
                 }
-            }));
+                url = String.join("; ", list);
+            }
+            for (String method : Tool.array("setURL", "setUrl")) {
+                try {
+                    c.getMethod(method, String.class).invoke(ds, url);
+                    break;
+                } catch (NoSuchMethodException e) {
+                    continue;
+                }
+            }
             Tool.getLogger().info("DataSource created #" + ds);
             return ds;
-        });
+        }));
     }
 
     /**
@@ -586,12 +586,12 @@ public class Db implements AutoCloseable {
      * @return SQL
      */
     public Optional<String> getSQL(String name) {
-        String folder = Config.app_sql_folder.text();
+        String folder = Sys.sql_folder;
         String path = folder + type + '/' + name;
         String commonPath = folder + name;
-        Optional<URL> url = Config.toURL(path);
+        Optional<URL> url = Tool.toURL(path);
         if (!url.isPresent()) {
-            url = Config.toURL(commonPath);
+            url = Tool.toURL(commonPath);
         }
         logger.info(url.map(URL::toString).orElse(name + " not found"));
         return url.map(Try.f(i -> builder.replace(Tool.loadText(i.openStream()))));
@@ -929,7 +929,7 @@ public class Db implements AutoCloseable {
         }
 
         /* get all sql files(object.*.sql or data.*.sql) */
-        String folder = Config.app_sql_folder.text();
+        String folder = Sys.sql_folder;
         String tablePrefix = "object.";
         String dataPrefix = "data.";
         String suffix = ".sql";
@@ -948,7 +948,7 @@ public class Db implements AutoCloseable {
 
             List<Tuple<String, Class<?>>> models = new ArrayList<>();
             List<Tuple<String, InitialData>> modelDatas = new ArrayList<>();
-            Config.app_model_packages.stream().forEach(p -> {
+            Sys.model_packages.stream().forEach(p -> {
                 try (Stream<Class<?>> classes = Tool.getClasses(p)) {
                     classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c))
                             .peek(t -> Optional.ofNullable(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))

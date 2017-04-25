@@ -202,7 +202,7 @@ public abstract class Response {
      * @return response
      */
     public static Response file(String file) {
-        return of(Paths.get(Config.app_document_root_folder.text(), file));
+        return of(Paths.get(Sys.document_root_folder, file));
     }
 
     /**
@@ -210,7 +210,7 @@ public abstract class Response {
      * @return response
      */
     public static Response template(String file) {
-        return of(Paths.get(Config.app_template_folder.text(), file)).charset(StandardCharsets.UTF_8);
+        return of(Paths.get(Sys.template_folder, file)).charset(StandardCharsets.UTF_8);
     }
 
     /**
@@ -413,25 +413,25 @@ public abstract class Response {
      */
     static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays
             .asList(Tuple.of(String.class, (response, out, cancel) -> {
-                response.contentType(Content.HTML, response.charset.orElse(null));
+                response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
                 out.get().write(((String) response.content).getBytes(response.charset()));
             }), Tuple.of(Writer.class, (response, out, cancel) -> {
-                response.contentType(Content.HTML, response.charset.orElse(null));
+                response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
                     ((Writer) response.content).write(writer);
                 }
             }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
                     Tuple.of(Path.class, (response, out, cancel) -> {
                         String file = ((Path) response.content).toString().replace('\\', '/');
-                        Optional<URL> url = Config.toURL(file);
+                        Optional<URL> url = Tool.toURL(file);
                         if (url.isPresent()) {
                             try (InputStream in = url.get().openStream()) {
                                 if (!("file".equals(url.get().getProtocol()) && Paths.get(url.get().toURI()).toFile().isDirectory())
                                         && Try.s(() -> in.available() >= 0, e -> false).get()) {
                                     response.contentType(Tool.getContentType(file),
                                             response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                                    if (Config.app_format_include_regex.stream().anyMatch(file::matches)
-                                            && Config.app_format_exclude_regex.stream().noneMatch(file::matches)) {
+                                    if (Sys.format_include_regex.matcher(file).matches()
+                                            && !Sys.format_exclude_regex.matcher(file).matches()) {
                                         try (Stream<String> lines = Tool.lines(in);
                                                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
                                             Function<Formatter, Formatter.Result> exclude;
@@ -454,7 +454,7 @@ public abstract class Response {
                                         Tool.copy(in, out.get(), new byte[1024]);
                                     }
                                 } else {
-                                    String prefix = Paths.get(Config.app_document_root_folder.text()).toString().replace('\\', '/');
+                                    String prefix = Paths.get(Sys.document_root_folder).toString().replace('\\', '/');
                                     String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
                                     Tool.getLogger().info(file + " : " + path);
                                     response.setHeader("Location",
@@ -478,7 +478,7 @@ public abstract class Response {
                         Template template = (Template) response.content;
                         response.contentType(Tool.getContentType(template.name), response.charset());
                         try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
-                                Stream<String> lines = Tool.lines(Config.toURL(Config.app_template_folder.text(), template.name).get().openStream());
+                                Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
                                 Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
                             lines.map(formatter::format).forEach(line -> {
                                 Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");

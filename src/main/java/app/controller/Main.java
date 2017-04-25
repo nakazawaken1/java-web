@@ -7,16 +7,17 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
-import framework.Config;
 import framework.Db;
 import framework.Diff;
-import framework.Message;
 import framework.Request;
 import framework.Response;
+import framework.Response.Status;
 import framework.Session;
+import framework.Sys;
 import framework.Try;
 import framework.Xml;
-import framework.annotation.Content;
+import framework.annotation.Config;
+import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
 import framework.annotation.Route;
@@ -74,7 +75,7 @@ public class Main {
     @Route
     @Only(Administrator.class)
     Object db_console() {
-        return Response.redirect("http://localhost:" + Config.app_h2_port.integer());
+        return Sys.h2_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
     }
 
     /**
@@ -113,7 +114,7 @@ public class Main {
             session.remove("alert");
             return Response.redirect("index.html");
         } else {
-            session.setAttr("alert", "ログインIDまたはパスワードが違います。");
+            session.setAttr("alert", Sys.Alert.login_failed);
             return Response.redirect("login.html");
         }
     }
@@ -144,19 +145,9 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Object config_default() {
-        return Response.write(Config::printDefault).contentType(Content.TEXT);
-    }
-
-    /**
-     * default config file
-     * 
-     * @return response
-     */
-    @Route
-    @Only(Administrator.class)
-    Object config_current() {
-        return Response.write(Config::printCurrent).contentType(Content.TEXT);
+    Object config() {
+        return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true))));
     }
 
     /**
@@ -177,8 +168,9 @@ public class Main {
         return before.flatMap(b -> after2.map(a -> {
             session.put("before", b);
             session.put("after", a);
-            return Response.template("diff.html").bind("isFull", isFull).bind("diffs", Diff.compact(
-                    Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3, Message.find("reader").orElse("...")));
+            return Response.template("diff.html").bind("isFull", isFull).bind("diffs",
+                    Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
+                            Sys.Item.reader));
         })).orElseGet(() -> Response.file("diff.html"));
     }
 }
