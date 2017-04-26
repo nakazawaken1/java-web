@@ -173,7 +173,7 @@ public class Log extends Handler {
                     if (!Sys.Log.is_shared && c.tryLock() == null) {
                         throw new Exception("lock failed: " + path);
                     }
-                    System.out.println("log open #" + c.hashCode() + " : " + path);
+                    System.err.println("log open #" + c.hashCode() + " : " + path);
                     return c;
                 } catch (Exception e) {
                     if (c != null) {

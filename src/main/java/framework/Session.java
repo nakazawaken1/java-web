@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 import app.config.Sys;
+import app.model.Account;
 
 /**
  * session scoped object
@@ -32,11 +33,6 @@ public abstract class Session implements Attributes<Serializable> {
      * session key of account
      */
     public static final String sessionKey = "\naccount\n";
-
-    /**
-     * getters
-     */
-    static final Getters getters = new Getters(Session.class);
 
     /**
      * @return account

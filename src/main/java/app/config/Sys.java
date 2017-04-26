@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
+import app.model.Account;
 import framework.Db.Setup;
 import framework.Tool;
 import framework.annotation.Config;
@@ -35,10 +36,16 @@ public interface Sys {
 
         @Help("classes of suppress log")
         @Separator(',')
-        List<String> ignore_prefixes = Arrays.asList("com.sun.");
+        List<String> ignore_prefixes = Collections.unmodifiableList(Arrays.asList("com.sun."));
 
         @Help("shared lock if true else exclusive lock")
         Boolean is_shared = true;
+
+        @Help("eval log max output letters")
+        Integer eval_max_letters = 100;
+
+        @Help("request parameter max output letters")
+        Integer parameter_max_letters = 50;
     }
 
     @Help("database connection string(inclucde id and password)")
@@ -90,7 +97,7 @@ public interface Sys {
     Integer job_threads = 1;
 
     @Help("login method(must to be static method)")
-    String login_method = "framework.Account.loginWithConfig";
+    String login_method = Account.class.getName() + ".loginWithConfig";
 
     @Help("accounts data(loginId:password:name:roles,...)")
     @Separator(value = ';')
@@ -136,9 +143,6 @@ public interface Sys {
 
     @Help("model packages")
     List<String> model_packages = Collections.unmodifiableList(Arrays.asList("app.model"));
-
-    @Help("eval log max output letters")
-    Integer eval_log_max_letters = 100;
 
     public interface Item {
         String title = "タイトル";

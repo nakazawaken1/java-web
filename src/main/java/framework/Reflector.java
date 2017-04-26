@@ -3,6 +3,7 @@ package framework;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -182,15 +184,13 @@ public class Reflector {
      * @return method
      */
     public static Optional<Method> method(Class<?> clazz, String name, Class<?>... args) {
-        try {
-            return Optional.ofNullable(methods.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> {
-                Method result = pair.l.getDeclaredMethod(name, args);
+        return Optional.ofNullable(methods.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> pair.l.getMethod(name, args), (e, pair) -> {
+            Method result = Try.s(() -> pair.l.getDeclaredMethod(name, args), ee -> null).get();
+            if (result != null) {
                 result.setAccessible(true);
-                return result;
-            })));
-        } catch (RuntimeException e) {
-            return Optional.empty();
-        }
+            }
+            return result;
+        })));
     }
 
     /**
@@ -267,5 +267,29 @@ public class Reflector {
             return (char) value != (char) 0;
         }
         return true;
+    }
+
+    /**
+     * @param <T> type
+     * @param instance instance
+     * @param name Property name
+     * @param orElse call if not exists property
+     * @return Property value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T getProperty(Object instance, String name, Supplier<T> orElse) {
+        if (instance != null) {
+            Class<?> clazz = instance.getClass();
+            Method m = method(clazz, "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1))
+                    .orElseGet(() -> name.startsWith("is") ? method(clazz, name).orElse(null) : null);
+            if (m != null) {
+                try {
+                    return (T) m.invoke(instance);
+                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                    Log.warning(e, () -> "get property error");
+                }
+            }
+        }
+        return orElse.get();
     }
 }

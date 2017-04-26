@@ -43,11 +43,6 @@ public abstract class Application implements Attributes<Object> {
     static SortedMap<String, Tuple<Class<?>, Method>> table;
 
     /**
-     * getters
-     */
-    Getters getters = new Getters(Application.class);
-
-    /**
      * @return singleton
      */
     static Optional<Application> current() {

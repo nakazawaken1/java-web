@@ -21,6 +21,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import app.config.Sys;
 import framework.annotation.Route;
 
 /**
@@ -32,11 +33,6 @@ public abstract class Request implements Attributes<Object> {
      * current request
      */
     transient static final ThreadLocal<Request> CURRENT = new ThreadLocal<>();
-
-    /**
-     * getters
-     */
-    static final Getters getters = new Getters(Request.class);
 
     /**
      * @return current request
@@ -78,7 +74,7 @@ public abstract class Request implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + pair.getValue()).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue().toString(), Sys.Log.parameter_max_letters)).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
     }
 
     /**

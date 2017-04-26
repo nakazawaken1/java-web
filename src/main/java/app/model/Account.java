@@ -1,4 +1,4 @@
-package framework;
+package app.model;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -6,6 +6,10 @@ import java.util.Optional;
 
 import app.config.Sys;
 import framework.annotation.Only.User;
+import framework.AbstractBuilder;
+import framework.Db;
+import framework.Tool;
+import framework.Try;
 import framework.annotation.Required;
 
 /**

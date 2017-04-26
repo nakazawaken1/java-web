@@ -17,7 +17,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -505,7 +504,7 @@ public class Formatter implements AutoCloseable {
                     value = Tool.string(result).orElse(null);
                     type = "raw " + type;
                 }
-                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.eval_log_max_letters));
+                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.Log.eval_max_letters));
                 return value;
             };
             String key = s.substring(prefix, s.length() - suffix);
@@ -519,177 +518,14 @@ public class Formatter implements AutoCloseable {
                 try {
                     if (el == null) {
                         el = new ELProcessor();
-                        el.getELManager().addELResolver(new ELResolver() { /* field resolver */
-
-                            @Override
-                            public void setValue(ELContext context, Object base, Object property, Object value) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base != null && property instanceof String) {
-                                        Method method;
-                                        try {
-                                            method = new PropertyDescriptor((String) property, base.getClass()).getWriteMethod();
-                                        } catch (IntrospectionException e) {
-                                            method = null;
-                                        }
-                                        if (method != null) {
-                                            method.invoke(base, value);
-                                        } else {
-                                            Field f = base.getClass().getDeclaredField((String) property);
-                                            int m = f.getModifiers();
-                                            if (Modifier.isFinal(m)) {
-                                                throw new PropertyNotWritableException((String) property);
-                                            }
-                                            f.set(base, value);
-                                        }
-                                        context.setPropertyResolved(true);
-                                    }
-                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException
-                                        | InvocationTargetException e) {
-                                    throw new PropertyNotWritableException((String) property);
-                                }
-                            }
-
-                            @Override
-                            public boolean isReadOnly(ELContext context, Object base, Object property) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base != null && property instanceof String) {
-                                        boolean result = new PropertyDescriptor((String) property, base.getClass()).getWriteMethod() == null
-                                                || Modifier.isFinal(base.getClass().getDeclaredField((String) property).getModifiers());
-                                        context.setPropertyResolved(true);
-                                        return result;
-                                    }
-                                } catch (NoSuchFieldException | SecurityException | IntrospectionException e) {
-                                    return true;
-                                }
-                                return false;
-                            }
-
-                            @Override
-                            public Object getValue(ELContext context, Object base, Object property) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base != null && property instanceof String) {
-                                        Class<?> clazz = base.getClass();
-                                        Method method;
-                                        try {
-                                            method = new PropertyDescriptor((String) property, clazz).getReadMethod();
-                                        } catch (IntrospectionException e) {
-                                            method = null;
-                                        }
-                                        Object value;
-                                        if (method != null) {
-                                            value = method.invoke(base);
-                                        } else {
-                                            value = Reflector.field(clazz, (String) property).map(Try.f(f -> f.get(base)))
-                                                    .orElseThrow(() -> new NoSuchFieldException(clazz.getSimpleName() + "." + property));
-                                        }
-                                        context.setPropertyResolved(true);
-                                        return value;
-                                    }
-                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException
-                                        | InvocationTargetException e) {
-                                    return null;
-                                }
-                                return null;
-                            }
-
-                            @Override
-                            public Class<?> getType(ELContext context, Object base, Object property) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base != null && property instanceof String) {
-                                        Class<?> c;
-                                        try {
-                                            c = new PropertyDescriptor((String) property, base.getClass()).getPropertyType();
-                                        } catch (IntrospectionException e) {
-                                            c = null;
-                                        }
-                                        if (c == null) {
-                                            c = base.getClass().getDeclaredField((String) property).getType();
-                                        }
-                                        context.setPropertyResolved(true);
-                                        return c;
-                                    }
-                                } catch (NoSuchFieldException | SecurityException e) {
-                                    return null;
-                                }
-                                return null;
-                            }
-
-                            @Override
-                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
-                                Objects.requireNonNull(context);
-                                return Arrays.<FeatureDescriptor>asList().iterator();
-                            }
-
-                            @Override
-                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
-                                Objects.requireNonNull(context);
-                                return base == null ? String.class : Object.class;
-                            }
-                        });
-                        el.getELManager().addELResolver(new ELResolver() { /* inner class resolver */
-
-                            @Override
-                            public Object getValue(ELContext context, Object base, Object property) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base instanceof ELClass && property instanceof String) {
-                                        Class<?> clazz = ((ELClass) base).getKlass();
-                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
-                                                .peek(c -> context.setPropertyResolved(true)).findFirst().map(ELClass::new).orElse(null);
-                                    }
-                                } catch (SecurityException | IllegalArgumentException e) {
-                                    return null;
-                                }
-                                return null;
-                            }
-
-                            @Override
-                            public Class<?> getType(ELContext context, Object base, Object property) {
-                                Objects.requireNonNull(context);
-                                try {
-                                    if (base instanceof ELClass && property instanceof String) {
-                                        Class<?> clazz = ((ELClass) base).getKlass();
-                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
-                                                .peek(c -> context.setPropertyResolved(true)).findFirst().orElse(null);
-                                    }
-                                } catch (SecurityException | IllegalArgumentException e) {
-                                    return null;
-                                }
-                                return null;
-                            }
-
-                            @Override
-                            public void setValue(ELContext context, Object base, Object property, Object value) {
-                                throw new UnsupportedOperationException();
-                            }
-
-                            @Override
-                            public boolean isReadOnly(ELContext context, Object base, Object property) {
-                                return true;
-                            }
-
-                            @Override
-                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
-                                return Arrays.<FeatureDescriptor>asList().iterator();
-                            }
-
-                            @Override
-                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
-                                return String.class;
-                            }
-                        });
                         el.getELManager().addELResolver(new ELResolver() { /* empty resolver */
 
                             @Override
                             public Object getValue(ELContext context, Object base, Object property) {
                                 try {
                                     ELContext c;
-                                    if(context instanceof EvaluationContext) {
-                                        c = ((EvaluationContext)context).getELContext();
+                                    if (context instanceof EvaluationContext) {
+                                        c = ((EvaluationContext) context).getELContext();
                                     } else {
                                         c = context;
                                     }
@@ -727,6 +563,161 @@ public class Formatter implements AutoCloseable {
                             @Override
                             public Class<?> getCommonPropertyType(ELContext context, Object base) {
                                 return String.class;
+                            }
+                        });
+                        el.getELManager().addELResolver(new ELResolver() { /* inner class resolver */
+
+                            @Override
+                            public Object getValue(ELContext context, Object base, Object property) {
+                                try {
+                                    if (base instanceof ELClass && property instanceof String) {
+                                        Class<?> clazz = ((ELClass) base).getKlass();
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                                .peek(c -> context.setPropertyResolved(true)).findFirst().map(ELClass::new).orElse(null);
+                                    }
+                                } catch (SecurityException | IllegalArgumentException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Class<?> getType(ELContext context, Object base, Object property) {
+                                try {
+                                    if (base instanceof ELClass && property instanceof String) {
+                                        Class<?> clazz = ((ELClass) base).getKlass();
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                                .peek(c -> context.setPropertyResolved(true)).findFirst().orElse(null);
+                                    }
+                                } catch (SecurityException | IllegalArgumentException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public void setValue(ELContext context, Object base, Object property, Object value) {
+                                throw new UnsupportedOperationException();
+                            }
+
+                            @Override
+                            public boolean isReadOnly(ELContext context, Object base, Object property) {
+                                return true;
+                            }
+
+                            @Override
+                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+                                return Arrays.<FeatureDescriptor>asList().iterator();
+                            }
+
+                            @Override
+                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
+                                return String.class;
+                            }
+                        });
+                        el.getELManager().addELResolver(new ELResolver() { /* field resolver */
+
+                            @Override
+                            public void setValue(ELContext context, Object base, Object property, Object value) {
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Method method;
+                                        try {
+                                            method = new PropertyDescriptor((String) property, base.getClass()).getWriteMethod();
+                                        } catch (IntrospectionException e) {
+                                            method = null;
+                                        }
+                                        if (method != null) {
+                                            method.invoke(base, value);
+                                        } else {
+                                            Field f = base.getClass().getDeclaredField((String) property);
+                                            int m = f.getModifiers();
+                                            if (Modifier.isFinal(m)) {
+                                                throw new PropertyNotWritableException((String) property);
+                                            }
+                                            f.set(base, value);
+                                        }
+                                        context.setPropertyResolved(true);
+                                    }
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException
+                                        | InvocationTargetException e) {
+                                    throw new PropertyNotWritableException((String) property);
+                                }
+                            }
+
+                            @Override
+                            public boolean isReadOnly(ELContext context, Object base, Object property) {
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        boolean result = new PropertyDescriptor((String) property, base.getClass()).getWriteMethod() == null
+                                                || Modifier.isFinal(base.getClass().getDeclaredField((String) property).getModifiers());
+                                        context.setPropertyResolved(true);
+                                        return result;
+                                    }
+                                } catch (NoSuchFieldException | SecurityException | IntrospectionException e) {
+                                    return true;
+                                }
+                                return false;
+                            }
+
+                            @Override
+                            public Object getValue(ELContext context, Object base, Object property) {
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Class<?> clazz = base.getClass();
+                                        Method method;
+                                        try {
+                                            method = new PropertyDescriptor((String) property, clazz).getReadMethod();
+                                        } catch (IntrospectionException e) {
+                                            method = null;
+                                        }
+                                        Object value;
+                                        if (method != null) {
+                                            value = method.invoke(base);
+                                        } else {
+                                            value = Reflector.field(clazz, (String) property).map(Try.f(f -> f.get(base)))
+                                                    .orElseThrow(() -> new NoSuchFieldException(clazz.getSimpleName() + "." + property));
+                                        }
+                                        context.setPropertyResolved(true);
+                                        return value;
+                                    }
+                                } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException
+                                        | InvocationTargetException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Class<?> getType(ELContext context, Object base, Object property) {
+                                try {
+                                    if (base != null && property instanceof String) {
+                                        Class<?> c;
+                                        try {
+                                            c = new PropertyDescriptor((String) property, base.getClass()).getPropertyType();
+                                        } catch (IntrospectionException e) {
+                                            c = null;
+                                        }
+                                        if (c == null) {
+                                            c = base.getClass().getDeclaredField((String) property).getType();
+                                        }
+                                        context.setPropertyResolved(true);
+                                        return c;
+                                    }
+                                } catch (NoSuchFieldException | SecurityException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+                                return Arrays.<FeatureDescriptor>asList().iterator();
+                            }
+
+                            @Override
+                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
+                                return base == null ? String.class : Object.class;
                             }
                         });
                         el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));

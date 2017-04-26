@@ -100,16 +100,16 @@ public class ServletImpl implements javax.servlet.Servlet {
         /**
          * application scope object
          */
-        transient final ServletContext raw;
+        transient final ServletContext context;
 
         /**
          * constructor
          * 
-         * @param raw application scope object
+         * @param context application scope object
          */
         @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
-        ApplicationImpl(ServletContext raw) {
-            this.raw = raw;
+        ApplicationImpl(ServletContext context) {
+            this.context = context;
             CURRENT = this;
         }
 
@@ -120,7 +120,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public Stream<String> names() {
-            return Tool.stream(raw.getAttributeNames());
+            return Tool.stream(context.getAttributeNames());
         }
 
         /*
@@ -131,7 +131,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> raw.getAttribute(name)));
+            return Optional.ofNullable(Optional.ofNullable((T) context.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -141,7 +141,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public void setAttr(String name, Object value) {
-            raw.setAttribute(name, value);
+            context.setAttribute(name, value);
         }
 
         /*
@@ -151,7 +151,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public void removeAttr(String name) {
-            raw.removeAttribute(name);
+            context.removeAttribute(name);
         }
 
         /**
@@ -159,7 +159,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public String getContextPath() {
-            return Tool.suffix(raw.getContextPath(), "/");
+            return Tool.suffix(context.getContextPath(), "/");
         }
     }
 
@@ -216,7 +216,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> session.getAttribute(name)));
+            return Optional.ofNullable(Optional.ofNullable((T) session.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -248,12 +248,12 @@ public class ServletImpl implements javax.servlet.Servlet {
         /**
          * http request
          */
-        final HttpServletRequest servletRequest;
+        final HttpServletRequest request;
 
         /**
          * http response
          */
-        final HttpServletResponse servletResponse;
+        final HttpServletResponse response;
 
         /**
          * request path
@@ -268,8 +268,8 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         RequestImpl(HttpServletRequest request, HttpServletResponse response) {
             Try.r(() -> request.setCharacterEncoding(StandardCharsets.UTF_8.name())).run();
-            servletRequest = request;
-            servletResponse = response;
+            this.request = request;
+            this.response = response;
             String uri = request.getRequestURI();
             int rootLength = request.getContextPath().length() + 1;
             path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
@@ -280,7 +280,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public Route.Method getMethod() {
-            return Enum.valueOf(Route.Method.class, servletRequest.getMethod());
+            return Enum.valueOf(Route.Method.class, request.getMethod());
         }
 
         /*
@@ -290,7 +290,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public Stream<String> names() {
-            return Tool.stream(servletRequest.getAttributeNames());
+            return Tool.stream(request.getAttributeNames());
         }
 
         /*
@@ -301,7 +301,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> servletRequest.getAttribute(name)));
+            return Optional.ofNullable(Optional.ofNullable((T) request.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -311,7 +311,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public void setAttr(String name, Object value) {
-            servletRequest.setAttribute(name, value);
+            request.setAttribute(name, value);
         }
 
         /*
@@ -321,7 +321,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public void removeAttr(String name) {
-            servletRequest.removeAttribute(name);
+            request.removeAttribute(name);
         }
 
         @Override
@@ -340,13 +340,13 @@ public class ServletImpl implements javax.servlet.Servlet {
 
                 @Override
                 public Stream<String> names() {
-                    return Tool.stream(servletRequest.getHeaderNames());
+                    return Tool.stream(request.getHeaderNames());
                 }
 
                 @SuppressWarnings("unchecked")
                 @Override
                 public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Optional.ofNullable(servletRequest.getHeaders(name)).map(e -> Tool.stream(e).collect(Collectors.toList()));
+                    return (Optional<T>) Optional.ofNullable(request.getHeaders(name)).map(e -> Tool.stream(e).collect(Collectors.toList()));
                 }
 
                 @Override
@@ -367,13 +367,13 @@ public class ServletImpl implements javax.servlet.Servlet {
 
                 @Override
                 public Stream<String> names() {
-                    return Tool.stream(servletRequest.getParameterNames());
+                    return Tool.stream(request.getParameterNames());
                 }
 
                 @SuppressWarnings("unchecked")
                 @Override
                 public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Optional.ofNullable(servletRequest.getParameterValues(name)).map(a -> Arrays.asList(a));
+                    return (Optional<T>) Optional.ofNullable(request.getParameterValues(name)).map(a -> Arrays.asList(a));
                 }
 
                 @Override
@@ -396,7 +396,7 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
-            HttpServletResponse response = ((RequestImpl) Request.current().get()).servletResponse;
+            HttpServletResponse response = ((RequestImpl) Request.current().get()).response;
             Runnable action = () -> {
                 Sys.headers.forEach((key, value) -> response.setHeader(key, value));
                 if (headers != null) {
@@ -417,8 +417,8 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> (RequestImpl) i).map(i -> "-> " + i.servletRequest.getProtocol() + " " + i.servletResponse.getStatus() + " "
-                    + Tool.string(i.servletResponse.getContentType()).orElse("")).orElse("");
+            return Request.current().map(i -> (RequestImpl) i).map(i -> "-> " + i.request.getProtocol() + " " + i.response.getStatus() + " "
+                    + Tool.string(i.response.getContentType()).orElse("")).orElse("");
         }
     }
 }

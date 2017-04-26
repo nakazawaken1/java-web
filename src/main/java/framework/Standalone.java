@@ -299,7 +299,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
+            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
@@ -422,7 +422,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
+            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
@@ -614,7 +614,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable((T) getters.get(this, name).orElseGet(() -> attributes.get(name)));
+            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
