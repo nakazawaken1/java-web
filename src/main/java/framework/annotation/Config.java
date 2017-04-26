@@ -3,7 +3,6 @@ package framework.annotation;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -11,7 +10,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,14 +30,16 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import app.config.Sys;
+import framework.Log;
 import framework.Reflector;
-import framework.Sys;
 import framework.Tool;
+import framework.Tuple;
 
 /**
  * config file mapping
@@ -65,8 +65,6 @@ public @interface Config {
          * @return real properties
          */
         public static Properties inject(Class<?> clazz) {
-
-            defaultMap.computeIfAbsent(clazz, c -> String.join(Letters.CRLF, dump(c, true)));
 
             Properties sourceProperties = new Properties();
 
@@ -107,7 +105,7 @@ public @interface Config {
                     }, missings::add);
                 });
                 if (!loop[0]) {
-                    missings.stream().map(key -> BEGIN + key + END + " cannot resolve.").forEach(Tool.getLogger()::warning);
+                    missings.stream().map(key -> BEGIN + key + END + " cannot resolve.").forEach(Log::warning);
                     break;
                 }
             }
@@ -123,7 +121,8 @@ public @interface Config {
          * @return real properties
          */
         public static Properties inject(Class<?> clazz, Properties properties) {
-            return inject(clazz, properties, "");
+            defaultMap.put(clazz, String.join(Letters.CRLF, dump(clazz, true)));
+            return Tool.peek(inject(clazz, properties, ""), p -> sourceMap.put(clazz, p));
         }
 
         /**
@@ -159,16 +158,18 @@ public @interface Config {
             Field field = fieldCache.computeIfAbsent(name, fullName -> {
                 int classIndex = fullName.indexOf('.');
                 int fieldIndex = fullName.lastIndexOf('.');
-                if(classIndex < 0 || fieldIndex < 0) {
+                if (classIndex < 0 || fieldIndex < 0) {
                     return null;
                 }
                 Class<?> clazz = classCache.computeIfAbsent(fullName.substring(0, fieldIndex), className -> {
                     Class<?> c = classCache.get(fullName.substring(0, classIndex));
-                    for (String i : fullName.substring(classIndex + 1, fieldIndex).split("[.]")) {
-                        if (c == null) {
-                            return null;
+                    if (classIndex < fieldIndex) {
+                        for (String i : fullName.substring(classIndex + 1, fieldIndex).split("[.]")) {
+                            if (c == null) {
+                                return null;
+                            }
+                            c = Stream.of(c.getClasses()).filter(j -> i.equalsIgnoreCase(j.getSimpleName())).findAny().orElse(null);
                         }
-                        c = Stream.of(c.getClasses()).filter(j -> i.equalsIgnoreCase(j.getSimpleName())).findAny().orElse(null);
                     }
                     return c;
                 });
@@ -194,11 +195,19 @@ public @interface Config {
         }
 
         /**
-         * @param c Class
+         * @param clazz Class
          * @return Default settings
          */
-        public static String getDefault(Class<?> c) {
-            return defaultMap.get(c);
+        public static String getDefault(Class<?> clazz) {
+            return defaultMap.get(clazz);
+        }
+
+        /**
+         * @param clazz Class
+         * @return Properties
+         */
+        public static Properties getSource(Class<?> clazz) {
+            return sourceMap.get(clazz);
         }
 
         /**
@@ -217,11 +226,20 @@ public @interface Config {
          * default value of Separator.suffix
          */
         static final String suffixDefault;
+        /**
+         * default value of Separator.value
+         */
+        static final char pairDefault;
 
         /**
          * default settings
          */
         static final Map<Class<?>, String> defaultMap = new ConcurrentHashMap<>();
+
+        /**
+         * source properties
+         */
+        static final Map<Class<?>, Properties> sourceMap = new ConcurrentHashMap<>();
 
         /**
          * class cache
@@ -240,9 +258,10 @@ public @interface Config {
             } catch (NoSuchFieldException | SecurityException e) {
                 throw new InternalError(e);
             }
-            prefixDefault = getDefaultValue(Separator.class, "prefix");
-            valueDefault = getDefaultValue(Separator.class, "value");
-            suffixDefault = getDefaultValue(Separator.class, "suffix");
+            prefixDefault = Reflector.getDefaultValue(Separator.class, "prefix");
+            valueDefault = Reflector.getDefaultValue(Separator.class, "value");
+            suffixDefault = Reflector.getDefaultValue(Separator.class, "suffix");
+            pairDefault = Reflector.getDefaultValue(Separator.class, "pair");
         }
 
         /**
@@ -255,9 +274,10 @@ public @interface Config {
          */
         static Properties inject(Class<?> clazz, Properties properties, String prefix) {
             Properties realProperties = new Properties();
+            realProperties.putAll(properties);
             String newPrefix = prefix + clazz.getSimpleName().toLowerCase() + '.';
             classCache.put(newPrefix.substring(0, newPrefix.length() - 1), clazz);
-            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers()) && f.getType() != Properties.class).forEach(f -> {
+            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
                 String key = newPrefix + f.getName();
                 String raw = properties.getProperty(key);
                 int modifiers = f.getModifiers();
@@ -278,7 +298,7 @@ public @interface Config {
                 if (properties.containsKey(key) || value == null) {
                     Class<?> type = f.getType();
                     if (type == Optional.class) {
-                        value = raw == null ? Optional.empty() : Optional.of(getValue(f, getFirstGenericType(f), raw));
+                        value = raw == null ? Optional.empty() : Optional.of(getValue(f, Reflector.getGenericParameter(f, 0), raw));
                     } else if (type.isArray()) {
                         Class<?> componentType = type.getComponentType();
                         Object[] array = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, componentType, i)).toArray();
@@ -289,9 +309,18 @@ public @interface Config {
                             i++;
                         }
                     } else if (type == List.class) {
-                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, getFirstGenericType(f), i)).collect(Collectors.toList());
+                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
+                                .collect(Collectors.toList());
                     } else if (type == Set.class) {
-                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, getFirstGenericType(f), i)).collect(Collectors.toSet());
+                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
+                                .collect(Collectors.toSet());
+                    } else if (type == Map.class) {
+                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> {
+                            String[] pair = i.split(Tool.val(f.getAnnotation(Separator.class),
+                                    s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
+                            return Tuple.of(getValue(f, Reflector.getGenericParameter(f, 0), pair[0]),
+                                    getValue(f, Reflector.getGenericParameter(f, 1), pair[1]));
+                        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
                     } else {
                         value = getValue(f, type, raw);
                     }
@@ -318,7 +347,7 @@ public @interface Config {
         static List<String> dump(Class<?> clazz, String prefix, boolean sort) {
             String newPrefix = prefix + clazz.getSimpleName().replace('$', '.').toLowerCase() + '.';
             List<String> lines = new ArrayList<>();
-            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers()) && f.getType() != Properties.class).forEach(f -> {
+            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
                 try {
                     String key = newPrefix + f.getName();
                     Object value = f.get(null);
@@ -346,33 +375,6 @@ public @interface Config {
         /**
          * inner use
          * 
-         * @param <T> Value type
-         * @param annotation Target
-         * @param methodName Method name
-         * @return Default value
-         */
-        @SuppressWarnings("unchecked")
-        static <T> T getDefaultValue(Class<? extends Annotation> annotation, String methodName) {
-            try {
-                return (T) annotation.getMethod(methodName).getDefaultValue();
-            } catch (NoSuchMethodException | SecurityException e) {
-                throw new InternalError(e);
-            }
-        }
-
-        /**
-         * inner use
-         * 
-         * @param field Field
-         * @return First generic type
-         */
-        static Class<?> getFirstGenericType(Field field) {
-            return (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
-        }
-
-        /**
-         * inner use
-         * 
          * @param field Field
          * @return DateTimeFormatter or empty
          */
@@ -391,7 +393,7 @@ public @interface Config {
             try (Reader reader = new InputStreamReader(Thread.currentThread().getContextClassLoader().getResourceAsStream(path), StandardCharsets.UTF_8)) {
                 p.load(reader);
             } catch (IOException | NullPointerException e) {
-                Logger.getGlobal().warning("cannot read " + path);
+                Log.warning("cannot read " + path);
             }
             return p;
         }
@@ -442,46 +444,11 @@ public @interface Config {
                 return raw == null ? DateTimeFormatter.BASIC_ISO_DATE : DateTimeFormatter.ofPattern(raw);
             } else if (type == Pattern.class) {
                 return Pattern.compile(raw == null ? ".*" : raw);
+            } else if (type == Level.class) {
+                return raw == null ? Level.INFO : Level.parse(raw);
             } else {
                 return raw;
             }
-        }
-
-        /**
-         * inner use
-         * 
-         * @param value Value
-         * @return true if modified value else false
-         */
-        static boolean isModified(Object value) {
-            if (value == null || value == Optional.empty()) {
-                return false;
-            }
-            if (value instanceof Boolean) {
-                return (boolean) value != false;
-            }
-            if (value instanceof Byte) {
-                return (byte) value != (byte) 0;
-            }
-            if (value instanceof Short) {
-                return (short) value != (short) 0;
-            }
-            if (value instanceof Integer) {
-                return (int) value != (int) 0;
-            }
-            if (value instanceof Long) {
-                return (long) value != (long) 0;
-            }
-            if (value instanceof Float) {
-                return (float) value != (float) 0;
-            }
-            if (value instanceof Double) {
-                return (double) value != (double) 0;
-            }
-            if (value instanceof Character) {
-                return (char) value != (char) 0;
-            }
-            return true;
         }
 
         /**
@@ -517,6 +484,9 @@ public @interface Config {
             }
             Class<?> clazz = field.getType();
             char separator = Optional.ofNullable(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
+            if (clazz == Optional.class) {
+                return ((Optional<?>) value).map(String::valueOf).orElse("");
+            }
             if (clazz.isArray()) {
                 StringBuilder s = new StringBuilder();
                 for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
@@ -529,6 +499,11 @@ public @interface Config {
             }
             if (clazz == Set.class) {
                 return ((Set<?>) value).stream().map(String::valueOf).collect(Collectors.joining(String.valueOf(separator)));
+            }
+            if (clazz == Map.class) {
+                char pairSeparator = Optional.ofNullable(field.getAnnotation(Separator.class)).map(Separator::pair).orElse(pairDefault);
+                return ((Map<?, ?>) value).entrySet().stream().map(pair -> String.valueOf(pair.getKey()) + pairSeparator + pair.getValue())
+                        .collect(Collectors.joining(String.valueOf(separator)));
             }
             if (value instanceof Temporal) {
                 Optional<DateTimeFormatter> formatter = getFormat(field);

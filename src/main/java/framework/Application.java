@@ -15,17 +15,17 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.stream.Stream;
 
+import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Response.Status;
+import framework.annotation.Config.Injector;
 import framework.annotation.Content;
 import framework.annotation.Job;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Route;
-import framework.annotation.Config.Injector;
 
 /**
  * application scoped object
@@ -55,14 +55,20 @@ public abstract class Application implements Attributes<Object> {
     }
 
     /**
+     * @return request id
+     */
+    public int getId() {
+        return hashCode();
+    }
+
+    /**
      * @return context path
      */
     abstract String getContextPath();
 
     @Override
     public String toString() {
-        return "real path: "
-                + Tool.val(Tool.trim(null, Tool.toURL("framework").get().toString(), "/"), s -> s.substring(0, s.length() - "framework".length()))
+        return "real path: " + Tool.val(Tool.trim(null, Tool.toURL("framework").get().toString(), "/"), s -> s.substring(0, s.length() - "framework".length()))
                 + ", context path: " + getContextPath();
     }
 
@@ -83,11 +89,11 @@ public abstract class Application implements Attributes<Object> {
             throw new InternalError(e);
         }
 
-        Sys.properties.putAll(Injector.inject(Sys.class));
-        LogHandler.startupLog();
-        Tool.getLogger().info("---- setting ----" + String.join(Letters.CRLF, Injector.dump(Sys.class, true)));
+        Injector.inject(Sys.class);
+        Log.startup();
+        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Injector.dump(Sys.class, true)));
 
-        Tool.getLogger().info(Application.current().get().toString());
+        Log.info(Application.current().get()::toString);
 
         /* setup for response creator */
         if (Response.factory == null) {
@@ -98,8 +104,6 @@ public abstract class Application implements Attributes<Object> {
         if (table == null) {
             table = new TreeMap<>();
             Sys.controller_packages.stream().forEach(p -> {
-                Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(p.replace('.', '/')))
-                        .forEach(url -> Tool.getLogger().info("url: " + url));
                 try (Stream<Class<?>> cs = Tool.getClasses(p)) {
                     cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
                             .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
@@ -113,7 +117,7 @@ public abstract class Application implements Attributes<Object> {
                             }, Map::putAll);
                 }
             });
-            Tool.getLogger().info(Tool.print(writer -> {
+            Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
                 table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
             }));
@@ -141,9 +145,9 @@ public abstract class Application implements Attributes<Object> {
             Db.shutdown();
             Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver));
         } catch (Exception e) {
-            Tool.getLogger().log(Level.WARNING, "destroy error", e);
+            Log.warning(e, () -> "destroy error");
         }
-        LogHandler.shutdownLog();
+        Log.shutdown();
     }
 
     /**
@@ -153,7 +157,7 @@ public abstract class Application implements Attributes<Object> {
      * @param session session
      */
     void handle(Request request, Lazy<Session> session) {
-        Tool.getLogger().info(request.toString());
+        Log.info(request::toString);
 
         /* no slash root access */
         final String path = request.getPath();

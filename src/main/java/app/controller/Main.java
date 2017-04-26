@@ -1,19 +1,18 @@
 package app.controller;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
+import app.config.Sys;
 import framework.Db;
 import framework.Diff;
 import framework.Request;
 import framework.Response;
 import framework.Response.Status;
 import framework.Session;
-import framework.Sys;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Config;
@@ -74,7 +73,7 @@ public class Main {
      */
     @Route
     @Only(Administrator.class)
-    Object db_console() {
+    Object db() {
         return Sys.h2_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
     }
 
@@ -86,7 +85,7 @@ public class Main {
     @Route
     @Only
     Object add(int a, Optional<Integer> b) {
-        return Response.write(out -> out.println(a + " + " + b + " = " + (a + b.orElse(0))));
+        return a + " + " + b + " = " + (a + b.orElse(0));
     }
 
     /**
@@ -135,7 +134,7 @@ public class Main {
      */
     @Route
     Object alert(Session session) {
-        return Response.of(session.flash("alert")).charset(StandardCharsets.UTF_8);
+        return session.flash("alert");
     }
 
     /**
@@ -147,7 +146,7 @@ public class Main {
     @Only(Administrator.class)
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
-                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true))));
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定");
     }
 
     /**
@@ -158,7 +157,7 @@ public class Main {
      * @return Diff
      */
     @Route
-    Object diff(Session session, Request request, Optional<String> before, Optional<String> after) {
+    Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
             before = session.getAttr("before");

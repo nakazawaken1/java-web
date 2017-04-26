@@ -18,14 +18,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
+import app.config.Sys;
 import framework.Db;
 import framework.Lazy;
+import framework.Log;
 import framework.Reflector;
-import framework.Sys;
 import framework.Tool;
 import framework.Tuple;
 
@@ -73,23 +72,23 @@ public @interface Job {
                         .forEach(pair -> {
                             Method method = pair.l;
                             Stream.of(pair.r.value().split("\\s*,\\s*")).filter(Tool.notEmpty)
-                                    .<String>map(j -> j.startsWith("job.") ? Config.Injector.<String>get(j).orElse("") : j).filter(Tool.notEmpty).forEach(text -> {
+                                    .<String>map(j -> j.startsWith("job.") ? Config.Injector.<String>get(j).orElse("") : j).filter(Tool.notEmpty)
+                                    .forEach(text -> {
                                         if (scheduler.get() == null) {
                                             int n = Sys.job_threads;
                                             scheduler.set(Executors.newScheduledThreadPool(n));
-                                            Tool.getLogger().info(n + " job threads created");
+                                            Log.info(n + " job threads created");
                                         }
                                         String name = c.getName() + '.' + method.getName();
                                         long first = Tool.nextMillis(text, now);
                                         ZonedDateTime firstStart = now.plus(first, ChronoUnit.MILLIS);
-                                        Tool.getLogger().info(name + " : job next start at " + firstStart);
+                                        Log.info(name + " : job next start at " + firstStart);
                                         scheduler.get().schedule(new Runnable() {
                                             ZonedDateTime start = firstStart;
 
                                             @Override
                                             public void run() {
-                                                Logger logger = Tool.getLogger();
-                                                logger.info(name + " : job start - " + start);
+                                                Log.info(name + " : job start - " + start);
                                                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                                                     method.setAccessible(true);
                                                     method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(c),
@@ -113,16 +112,16 @@ public @interface Job {
                                                                 return null;
                                                             }).toArray());
                                                 } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                                                    logger.log(Level.WARNING, name + " : job error", e);
+                                                    Log.warning(e, () -> name + " : job error");
                                                 }
                                                 ZonedDateTime end = ZonedDateTime.now();
-                                                logger.info(name + " : job end - " + end + " (" + Duration.between(start, end) + ")");
+                                                Log.info(name + " : job end - " + end + " (" + Duration.between(start, end) + ")");
                                                 long next = Tool.nextMillis(text, end);
                                                 if (next < 1000) {
                                                     next = Tool.nextMillis(text, end.plusSeconds(1));
                                                 }
                                                 start = end.plus(next, ChronoUnit.MILLIS);
-                                                logger.info(name + " : job next start at " + start);
+                                                Log.info(name + " : job next start at " + start);
                                                 scheduler.get().schedule(this, next, TimeUnit.MILLISECONDS);
                                             }
                                         }, first, TimeUnit.MILLISECONDS);

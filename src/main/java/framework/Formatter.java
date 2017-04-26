@@ -21,13 +21,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.logging.Level;
+import java.util.stream.Stream;
 
+import javax.el.ELClass;
 import javax.el.ELContext;
 import javax.el.ELProcessor;
 import javax.el.ELResolver;
 import javax.el.PropertyNotWritableException;
+import javax.el.StandardELContext;
 
+import com.sun.el.lang.EvaluationContext;
+
+import app.config.Sys;
 import framework.annotation.Config;
 
 /**
@@ -500,7 +505,7 @@ public class Formatter implements AutoCloseable {
                     value = Tool.string(result).orElse(null);
                     type = "raw " + type;
                 }
-                Tool.getLogger().config("[" + type + "] " + s + " -> " + Tool.cutLog(value));
+                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.eval_log_max_letters));
                 return value;
             };
             String key = s.substring(prefix, s.length() - suffix);
@@ -625,21 +630,120 @@ public class Formatter implements AutoCloseable {
                                 return base == null ? String.class : Object.class;
                             }
                         });
+                        el.getELManager().addELResolver(new ELResolver() { /* inner class resolver */
+
+                            @Override
+                            public Object getValue(ELContext context, Object base, Object property) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base instanceof ELClass && property instanceof String) {
+                                        Class<?> clazz = ((ELClass) base).getKlass();
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                                .peek(c -> context.setPropertyResolved(true)).findFirst().map(ELClass::new).orElse(null);
+                                    }
+                                } catch (SecurityException | IllegalArgumentException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Class<?> getType(ELContext context, Object base, Object property) {
+                                Objects.requireNonNull(context);
+                                try {
+                                    if (base instanceof ELClass && property instanceof String) {
+                                        Class<?> clazz = ((ELClass) base).getKlass();
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                                .peek(c -> context.setPropertyResolved(true)).findFirst().orElse(null);
+                                    }
+                                } catch (SecurityException | IllegalArgumentException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public void setValue(ELContext context, Object base, Object property, Object value) {
+                                throw new UnsupportedOperationException();
+                            }
+
+                            @Override
+                            public boolean isReadOnly(ELContext context, Object base, Object property) {
+                                return true;
+                            }
+
+                            @Override
+                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+                                return Arrays.<FeatureDescriptor>asList().iterator();
+                            }
+
+                            @Override
+                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
+                                return String.class;
+                            }
+                        });
+                        el.getELManager().addELResolver(new ELResolver() { /* empty resolver */
+
+                            @Override
+                            public Object getValue(ELContext context, Object base, Object property) {
+                                try {
+                                    ELContext c;
+                                    if(context instanceof EvaluationContext) {
+                                        c = ((EvaluationContext)context).getELContext();
+                                    } else {
+                                        c = context;
+                                    }
+                                    if (c instanceof StandardELContext && base == null && property instanceof String) {
+                                        if (Reflector.method(StandardELContext.class, "getBeans")
+                                                .map(Try.f(m -> !((Map<?, ?>) m.invoke(c)).containsKey(property))).orElse(false)) {
+                                            context.setPropertyResolved(true);
+                                        }
+                                    }
+                                } catch (SecurityException | IllegalArgumentException e) {
+                                    return null;
+                                }
+                                return null;
+                            }
+
+                            @Override
+                            public Class<?> getType(ELContext context, Object base, Object property) {
+                                return null;
+                            }
+
+                            @Override
+                            public void setValue(ELContext context, Object base, Object property, Object value) {
+                            }
+
+                            @Override
+                            public boolean isReadOnly(ELContext context, Object base, Object property) {
+                                return true;
+                            }
+
+                            @Override
+                            public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+                                return Arrays.<FeatureDescriptor>asList().iterator();
+                            }
+
+                            @Override
+                            public Class<?> getCommonPropertyType(ELContext context, Object base) {
+                                return String.class;
+                            }
+                        });
                         el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
                         el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
-                        el.defineBean("C", Sys.properties);
-                        el.defineBean("V", values == null ? new Object[] {} : values);
                         el.defineBean("A", Application.current().orElse(null));
                         el.defineBean("S", Session.current().orElse(null));
                         el.defineBean("R", Request.current().orElse(null));
+                        el.defineBean("V", values == null ? new Object[] {} : values);
+                        el.defineBean("sys", new ELClass(Sys.class));
                         if (map != null) {
                             map.forEach(el::defineBean);
                         }
                     }
                     return getResult.apply(Tool.string(el.eval(key)).orElse(""), "el");
                 } catch (Exception e) {
-                    Tool.getLogger().log(Level.WARNING, "el error", e);
+                    Log.warning(e, () -> "el error");
                     return s;
                 }
             }
@@ -654,7 +758,7 @@ public class Formatter implements AutoCloseable {
                 }
             }
 
-            /* bind messages {message.id:parameter1:...} */
+            /* bind config {key:parameter1:...} */
             if (key.indexOf('\n') < 0) {
                 String[] keys = key.split("\\s*:\\s*");
                 boolean hasParameter = keys.length > 1;
@@ -664,7 +768,7 @@ public class Formatter implements AutoCloseable {
                 Optional<String> message = Config.Injector.get(key);
                 if (message.isPresent()) {
                     return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
-                            "message");
+                            "config");
                 }
             }
             return s;

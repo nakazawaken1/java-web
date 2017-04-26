@@ -35,8 +35,6 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -45,6 +43,7 @@ import java.util.stream.StreamSupport;
 
 import javax.sql.DataSource;
 
+import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
@@ -136,9 +135,8 @@ public class Db implements AutoCloseable {
 
             public Example(Db db) {
                 String table = "test_table";
-                Logger logger = Tool.getLogger();
-                logger.info("[tables]");
-                db.tables().peek(logger::info).filter(table::equals).forEach(db::drop);
+                Log.info("[tables]");
+                db.tables().peek(Log::info).filter(table::equals).forEach(db::drop);
                 String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday").date(),
                         new Column("weight").decimal(4, 1));
                 for (int i = 1; i <= 20; i++) {
@@ -146,21 +144,21 @@ public class Db implements AutoCloseable {
                     c.add(Calendar.DATE, -i * 31);
                     db.insert(table, names, 1, i, "氏名'" + i, c.getTime(), BigDecimal.valueOf(Math.random() * 80 + 40));
                 }
-                logger.info(table + " rows: " + db.from(table).count());
+                Log.info(table + " rows: " + db.from(table).count());
                 Query q = db.select("name", "birthday", "weight").from(table).where(db.builder.fn("MONTH", "birthday") + " > 6").orderBy("id");
-                logger.info("querey rows: " + q.count());
+                Log.info("querey rows: " + q.count());
                 TryConsumer<ResultSet> printer = row -> {
                     ResultSetMetaData meta = row.getMetaData();
                     IntStream.rangeClosed(1, meta.getColumnCount()).forEach(Try.intC(i -> System.out.println(meta.getColumnName(i) + "=" + row.getObject(i))));
                 };
-                logger.info("7月以降まれ[1-3]");
+                Log.info("7月以降まれ[1-3]");
                 q.limit(3).rows(printer);
-                logger.info("7月以降まれ[4-6]");
+                Log.info("7月以降まれ[4-6]");
                 q.offset(3).rows(printer);
-                logger.info("7月以降まれ[7-]");
+                Log.info("7月以降まれ[7-]");
                 q.offset(6).limit(0).rows(printer);
                 db.truncate(table);
-                logger.info(table + " rows: " + db.from(table).count());
+                Log.info(table + " rows: " + db.from(table).count());
                 db.drop(table);
             }
         }
@@ -180,11 +178,6 @@ public class Db implements AutoCloseable {
             e.printStackTrace();
         }
     }
-
-    /**
-     * logger
-     */
-    transient Logger logger = Tool.getLogger();
 
     /**
      * data sources
@@ -361,9 +354,9 @@ public class Db implements AutoCloseable {
         this.type = type;
         try {
             connection.setAutoCommit(false);
-            logger.config("Connection created #" + connection.hashCode() + ", type = " + type + ", autoCommit = " + connection.getAutoCommit());
+            Log.config("Connection created #" + connection.hashCode() + ", type = " + type + ", autoCommit = " + connection.getAutoCommit());
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "setAutoCommit failed", e);
+            Log.warning(e, () -> "setAutoCommit failed");
         }
         switch (type) {
         case POSTGRESQL:
@@ -397,7 +390,7 @@ public class Db implements AutoCloseable {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
             String url = Config.Injector.<String>get("sys.db" + key).orElseThrow(RuntimeException::new);
             Type type = Type.fromUrl(url);
-            String name = Tool.string(Sys.properties.getProperty("sys.db.datasource_class")).orElse(type.dataSource);
+            String name = Tool.string(Config.Injector.getSource(Sys.class).getProperty("sys.db.datasource_class")).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
             if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
@@ -422,7 +415,7 @@ public class Db implements AutoCloseable {
                     continue;
                 }
             }
-            Tool.getLogger().info("DataSource created #" + ds);
+            Log.info("DataSource created #" + ds);
             return ds;
         }));
     }
@@ -486,10 +479,10 @@ public class Db implements AutoCloseable {
                 connection.commit();
             }
             connection.close();
-            logger.config("Connection dropped #" + connection.hashCode() + " " + (isRollback ? "rollback" : "commit"));
+            Log.config("Connection dropped #" + connection.hashCode() + " " + (isRollback ? "rollback" : "commit"));
             connection = null;
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Connection close error", e);
+            Log.warning(e, () -> "Connection close error");
         }
     }
 
@@ -518,7 +511,7 @@ public class Db implements AutoCloseable {
     @SuppressFBWarnings("OBL_UNSATISFIED_OBLIGATION")
     public Stream<ResultSet> query(String sql, Map<String, Object> map, Object... values) {
         sql = sql(sql, map, values);
-        logger.info(sql + ";");
+        Log.info(sql + ";");
         try {
             return stream(connection.prepareStatement(sql));
         } catch (SQLException e) {
@@ -554,14 +547,14 @@ public class Db implements AutoCloseable {
             Integer hash = null;
             try (PreparedStatement ps = connection.prepareStatement(s)) {
                 hash = ps.hashCode();
-                logger.config("PreparedStatement created #" + hash);
-                logger.info(s + ";");
+                Log.config("PreparedStatement created #" + hash);
+                Log.info(s + ";");
                 total += ps.executeUpdate();
             } catch (SQLException e) {
                 Try.r(connection::rollback).run();
                 throw new UncheckedSQLException(e);
             } finally {
-                logger.config("PreparedStatement dropped #" + hash);
+                Log.config("PreparedStatement dropped #" + hash);
             }
         }
         return total;
@@ -593,7 +586,7 @@ public class Db implements AutoCloseable {
         if (!url.isPresent()) {
             url = Tool.toURL(commonPath);
         }
-        logger.info(url.map(URL::toString).orElse(name + " not found"));
+        Log.info(url.map(URL::toString).orElse(name + " not found"));
         return url.map(Try.f(i -> builder.replace(Tool.loadText(i.openStream()))));
     }
 
@@ -749,7 +742,7 @@ public class Db implements AutoCloseable {
      */
     public Stream<ResultSet> stream(String sql) {
         try {
-            logger.info(sql + ";");
+            Log.info(sql + ";");
             ResultSetSpliterator i = new ResultSetSpliterator(connection.prepareStatement(sql));
             if (resources == null) {
                 resources = new ArrayList<>();
@@ -935,7 +928,7 @@ public class Db implements AutoCloseable {
         String suffix = ".sql";
         List<String> all;
         try (Stream<String> files = Tool.getResources(folder)) {
-            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(Tool.getLogger()::info)
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(Log::info)
                     .collect(Collectors.toList());
         }
         List<String> datas = all.stream().filter(file -> file.startsWith(dataPrefix)).collect(Collectors.toList());
@@ -1502,18 +1495,13 @@ public class Db implements AutoCloseable {
         ResultSet rs;
 
         /**
-         * logger
-         */
-        Logger logger = Tool.getLogger();
-
-        /**
          * constructor
          *
          * @param rs result set
          */
         public ResultSetSpliterator(ResultSet rs) {
             this.rs = rs;
-            logger.config("ResultSet created #" + rs.hashCode());
+            Log.config("ResultSet created #" + rs.hashCode());
         }
 
         /**
@@ -1523,7 +1511,7 @@ public class Db implements AutoCloseable {
          */
         public ResultSetSpliterator(PreparedStatement ps) {
             this.ps = ps;
-            logger.config("PreparedStatement created #" + ps.hashCode());
+            Log.config("PreparedStatement created #" + ps.hashCode());
         }
 
         /*
@@ -1536,20 +1524,20 @@ public class Db implements AutoCloseable {
             try {
                 if (rs != null) {
                     rs.close();
-                    logger.config("ResultSet dropped #" + rs.hashCode());
+                    Log.config("ResultSet dropped #" + rs.hashCode());
                     rs = null;
                 }
             } catch (SQLException e) {
-                logger.log(Level.WARNING, "ResultSet close error", e);
+                Log.warning(e, () -> "ResultSet close error");
             }
             try {
                 if (ps != null) {
                     ps.close();
-                    logger.config("PreparedStatement dropped #" + ps.hashCode());
+                    Log.config("PreparedStatement dropped #" + ps.hashCode());
                     ps = null;
                 }
             } catch (SQLException e) {
-                logger.log(Level.WARNING, "PreparedStatement close error", e);
+                Log.warning(e, () -> "PreparedStatement close error");
             }
         }
 
@@ -1563,7 +1551,7 @@ public class Db implements AutoCloseable {
             try {
                 if (rs == null) {
                     rs = ps.executeQuery();
-                    logger.config("ResultSet created #" + rs.hashCode());
+                    Log.config("ResultSet created #" + rs.hashCode());
                 }
                 if (rs.next()) {
                     if (action != null) {
@@ -1616,10 +1604,6 @@ public class Db implements AutoCloseable {
      */
     public static class Query {
 
-        /**
-         * logger
-         */
-        Logger logger = Tool.getLogger();
         /**
          * table
          */
@@ -1901,7 +1885,7 @@ public class Db implements AutoCloseable {
          */
         public void delete() {
             String sql = db.builder.deleteSql(this);
-            logger.info(sql + ";");
+            Log.info(sql + ";");
             try (PreparedStatement ps = db.connection.prepareStatement(sql)) {
                 ps.execute();
             } catch (SQLException e) {
@@ -1934,7 +1918,7 @@ public class Db implements AutoCloseable {
     public void prepare(String sql, TryFunction<PreparedStatement, Object[]> prepare) {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             Object[] values = Try.f(prepare).apply(ps);
-            logger.info(() -> preparedSQL(sql, values));
+            Log.info(() -> preparedSQL(sql, values));
         } catch (SQLException e) {
             Try.r(connection::rollback).run();
             throw new UncheckedSQLException(e);
@@ -1953,7 +1937,7 @@ public class Db implements AutoCloseable {
         long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             Object[] values = Try.f(prepare).apply(ps);
-            logger.info(() -> preparedSQL(sql, values));
+            Log.info(() -> preparedSQL(sql, values));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     count++;

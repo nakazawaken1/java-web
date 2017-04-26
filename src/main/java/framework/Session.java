@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Optional;
 
+import app.config.Sys;
+
 /**
  * session scoped object
  */
@@ -20,6 +22,11 @@ public abstract class Session implements Attributes<Serializable> {
     public static Optional<Session> current() {
         return Optional.ofNullable(CURRENT.get());
     }
+
+    /**
+     * @return request id
+     */
+    public abstract int getId();
 
     /**
      * session key of account
@@ -53,13 +60,13 @@ public abstract class Session implements Attributes<Serializable> {
     public boolean login(String loginId, String password) {
         Optional<Account> a = Try
                 .s(() -> Tool.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
-                    Tool.getLogger().warning(Tool.print(e::printStackTrace));
+                    Log.warning(() -> Tool.print(e::printStackTrace));
                     return Optional.<Account>empty();
                 }).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
-            Tool.getLogger().info("logged in : " + loginId + Arrays.toString(i.roles));
-        }, () -> Tool.getLogger().info("login failed: " + loginId));
+            Log.info("logged in : " + loginId + Arrays.toString(i.roles));
+        }, () -> Log.info("login failed: " + loginId));
     }
 
     /**

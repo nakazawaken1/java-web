@@ -14,7 +14,6 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -45,7 +44,6 @@ public abstract class Request implements Attributes<Object> {
     public static Optional<Request> current() {
         return Optional.ofNullable(CURRENT.get());
     }
-
 
     /**
      * @return request id
@@ -119,7 +117,7 @@ public abstract class Request implements Attributes<Object> {
                 if (n <= 0) {
                     break;
                 }
-                Logger.getGlobal().info(new String(bytes, 0, n, StandardCharsets.UTF_8));
+                Log.info(new String(bytes, 0, n, StandardCharsets.UTF_8));
             }
         }
     }

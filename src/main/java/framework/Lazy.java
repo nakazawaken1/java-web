@@ -3,8 +3,6 @@ package framework;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Instantiate when first reference
@@ -33,7 +31,7 @@ public class Lazy<T> implements AutoCloseable {
      */
     public synchronized T get() {
         T value = instance.orElseGet(() -> supplier == null ? null : supplier.get());
-        if(!instance.isPresent()) {
+        if (!instance.isPresent()) {
             instance = Optional.ofNullable(value);
         }
         return value;
@@ -43,7 +41,7 @@ public class Lazy<T> implements AutoCloseable {
      * @param value value
      */
     public synchronized void set(T value) {
-        if(supplier != null) {
+        if (supplier != null) {
             throw new UnsupportedOperationException();
         }
         instance = Optional.ofNullable(value);
@@ -58,11 +56,13 @@ public class Lazy<T> implements AutoCloseable {
         return this;
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see java.lang.AutoCloseable#close()
      */
     @Override
     public void close() {
-        instance.filter(i -> i instanceof AutoCloseable).ifPresent(Try.c(i -> ((AutoCloseable) i).close(), (e, i) -> Logger.getGlobal().log(Level.WARNING, "close error", e)));
+        instance.filter(i -> i instanceof AutoCloseable).ifPresent(Try.c(i -> ((AutoCloseable) i).close(), (e, i) -> Log.warning(e, () -> "close error")));
     }
 }

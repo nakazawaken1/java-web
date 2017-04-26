@@ -19,11 +19,11 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
@@ -110,11 +110,6 @@ public abstract class Response {
      * instance creator
      */
     static Supplier<Response> factory;
-
-    /**
-     * logger
-     */
-    transient final Logger logger = Tool.getLogger();
 
     /**
      * encoding
@@ -355,7 +350,7 @@ public abstract class Response {
                 }
             }
         }));
-        logger.info(toString());
+        Log.info(this::toString);
     }
 
     /**
@@ -430,8 +425,7 @@ public abstract class Response {
                                         && Try.s(() -> in.available() >= 0, e -> false).get()) {
                                     response.contentType(Tool.getContentType(file),
                                             response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                                    if (Sys.format_include_regex.matcher(file).matches()
-                                            && !Sys.format_exclude_regex.matcher(file).matches()) {
+                                    if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
                                         try (Stream<String> lines = Tool.lines(in);
                                                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
                                             Function<Formatter, Formatter.Result> exclude;
@@ -456,7 +450,7 @@ public abstract class Response {
                                 } else {
                                     String prefix = Paths.get(Sys.document_root_folder).toString().replace('\\', '/');
                                     String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
-                                    Tool.getLogger().info(file + " : " + path);
+                                    Log.info(file + " : " + path);
                                     response.setHeader("Location",
                                             Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
                                             .status(Status.Moved_Permamently);
@@ -470,7 +464,7 @@ public abstract class Response {
                         if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
                             response.status(Status.No_Content);
                         } else {
-                            Tool.getLogger().info("not found: " + Tool.trim("/", file, null));
+                            Log.info("not found: " + Tool.trim("/", file, null));
                             response.status(Status.Not_Found);
                         }
                         out.get();

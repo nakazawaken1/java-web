@@ -102,7 +102,7 @@ width: 48%;
 
 <div id="menu">
   <form method="post" class="left">
-    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${C[isFull ? 'sys.item.compact' : 'sys.item.full']}" /> <a href="{sys.context_path}">{sys.item.back}</a>
+    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? sys.item.compact : sys.item.full}" /> <a href="{sys.context_path}">{sys.item.back}</a>
   </form>
 
   <table class="legend">
@@ -118,9 +118,9 @@ width: 48%;
 <table class="full">
   <tr class="header">
     <th class="index">{sys.item.index}</th>
-    <th>{sys.item.before}</th>
+    <th>${empty before ? sys.item.before : before}</th>
     <th class="index">{sys.item.index}</th>
-    <th>{sys.item.after}</th>
+    <th>${empty after ? sys.item.after : after}</th>
   </tr>
   <!--{F:includeFor('parts/diff.html', diffs)}-->
 </table>

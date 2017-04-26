@@ -51,8 +51,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -68,8 +66,10 @@ import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
 
+import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
+import framework.annotation.Config;
 import framework.annotation.Route.Method;
 
 /**
@@ -87,7 +87,6 @@ public class Standalone {
         // setup
         String contextPath = Sys.context_path;
         new ApplicationImpl(contextPath).setup(ResponseImpl::new);
-        Logger logger = Tool.getLogger();
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
             try (Defer<Request> request = new Defer<>(new RequestImpl(exchange), r -> Request.CURRENT.remove());
@@ -99,7 +98,7 @@ public class Standalone {
                 Request.CURRENT.set(request.get());
                 Application.current().get().handle(request.get(), session.get());
             } catch (Exception e) {
-                logger.log(Level.WARNING, "500", e);
+                Log.warning(e, () -> "500");
                 exchange.sendResponseHeaders(500, -1);
                 exchange.close();
             }
@@ -112,9 +111,9 @@ public class Standalone {
                 http.setExecutor(executor);
                 http.createContext(contextPath, handler);
                 http.start();
-                logger.info("http server started on port " + port);
+                Log.info("http server started on port " + port);
             } catch (IOException e) {
-                logger.log(Level.WARNING, "http sever setup error", e);
+                Log.warning(e, () -> "http sever setup error");
             }
         });
 
@@ -128,10 +127,10 @@ public class Standalone {
                 https.setExecutor(executor);
                 https.createContext(contextPath, handler);
                 https.start();
-                logger.info("https server started on port " + port);
+                Log.info("https server started on port " + port);
             } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException
                     | InvalidKeySpecException e) {
-                logger.log(Level.WARNING, "https server setup error", e);
+                Log.warning(e, () -> "https server setup error");
             }
         });
 
@@ -144,7 +143,7 @@ public class Standalone {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Sys.properties.entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
+                Config.Injector.getSource(Sys.class).entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
                         .map(p -> Tuple.of((String) p.getKey(), (String) p.getValue())).filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
                         .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\="))
                         .forEach(lines::add);
@@ -153,11 +152,11 @@ public class Standalone {
                 Object db = Tool.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
                         new Object[] { Tool.array("-properties", config.getParent()) });
                 Tool.invoke(db, "start", Tool.array());
-                Runtime.getRuntime().addShutdownHook(
-                        new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Tool.getLogger().log(Level.WARNING, "h2 stop error", e))));
-                logger.info("h2 console started on port " + port);
+                Runtime.getRuntime()
+                        .addShutdownHook(new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 stop error"))));
+                Log.info("h2 console started on port " + port);
             } catch (Exception e) {
-                logger.log(Level.WARNING, "h2 error", e);
+                Log.warning(e, () -> "h2 error");
             }
         });
 
@@ -406,6 +405,11 @@ public class Standalone {
         }
 
         @Override
+        public int getId() {
+            return id.hashCode();
+        }
+
+        @Override
         public String toString() {
             return id;
         }
@@ -461,7 +465,7 @@ public class Standalone {
                 }
                 saved = true;
             } catch (IOException e) {
-                Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, e);
+                Log.severe(e, () -> "session save error");
             }
         }
 
@@ -507,7 +511,6 @@ public class Standalone {
          */
         RequestImpl(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
-            Logger logger = Tool.getLogger();
             String p = exchange.getRequestURI().getPath();
             String r = Application.current().map(Application::getContextPath).orElse("");
             path = p.length() <= r.length() ? "/" : p.substring(r.length());
@@ -560,10 +563,10 @@ public class Standalone {
                             if (filename == null) {// parameter value
                                 Tuple<byte[], File> pair = readBody(in, boundary);
                                 if (pair.r != null) {
-                                    logger.config(pair.r + " deleted " + pair.r.delete());
+                                    Log.config(pair.r + " deleted " + pair.r.delete());
                                 }
                                 if (pair.l == null) {
-                                    logger.info("413 payload too large");
+                                    Log.info("413 payload too large");
                                     break loop;
                                 }
                                 Tool.add(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
@@ -580,7 +583,7 @@ public class Standalone {
                                         try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
                                             to.transferFrom(Channels.newChannel(in), 0, length);
                                         }
-                                        logger.info("saved " + f + " " + length + "bytes");
+                                        Log.info("saved " + f + " " + length + "bytes");
                                         files.put(filename, Tuple.of(null, f));
                                     }
                                 } else if (!filename.isEmpty()) {
@@ -698,7 +701,7 @@ public class Standalone {
                 if (out == lines) {
                     return Tuple.of(lines.toByteArray(), null);
                 }
-                Tool.getLogger().info("saved " + f + " " + size + "bytes");
+                Log.info("saved " + f + " " + size + "bytes");
                 return Tuple.of(null, f);
             } finally {
                 lines.close();
@@ -877,8 +880,9 @@ public class Standalone {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> ((RequestImpl) i).exchange)
-                    .map(r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().getFirst("Content-Type")).orElse("")).orElse("");
+            return Request.current().map(i -> ((RequestImpl) i).exchange).map(
+                    r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().getFirst("Content-Type")).orElse(""))
+                    .orElse("");
         }
     }
 }

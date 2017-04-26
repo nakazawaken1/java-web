@@ -4,13 +4,13 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -108,7 +108,7 @@ public class Reflector {
         try {
             return Optional.ofNullable((Class<T>) Class.forName(clazz));
         } catch (ClassNotFoundException e) {
-            Tool.getLogger().log(Level.INFO, "class error", e);
+            Log.info(e, () -> "class error");
             return Optional.empty();
         }
     }
@@ -208,5 +208,64 @@ public class Reflector {
      */
     public static Predicate<Field> hasAnnotation(Class<? extends Annotation> annotationClass) {
         return field -> field.getAnnotation(annotationClass) != null;
+    }
+
+    /**
+     * @param field Field
+     * @param index index
+     * @return generic type
+     */
+    public static Class<?> getGenericParameter(Field field, int index) {
+        return (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[index];
+    }
+
+    /**
+     * @param <T> Value type
+     * @param annotation Target
+     * @param methodName Method name
+     * @return Default value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T getDefaultValue(Class<? extends Annotation> annotation, String methodName) {
+        try {
+            return (T) annotation.getMethod(methodName).getDefaultValue();
+        } catch (NoSuchMethodException | SecurityException e) {
+            throw new InternalError(e);
+        }
+    }
+
+    /**
+     * @param value Value
+     * @return True if modified value else false
+     */
+    public static boolean isModified(Object value) {
+        if (value == null || value == Optional.empty()) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (boolean) value != false;
+        }
+        if (value instanceof Byte) {
+            return (byte) value != (byte) 0;
+        }
+        if (value instanceof Short) {
+            return (short) value != (short) 0;
+        }
+        if (value instanceof Integer) {
+            return (int) value != (int) 0;
+        }
+        if (value instanceof Long) {
+            return (long) value != (long) 0;
+        }
+        if (value instanceof Float) {
+            return (float) value != (float) 0;
+        }
+        if (value instanceof Double) {
+            return (double) value != (double) 0;
+        }
+        if (value instanceof Character) {
+            return (char) value != (char) 0;
+        }
+        return true;
     }
 }

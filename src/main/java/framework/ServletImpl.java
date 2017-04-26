@@ -25,6 +25,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.annotation.Route;
 
@@ -180,6 +181,11 @@ public class ServletImpl implements javax.servlet.Servlet {
         SessionImpl(HttpSession session) {
             this.session = session;
             session.setMaxInactiveInterval(Sys.session_timeout_minutes * 60);
+        }
+
+        @Override
+        public int getId() {
+            return session.getId().hashCode();
         }
 
         /*

@@ -56,7 +56,6 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -86,6 +85,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
+import app.config.Sys;
 import framework.Try.TryTriConsumer;
 
 /**
@@ -1007,13 +1007,6 @@ public class Tool {
     }
 
     /**
-     * @return logger
-     */
-    public static Logger getLogger() {
-        return Logger.getLogger(Request.current().map(i -> String.valueOf(i.getId())).orElse(""));
-    }
-
-    /**
      * @param map map
      * @param key key
      * @param value value
@@ -1175,20 +1168,19 @@ public class Tool {
      * @param args text
      */
     public static void main(String[] args) {
-        // Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Logger.getGlobal()::info);
-        // Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Logger.getGlobal()::info);
+        // Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Log::info);
+        // Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Log::info);
         // // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
         // // ZonedDateTime.now()));
         // try(Stream<String> list = getResources("app/controller")) {
-        // list.forEach(Logger.getGlobal()::info);
+        // list.forEach(Log::info);
         // }
         // try (Stream<Class<?>> list = getClasses("test")) {
-        // list.forEach(c -> Logger.getGlobal().info(c.getCanonicalName()));
+        // list.forEach(c -> Log.info(c.getCanonicalName()));
         // }
-        Logger logger = Logger.getGlobal();
         String text = "target text!";
         // String password = "abcd123";
-        // logger.info("source: " + text);
+        // Log.info("source: " + text);
         // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         // try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
         // out.write(text.getBytes(StandardCharsets.UTF_8));
@@ -1196,11 +1188,11 @@ public class Tool {
         // e.printStackTrace();
         // }
         // byte[] encrypted = bytes.toByteArray();
-        // logger.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
-        // logger.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
+        // Log.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
+        // Log.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
         // password));
-        logger.info("base128encoded: " + base128Decode(text));
-        logger.info("base128decoded: " + base128Decode(base128Encode(text)));
+        Log.info("base128encoded: " + base128Decode(text));
+        Log.info("base128decoded: " + base128Decode(base128Encode(text)));
     }
 
     /**
@@ -1360,10 +1352,10 @@ public class Tool {
 
     /**
      * @param text text
+     * @param max max length
      * @return cut text
      */
-    public static String cutLog(String text) {
-        int max = Sys.eval_log_max_letters;
+    public static String cut(String text, int max) {
         return Optional.ofNullable(text).map(i -> {
             boolean suffix = false;
             int index = i.indexOf('\r');

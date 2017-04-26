@@ -4,16 +4,11 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 /**
  * Binder test
  */
 public class TestBinder extends Tester {
-    /**
-     * logger
-     */
-    Logger logger = Tool.getLogger();
 
     /**
      * @param text text
@@ -36,7 +31,7 @@ public class TestBinder extends Tester {
      */
     Object to(Class<?> c, Object value) {
         return c == null ? null : Try.s(() -> c.getMethod("valueOf", String.class).invoke(null, Objects.toString(value)), e -> {
-            logger.info(e.toString());
+            Log.info(e::toString);
             return value;
         }).get();
     }
