@@ -1,0 +1,68 @@
+<style type="text/css">
+* {
+  font-family: monospace;
+  font-size: 11pt;
+}
+table {
+  border-collapse: collapse;
+}
+th, td {
+  border: 1px solid #e2e2e2;
+}
+</style>
+<form method="post">
+  <table>
+    <tr>
+      <th>source</th>
+      <td><input type="text" name="text" value="${text}" /> <input type="submit" value="{sys.item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{sys.item.clear}" /></td>
+    </tr>
+    <tr>
+      <th>MD2</th>
+      <td>${empty text ? '' : Tool.hash(text, 'MD2')}</td>
+    </tr>
+    <tr>
+      <th>MD5</th>
+      <td>${empty text ? '' : Tool.hash(text, 'MD5')}</td>
+    </tr>
+    <tr>
+      <th>SHA-1</th>
+      <td>${empty text ? '' : Tool.hash(text, 'SHA-1')}</td>
+    </tr>
+    <tr>
+      <th>SHA-256</th>
+      <td>${empty text ? '' : Tool.hash(text, 'SHA-256')}</td>
+    </tr>
+    <tr>
+      <th>SHA-384</th>
+      <td>${empty text ? '' : Tool.hash(text, 'SHA-384')}</td>
+    </tr>
+    <tr>
+      <th>SHA-512</th>
+      <td>${empty text ? '' : Tool.hash(text, 'SHA-512')}</td>
+    </tr>
+    <tr>
+      <th>Base64 encode</th>
+      <td>${empty text ? '' : Tool.base64Encode(text)}</td>
+    </tr>
+    <tr>
+      <th>Base64 decode</th>
+      <td>${empty text ? '' : Tool.base64Decode(text)}</td>
+    </tr>
+    <tr>
+      <th>Base128 encode</th>
+      <td>${empty text ? '' : Tool.base128Encode(text)}</td>
+    </tr>
+    <tr>
+      <th>Base128 decode</th>
+      <td>${empty text ? '' : Tool.base128Decode(text)}</td>
+    </tr>
+    <tr>
+      <th>URL encode</th>
+      <td>${empty text ? '' : Tool.urlEncode(text)}</td>
+    </tr>
+    <tr>
+      <th>URL decode</th>
+      <td>${empty text ? '' : Tool.urlDecode(text)}</td>
+    </tr>
+  </table>
+</form>

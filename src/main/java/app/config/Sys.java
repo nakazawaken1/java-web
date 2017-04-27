@@ -164,6 +164,8 @@ public interface Sys {
         String full = "全行表示";
         String copyright = "©2016, All Rights Reserved.";
         String reader = "&#xFE19;";
+        String run = "実行";
+        String clear = "クリア";
     }
 
     public interface Alert {

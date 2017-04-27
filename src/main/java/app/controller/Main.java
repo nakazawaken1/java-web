@@ -154,7 +154,7 @@ public class Main {
      * @param request request
      * @param before before
      * @param after after
-     * @return Diff
+     * @return response
      */
     @Route
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
@@ -171,5 +171,14 @@ public class Main {
                     Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
                             Sys.Item.reader));
         })).orElseGet(() -> Response.file("diff.html"));
+    }
+    
+    /**
+     * @param text Source text
+     * @return response
+     */
+    @Route
+    Object hash(Optional<String> text) {
+        return Response.file("hash.html").bind("text", text.orElse(""));
     }
 }

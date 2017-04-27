@@ -16,6 +16,8 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.JarURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -898,10 +901,19 @@ public class Tool {
 
     /**
      * @param text text
+     * @param algorithm algorithm
+     * @return hash
+     */
+    public static String hash(String text, String algorithm) {
+        return DatatypeConverter.printHexBinary(digest(text.getBytes(StandardCharsets.UTF_8), algorithm));
+    }
+
+    /**
+     * @param text text
      * @return sha256
      */
     public static String hash(String text) {
-        return DatatypeConverter.printHexBinary(digest(text.getBytes(StandardCharsets.UTF_8), "SHA-256"));
+        return hash(text, "SHA-256");
     }
 
     /**
@@ -1024,6 +1036,50 @@ public class Tool {
     }
 
     /**
+     * @param text text
+     * @return Url encoded text
+     */
+    public static String urlEncode(String text) {
+        try {
+            return URLEncoder.encode(text, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new InternalError(e);
+        }
+    }
+
+    /**
+     * @param text Url encoded text
+     * @return text
+     */
+    public static String urlDecode(String text) {
+        try {
+            return URLDecoder.decode(text, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new InternalError(e);
+        }
+    }
+
+    /**
+     * @param text text
+     * @return Base64 encoded text
+     */
+    public static String base64Encode(String text) {
+        return Base64.getUrlEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * @param text Base64 encoded text
+     * @return text
+     */
+    public static String base64Decode(String text) {
+        try {
+            return new String(Base64.getUrlDecoder().decode(text), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return text;
+        }
+    }
+
+    /**
      * base 128 characters
      */
     static final byte[] base128 = Try
@@ -1086,7 +1142,7 @@ public class Tool {
 
     /**
      * @param text text
-     * @return base128 text
+     * @return base128 encoded text
      */
     public static String base128Encode(String text) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -1151,12 +1207,14 @@ public class Tool {
     }
 
     /**
-     * @param text encoded text
-     * @return decoded text
+     * @param text base128 encoded text
+     * @return text
      */
     public static String base128Decode(String text) {
         try {
             return loadText(withBase128Decode(new ByteArrayInputStream(text.getBytes("MS932"))));
+        } catch (IllegalArgumentException e) {
+            return text;
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
