@@ -420,9 +420,11 @@ public abstract class Response {
                         String file = ((Path) response.content).toString().replace('\\', '/');
                         Optional<URL> url = Tool.toURL(file);
                         if (url.isPresent()) {
-                            try (InputStream in = url.get().openStream()) {
-                                if (!("file".equals(url.get().getProtocol()) && Paths.get(url.get().toURI()).toFile().isDirectory())
+                            URL u = url.get();
+                            try (InputStream in = u.openStream()) {
+                                if (!("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
                                         && Try.s(() -> in.available() >= 0, e -> false).get()) {
+                                    Log.config("[static load] " + u);
                                     response.contentType(Tool.getContentType(file),
                                             response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
                                     if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {

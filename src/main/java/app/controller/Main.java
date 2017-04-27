@@ -16,6 +16,7 @@ import framework.Session;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Config;
+import framework.annotation.Content;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
@@ -34,7 +35,7 @@ public class Main {
      * @param request request
      * @return response
      */
-    @Route
+    @Route(extensions = ".html")
     Object index(Session session, Request request) {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
@@ -107,7 +108,7 @@ public class Main {
      * @param password password
      * @return response
      */
-    @Route(Method.POST)
+    @Route(value = Method.POST)
     Object login(Session session, Optional<String> loginId, Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
@@ -157,6 +158,7 @@ public class Main {
      * @return response
      */
     @Route
+    @Content(Content.HTML)
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -178,6 +180,7 @@ public class Main {
      * @return response
      */
     @Route
+    @Content(Content.HTML)
     Object hash(Optional<String> text) {
         return Response.file("hash.html").bind("text", text.orElse(""));
     }

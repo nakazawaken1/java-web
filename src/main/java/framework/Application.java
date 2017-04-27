@@ -164,16 +164,23 @@ public abstract class Application implements Attributes<Object> {
         /* action */
         Optional<String> mime;
         final String action;
-        int index = path.lastIndexOf('.');
-        if (index >= 0 && index + 5 >= path.length()) {
+        final String extension;
+        final int index = path.lastIndexOf('.');
+        if (index >= 0 && path.lastIndexOf('/') < index) {
             mime = Optional.ofNullable(Tool.getContentType(path));
             action = path.substring(0, index);
+            extension = path.substring(index);
         } else {
             mime = Optional.empty();
             action = path;
+            extension = "";
         }
+        final String contentType = mime.orElse(null);
         final Tuple<Class<?>, Method> pair = table.get(action);
-        if (pair != null) {
+        if (pair != null && (Optional.ofNullable(pair.r.getAnnotation(Content.class)).map(Content::value)
+                .map(v -> v.length <= 0 || Stream.of(v).anyMatch(t -> t.equals(contentType))).orElse(true)
+                || Tool.val(pair.r.getAnnotation(Route.class).extensions(),
+                        extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension))))) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);
@@ -192,6 +199,7 @@ public abstract class Application implements Attributes<Object> {
                 }
                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                     try {
+                        Log.config("[invoke method] " + method.getDeclaringClass().getName() + "." + method.getName());
                         Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
                                 Stream.of(method.getParameters()).map(p -> {
                                     Class<?> type = p.getType();

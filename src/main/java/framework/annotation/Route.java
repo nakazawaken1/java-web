@@ -21,6 +21,11 @@ public @interface Route {
      * @return path
      */
     String path() default "";
+    
+    /**
+     * @return allow extension(not check if empty)
+     */
+    String[] extensions() default {""};
 
     /**
      * http method
