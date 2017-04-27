@@ -175,12 +175,9 @@ public abstract class Application implements Attributes<Object> {
             action = path;
             extension = "";
         }
-        final String contentType = mime.orElse(null);
         final Tuple<Class<?>, Method> pair = table.get(action);
-        if (pair != null && (Optional.ofNullable(pair.r.getAnnotation(Content.class)).map(Content::value)
-                .map(v -> v.length <= 0 || Stream.of(v).anyMatch(t -> t.equals(contentType))).orElse(true)
-                || Tool.val(pair.r.getAnnotation(Route.class).extensions(),
-                        extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension))))) {
+        if (pair != null && Tool.val(pair.r.getAnnotation(Route.class).extensions(),
+                        extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension)))) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);

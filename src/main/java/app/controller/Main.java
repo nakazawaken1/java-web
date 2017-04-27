@@ -16,7 +16,6 @@ import framework.Session;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Config;
-import framework.annotation.Content;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
@@ -157,8 +156,7 @@ public class Main {
      * @param after after
      * @return response
      */
-    @Route
-    @Content(Content.HTML)
+    @Route(extensions=".html")
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -179,8 +177,7 @@ public class Main {
      * @param text Source text
      * @return response
      */
-    @Route
-    @Content(Content.HTML)
+    @Route(extensions=".html")
     Object hash(Optional<String> text) {
         return Response.file("hash.html").bind("text", text.orElse(""));
     }
