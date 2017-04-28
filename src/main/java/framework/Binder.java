@@ -92,7 +92,7 @@ public class Binder {
         // Optional
         if (clazz == Optional.class) {
             Object value = convert(first, parameterizedType[0], e -> null);
-            return Optional.ofNullable(value);
+            return Tool.of(value);
         }
 
         return convert(first, clazz, null);

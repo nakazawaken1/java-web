@@ -69,7 +69,7 @@ public @interface Config {
             Properties sourceProperties = new Properties();
 
             /* load config files form Config or classname.config */
-            String[] fs = Optional.ofNullable(clazz.getAnnotation(Config.class)).map(Config::value)
+            String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value)
                     .orElse(new String[] { clazz.getSimpleName().toLowerCase() + ".config" });
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
@@ -188,7 +188,7 @@ public @interface Config {
                 return Optional.empty();
             }
             try {
-                return Optional.ofNullable((T) field.get(null));
+                return Tool.of((T) field.get(null));
             } catch (IllegalArgumentException | IllegalAccessException e) {
                 return Optional.empty();
             }
@@ -351,7 +351,7 @@ public @interface Config {
                 try {
                     String key = newPrefix + f.getName();
                     Object value = f.get(null);
-                    List<String> comments = Optional.ofNullable(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
+                    List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
                     if (comments != null) {
                         Collections.reverse(comments);
                     }
@@ -379,7 +379,7 @@ public @interface Config {
          * @return DateTimeFormatter or empty
          */
         static Optional<DateTimeFormatter> getFormat(Field field) {
-            return Optional.ofNullable(field.getAnnotation(Format.class)).map(Format::value).map(DateTimeFormatter::ofPattern);
+            return Tool.of(field.getAnnotation(Format.class)).map(Format::value).map(DateTimeFormatter::ofPattern);
         }
 
         /**
@@ -423,7 +423,7 @@ public @interface Config {
             } else if (type == Character.class || type == char.class) {
                 return raw != null && raw.length() > 0 ? raw.charAt(0) : '\0';
             } else if (type == Boolean.class || type == boolean.class) {
-                return raw == null ? false : Boolean.parseBoolean(raw);
+                return Boolean.parseBoolean(raw);
             } else if (type == String.class) {
                 return raw == null ? "" : raw;
             } else if (type == LocalDate.class) {
@@ -483,7 +483,7 @@ public @interface Config {
                 return "";
             }
             Class<?> clazz = field.getType();
-            char separator = Optional.ofNullable(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
+            char separator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
             if (clazz == Optional.class) {
                 return ((Optional<?>) value).map(String::valueOf).orElse("");
             }
@@ -501,7 +501,7 @@ public @interface Config {
                 return ((Set<?>) value).stream().map(String::valueOf).collect(Collectors.joining(String.valueOf(separator)));
             }
             if (clazz == Map.class) {
-                char pairSeparator = Optional.ofNullable(field.getAnnotation(Separator.class)).map(Separator::pair).orElse(pairDefault);
+                char pairSeparator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::pair).orElse(pairDefault);
                 return ((Map<?, ?>) value).entrySet().stream().map(pair -> String.valueOf(pair.getKey()) + pairSeparator + pair.getValue())
                         .collect(Collectors.joining(String.valueOf(separator)));
             }

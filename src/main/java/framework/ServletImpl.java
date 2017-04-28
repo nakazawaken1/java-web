@@ -131,7 +131,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(Optional.ofNullable((T) context.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Tool.of((T) context.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -216,7 +216,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(Optional.ofNullable((T) session.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Tool.of((T) session.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -301,7 +301,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(Optional.ofNullable((T) request.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Tool.of((T) request.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
         }
 
         /*
@@ -346,7 +346,7 @@ public class ServletImpl implements javax.servlet.Servlet {
                 @SuppressWarnings("unchecked")
                 @Override
                 public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Optional.ofNullable(request.getHeaders(name)).map(e -> Tool.stream(e).collect(Collectors.toList()));
+                    return (Optional<T>) Tool.of(request.getHeaders(name)).map(e -> Tool.stream(e).collect(Collectors.toList()));
                 }
 
                 @Override
@@ -373,7 +373,7 @@ public class ServletImpl implements javax.servlet.Servlet {
                 @SuppressWarnings("unchecked")
                 @Override
                 public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Optional.ofNullable(request.getParameterValues(name)).map(a -> Arrays.asList(a));
+                    return (Optional<T>) Tool.of(request.getParameterValues(name)).map(a -> Arrays.asList(a));
                 }
 
                 @Override

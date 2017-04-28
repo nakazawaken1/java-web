@@ -172,13 +172,4 @@ public class Main {
                             Sys.Item.reader));
         })).orElseGet(() -> Response.file("diff.html"));
     }
-    
-    /**
-     * @param text Source text
-     * @return response
-     */
-    @Route(extensions=".html")
-    Object hash(Optional<String> text) {
-        return Response.file("hash.html").bind("text", text.orElse(""));
-    }
 }

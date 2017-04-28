@@ -107,7 +107,7 @@ public class Tool {
      */
     public static Optional<URL> toURL(String... relativePath) {
         String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
-        return Optional.ofNullable(Thread.currentThread().getContextClassLoader().getResource(path));
+        return Tool.of(Thread.currentThread().getContextClassLoader().getResource(path));
     }
 
     /**
@@ -150,6 +150,18 @@ public class Tool {
             }
             value = i.get();
         }
+        return Tool.of(value);
+    }
+
+    /**
+     * get optional
+     * 
+     * @param <T> type
+     *
+     * @param value value
+     * @return optional
+     */
+    public static <T> Optional<T> of(T value) {
         return Optional.ofNullable(value);
     }
 
@@ -198,10 +210,11 @@ public class Tool {
             if (object != null) {
                 String text = object.toString();
                 if (text != null) {
-                    return Optional.ofNullable(fromString.apply(text));
+                    return Tool.of(fromString.apply(text));
                 }
             }
         } catch (Exception e) {
+            return Optional.empty();
         }
         return Optional.empty();
     }
@@ -1404,8 +1417,8 @@ public class Tool {
      * @param name name
      * @return first value
      */
-    public static Optional<String> getFirstValue(Map<String, List<String>> map, String name) {
-        return Optional.ofNullable(map.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
+    public static Optional<String> getFirst(Map<String, List<String>> map, String name) {
+        return Tool.of(map).map(m -> m.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
     }
 
     /**
@@ -1414,7 +1427,7 @@ public class Tool {
      * @return cut text
      */
     public static String cut(String text, int max) {
-        return Optional.ofNullable(text).map(i -> {
+        return Tool.of(text).map(i -> {
             boolean suffix = false;
             int index = i.indexOf('\r');
             if (index < 0) {

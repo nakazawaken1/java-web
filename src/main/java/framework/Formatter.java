@@ -26,10 +26,9 @@ import javax.el.ELClass;
 import javax.el.ELContext;
 import javax.el.ELProcessor;
 import javax.el.ELResolver;
+import javax.el.LambdaExpression;
 import javax.el.PropertyNotWritableException;
 import javax.el.StandardELContext;
-
-import com.sun.el.lang.EvaluationContext;
 
 import app.config.Sys;
 import framework.annotation.Config;
@@ -518,27 +517,38 @@ public class Formatter implements AutoCloseable {
                 try {
                     if (el == null) {
                         el = new ELProcessor();
-                        el.getELManager().addELResolver(new ELResolver() { /* empty resolver */
+                        el.getELManager().addELResolver(new ELResolver() { /* top level empty, Optional.map, Optional.flatMap resolver */
 
                             @Override
                             public Object getValue(ELContext context, Object base, Object property) {
                                 try {
-                                    ELContext c;
-                                    if (context instanceof EvaluationContext) {
-                                        c = ((EvaluationContext) context).getELContext();
-                                    } else {
-                                        c = context;
-                                    }
-                                    if (c instanceof StandardELContext && base == null && property instanceof String) {
-                                        if (Reflector.method(StandardELContext.class, "getBeans")
-                                                .map(Try.f(m -> !((Map<?, ?>) m.invoke(c)).containsKey(property))).orElse(false)) {
-                                            context.setPropertyResolved(true);
-                                        }
+                                    ELContext c = Reflector.method(context.getClass(), "getELContext").map(Try.f(method -> (ELContext) method.invoke(context)))
+                                            .orElse(context);
+                                    if (c instanceof StandardELContext && base == null && property instanceof String
+                                            && Reflector.method(StandardELContext.class, "getBeans")
+                                                    .map(Try.f(m -> !((Map<?, ?>) m.invoke(c)).containsKey(property))).orElse(false)) {
+                                        context.setPropertyResolved(true);
                                     }
                                 } catch (SecurityException | IllegalArgumentException e) {
                                     return null;
                                 }
                                 return null;
+                            }
+
+                            @Override
+                            public Object invoke(ELContext context, Object base, Object method, Class<?>[] paramTypes, Object[] params) {
+                                if (base instanceof Optional && params.length == 1 && params[0] instanceof LambdaExpression) {
+                                    LambdaExpression lambda = (LambdaExpression) params[0];
+                                    Optional<?> o = (Optional<?>) base;
+                                    if ("map".equals(method)) {
+                                        context.setPropertyResolved(true);
+                                        return o.map(e -> lambda.invoke(context, e));
+                                    } else if ("flatMap".equals(method)) {
+                                        context.setPropertyResolved(true);
+                                        return o.flatMap(e -> (Optional<?>) lambda.invoke(context, e));
+                                    }
+                                }
+                                return super.invoke(context, base, method, paramTypes, params);
                             }
 
                             @Override
@@ -720,15 +730,14 @@ public class Formatter implements AutoCloseable {
                                 return base == null ? String.class : Object.class;
                             }
                         });
-                        el.defineFunction("F", "hash", Tool.class.getMethod("hash", String.class));
+                        el.defineBean("A", Application.current().orElse(null));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
                         el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
-                        el.defineBean("A", Application.current().orElse(null));
-                        el.defineBean("S", Session.current().orElse(null));
                         el.defineBean("R", Request.current().orElse(null));
-                        el.defineBean("V", values == null ? new Object[] {} : values);
+                        el.defineBean("S", Session.current().orElse(null));
                         el.defineBean("sys", new ELClass(Sys.class));
                         el.defineBean("Tool", new ELClass(Tool.class));
+                        el.defineBean("V", values == null ? new Object[] {} : values);
                         if (map != null) {
                             map.forEach(el::defineBean);
                         }
@@ -765,7 +774,7 @@ public class Formatter implements AutoCloseable {
             }
             return s;
         };
-        return isCache ? cache.computeIfAbsent(expression, get) : Optional.ofNullable(cache.get(expression)).orElseGet(() -> get.apply(expression));
+        return isCache ? cache.computeIfAbsent(expression, get) : Tool.of(cache.get(expression)).orElseGet(() -> get.apply(expression));
     }
 
     @Override

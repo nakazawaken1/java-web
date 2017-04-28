@@ -48,12 +48,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
-import framework.annotation.Mapping;
 import framework.annotation.Config;
 import framework.annotation.Help;
 import framework.annotation.Id;
 import framework.annotation.InitialData;
 import framework.annotation.Join;
+import framework.annotation.Mapping;
 import framework.annotation.Size;
 
 /**
@@ -944,7 +944,7 @@ public class Db implements AutoCloseable {
             Sys.model_packages.stream().forEach(p -> {
                 try (Stream<Class<?>> classes = Tool.getClasses(p)) {
                     classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c))
-                            .peek(t -> Optional.ofNullable(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
+                            .peek(t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
                                     .ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
                             .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
                 }
@@ -2017,10 +2017,10 @@ public class Db implements AutoCloseable {
             }
         }
         if (type == LocalDate.class) {
-            optional = Tool.val(rs.getDate(name), v -> Optional.ofNullable(v).map(java.sql.Date::toLocalDate));
+            optional = Tool.val(rs.getDate(name), v -> Tool.of(v).map(java.sql.Date::toLocalDate));
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
-        return isOptional ? Optional.ofNullable(value) : value;
+        return isOptional ? Tool.of(value) : value;
     }
 
     /**
@@ -2107,7 +2107,7 @@ public class Db implements AutoCloseable {
             T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
             IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
-                Optional.ofNullable(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
+                Tool.of(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
             });
             return object;
         });
@@ -2133,7 +2133,7 @@ public class Db implements AutoCloseable {
                 c.type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
                 c.nullable();
             }
-            Help.FIELD.apply(field).ifPresent(help -> c.display(String.join(" ", (help.value()))));
+            Help.FIELD.apply(field).ifPresent(help -> c.display(String.join(" ", help.value())));
             Size.FIELD.apply(field).ifPresent(size -> c.length(size.value()));
             Id.FIELD.apply(field).map(id -> primary).orElse(columns).add(c);
         });

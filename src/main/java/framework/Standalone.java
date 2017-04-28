@@ -299,7 +299,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
@@ -348,7 +348,7 @@ public class Standalone {
          */
         @SuppressWarnings("unchecked")
         SessionImpl(HttpExchange exchange) {
-            id = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
+            id = Tool.of(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
                     .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1].replaceFirst("\\..*$", "")).orElse(null)).orElse(null);
             if (id == null) {
                 id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
@@ -389,12 +389,12 @@ public class Standalone {
         static String createSetCookie(String name, String value, ZonedDateTime expires, long maxAge, String domain, String path, boolean secure,
                 boolean httpOnly) {
             StringBuilder result = new StringBuilder(name + "=" + value);
-            Optional.ofNullable(expires).map(DateTimeFormatter.RFC_1123_DATE_TIME::format).ifPresent(s -> result.append("; Expires=").append(s));
+            Tool.of(expires).map(DateTimeFormatter.RFC_1123_DATE_TIME::format).ifPresent(s -> result.append("; Expires=").append(s));
             if (maxAge > 0) {
                 result.append("; Max-Age=").append(maxAge);
             }
-            Optional.ofNullable(domain).ifPresent(s -> result.append("; Domain=").append(s));
-            Optional.ofNullable(path).ifPresent(s -> result.append("; Path=").append(s));
+            Tool.of(domain).ifPresent(s -> result.append("; Domain=").append(s));
+            Tool.of(path).ifPresent(s -> result.append("; Path=").append(s));
             if (secure) {
                 result.append("; Secure");
             }
@@ -422,7 +422,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
@@ -614,7 +614,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Optional.ofNullable(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
@@ -871,7 +871,7 @@ public class Standalone {
                 Try.c(action).accept(-1L);
             } else {
                 writeBody.accept(Try.s(() -> {
-                    action.accept(headers == null ? 0L : Tool.getFirstValue(headers, "Content-Length").flatMap(Tool::longInteger).orElse(0L));
+                    action.accept(headers == null ? 0L : Tool.getFirst(headers, "Content-Length").flatMap(Tool::longInteger).orElse(0L));
                     return exchange.getResponseBody();
                 }));
             }

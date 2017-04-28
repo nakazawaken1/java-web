@@ -303,7 +303,7 @@ public abstract class Response {
      * @return self
      */
     public Response charset(Charset charset) {
-        this.charset = Optional.ofNullable(charset);
+        this.charset = Tool.of(charset);
         return this;
     }
 

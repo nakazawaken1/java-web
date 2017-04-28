@@ -236,8 +236,8 @@ public class Diff<T> {
                 }
                 boolean hasB = i < maxB;
                 boolean hasA = i < maxA;
-                list.add(Tool.peek(new Diff<>(type, Optional.of(currentB + 1).filter(n -> hasB), Optional.ofNullable(hasB ? bLines.get(i) : null),
-                        Optional.of(currentA + 1).filter(n -> hasA), Optional.ofNullable(hasA ? aLines.get(i) : null)), editor));
+                list.add(Tool.peek(new Diff<>(type, Optional.of(currentB + 1).filter(n -> hasB), Tool.of(hasB ? bLines.get(i) : null),
+                        Optional.of(currentA + 1).filter(n -> hasA), Tool.of(hasA ? aLines.get(i) : null)), editor));
                 if (currentB < endB) {
                     currentB++;
                 }
@@ -250,8 +250,8 @@ public class Diff<T> {
             boolean hasB = currentB < endB;
             boolean hasA = currentA < endA;
             Type type = hasB && hasA ? Type.EQUAL : hasB ? Type.DELETE : Type.INSERT;
-            list.add(Tool.peek(new Diff<>(type, Optional.of(currentB + 1).filter(n -> hasB), Optional.ofNullable(hasB ? before[currentB] : null),
-                    Optional.of(currentA + 1).filter(n -> hasA), Optional.ofNullable(hasA ? after[currentA] : null)), editor));
+            list.add(Tool.peek(new Diff<>(type, Optional.of(currentB + 1).filter(n -> hasB), Tool.of(hasB ? before[currentB] : null),
+                    Optional.of(currentA + 1).filter(n -> hasA), Tool.of(hasA ? after[currentA] : null)), editor));
         }
         return list;
     }
@@ -294,7 +294,7 @@ public class Diff<T> {
         int pick0 = -1;
         for(int pick : picks) {
             if(pick0 + 1 != pick) {
-                result.add(new Diff<>(Type.SKIP, Optional.empty(), Optional.ofNullable(skipContent), Optional.empty(), Optional.ofNullable(skipContent)));
+                result.add(new Diff<>(Type.SKIP, Optional.empty(), Tool.of(skipContent), Optional.empty(), Tool.of(skipContent)));
             }
             pick0 = pick;
             result.add(diffs.get(pick));

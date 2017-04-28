@@ -32,7 +32,7 @@ public class Lazy<T> implements AutoCloseable {
     public synchronized T get() {
         T value = instance.orElseGet(() -> supplier == null ? null : supplier.get());
         if (!instance.isPresent()) {
-            instance = Optional.ofNullable(value);
+            instance = Tool.of(value);
         }
         return value;
     }
@@ -44,7 +44,7 @@ public class Lazy<T> implements AutoCloseable {
         if (supplier != null) {
             throw new UnsupportedOperationException();
         }
-        instance = Optional.ofNullable(value);
+        instance = Tool.of(value);
     }
 
     /**

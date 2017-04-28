@@ -21,7 +21,7 @@ public abstract class Session implements Attributes<Serializable> {
      * @return current session
      */
     public static Optional<Session> current() {
-        return Optional.ofNullable(CURRENT.get());
+        return Tool.of(CURRENT.get());
     }
 
     /**

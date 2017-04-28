@@ -21,7 +21,7 @@ import framework.annotation.Separator;
 @Config({ "sys.config", "sys.message" })
 public interface Sys {
 
-    public interface Log {
+    interface Log {
         @Help("log output folder")
         String folder = "/temp/";
 
@@ -51,7 +51,7 @@ public interface Sys {
     @Help("database connection string(inclucde id and password)")
     String db = "jdbc:h2:~/test";
 
-    public interface Db {
+    interface Db {
         @Help("default database suffix")
         String suffix = "";
 
@@ -144,7 +144,7 @@ public interface Sys {
     @Help("model packages")
     List<String> model_packages = Collections.unmodifiableList(Arrays.asList("app.model"));
 
-    public interface Item {
+    interface Item {
         String title = "タイトル";
         String login = "ログイン";
         String logout = "ログアウト";
@@ -168,12 +168,12 @@ public interface Sys {
         String clear = "クリア";
     }
 
-    public interface Alert {
+    interface Alert {
         String forbidden = "アクセス権限がありません。権限のあるアカウントでログインしてください。";
         String login_failed = "ログインIDまたはパスワードが違います。";
     }
 
-    public interface Prompt {
+    interface Prompt {
         String login = "ユーザ ID・ パスワードを入力して、 ログインボタンを押して下さい。";
     }
 }

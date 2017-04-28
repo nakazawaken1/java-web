@@ -222,7 +222,7 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
      * @param args not use
      */
     public static void main(String[] args) {
-        java.util.function.Consumer<Object> echo = System.out::println;
+        Consumer<Object> echo = System.out::println;
         echo.accept(Tuple.of(1).equals(Tuple.of(1)));
         echo.accept(Tuple.of(1, 2).equals(Tuple.of(1, 2)));
         echo.accept(Tuple.of(1, 2, 3).equals(Tuple.of(1, 2, 3)));

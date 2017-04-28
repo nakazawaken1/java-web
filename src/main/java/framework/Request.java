@@ -11,10 +11,14 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -38,7 +42,7 @@ public abstract class Request implements Attributes<Object> {
      * @return current request
      */
     public static Optional<Request> current() {
-        return Optional.ofNullable(CURRENT.get());
+        return Tool.of(CURRENT.get());
     }
 
     /**
@@ -52,14 +56,14 @@ public abstract class Request implements Attributes<Object> {
      * @return path
      */
     public abstract String getPath();
-    
+
     /**
      * @return file name(without extension)
      */
     public String getName() {
         return Tool.getName(getPath());
     }
-    
+
     /**
      * @return extension(with period)
      */
@@ -74,7 +78,10 @@ public abstract class Request implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet().stream().map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue().toString(), Sys.Log.parameter_max_letters)).collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+        return "<- " + getMethod() + " " + getPath()
+                + Tool.string(getParameters().entrySet().stream()
+                        .map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue().toString(), Sys.Log.parameter_max_letters))
+                        .collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
     }
 
     /**
@@ -87,7 +94,7 @@ public abstract class Request implements Attributes<Object> {
     public static void main(String[] args) throws NoSuchAlgorithmException, KeyManagementException, MalformedURLException, IOException {
         String url = args.length > 0 ? args[0] : "https://localhost:8443";
         SSLContext context = SSLContext.getInstance("TLS");
-        context.init(null, new TrustManager[]{new X509TrustManager() {
+        context.init(null, new TrustManager[] { new X509TrustManager() {
 
             @Override
             public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
@@ -101,7 +108,7 @@ public abstract class Request implements Attributes<Object> {
             public X509Certificate[] getAcceptedIssuers() {
                 return null;
             }
-        }}, null);
+        } }, null);
         HttpsURLConnection.setDefaultSSLSocketFactory(context.getSocketFactory());
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
@@ -132,4 +139,76 @@ public abstract class Request implements Attributes<Object> {
      * @return parameters
      */
     public abstract Map<String, List<String>> getParameters();
+
+    /**
+     * @return parameters
+     */
+    public Map<String, String> getFirstParameters() {
+        Map<String, List<String>> map = getParameters();
+        return new Map<String, String>() {
+
+            @Override
+            public int size() {
+                return map.size();
+            }
+
+            @Override
+            public boolean isEmpty() {
+                return map.isEmpty();
+            }
+
+            @Override
+            public boolean containsKey(Object key) {
+                return map.containsKey(key);
+            }
+
+            @Override
+            public boolean containsValue(Object value) {
+                return Stream.of(map.values()).anyMatch(i -> Objects.equals(i, value));
+            }
+
+            @Override
+            public String get(Object key) {
+                return Tool.getFirst(map, (String) key).orElse(null);
+            }
+
+            @Override
+            public String put(String key, String value) {
+                return Tool.setValue(map, key, value).get(0);
+            }
+
+            @Override
+            public String remove(Object key) {
+                return map.remove(key).get(0);
+            }
+
+            @Override
+            public void putAll(Map<? extends String, ? extends String> m) {
+                m.forEach((key, value) -> Tool.setValue(map, key, value));
+            }
+
+            @Override
+            public void clear() {
+                map.clear();
+            }
+
+            @Override
+            public Set<String> keySet() {
+                return map.keySet();
+            }
+
+            @Override
+            public Collection<String> values() {
+                return map.values().stream().flatMap(List::stream).collect(Collectors.toList());
+            }
+
+            @Override
+            public Set<java.util.Map.Entry<String, String>> entrySet() {
+                return map.entrySet().stream()
+                        .map(entry -> Tuple.of(entry.getKey(),
+                                Tool.of(entry.getValue()).filter(list -> !list.isEmpty()).map(list -> list.get(0)).orElse(null)))
+                        .collect(Collectors.toSet());
+            }
+        };
+    }
 }

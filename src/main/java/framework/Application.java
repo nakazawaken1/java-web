@@ -46,7 +46,7 @@ public abstract class Application implements Attributes<Object> {
      * @return singleton
      */
     static Optional<Application> current() {
-        return Optional.ofNullable(CURRENT);
+        return Tool.of(CURRENT);
     }
 
     /**
@@ -104,7 +104,7 @@ public abstract class Application implements Attributes<Object> {
                             .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
                                 Class<?> c = trio.l;
                                 Method m = trio.r.l;
-                                String left = Optional.ofNullable(c.getAnnotation(Route.class))
+                                String left = Tool.of(c.getAnnotation(Route.class))
                                         .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
                                 String right = Tool.string(trio.r.r.path()).orElse(m.getName());
                                 m.setAccessible(true);
@@ -167,7 +167,7 @@ public abstract class Application implements Attributes<Object> {
         final String extension;
         final int index = path.lastIndexOf('.');
         if (index >= 0 && path.lastIndexOf('/') < index) {
-            mime = Optional.ofNullable(Tool.getContentType(path));
+            mime = Tool.of(Tool.getContentType(path));
             action = path.substring(0, index);
             extension = path.substring(index);
         } else {

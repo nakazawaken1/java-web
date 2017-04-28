@@ -14,31 +14,31 @@ th, td {
   <table>
     <tr>
       <th>source</th>
-      <td><input type="text" name="text" value="${text}" /> <input type="submit" value="{sys.item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{sys.item.clear}" /></td>
+      <td><input type="text" name="text" value="${text = R.firstParameters.text}" /> <input type="submit" value="{sys.item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{sys.item.clear}" /></td>
     </tr>
     <tr>
       <th>MD2</th>
-      <td>${empty text ? '' : Tool.hash(text, 'MD2')}</td>
+      <td>${f = a -> empty text ? '' : Tool.hash(text, a); f('MD2')}</td>
     </tr>
     <tr>
       <th>MD5</th>
-      <td>${empty text ? '' : Tool.hash(text, 'MD5')}</td>
+      <td>${f('MD5')}</td>
     </tr>
     <tr>
       <th>SHA-1</th>
-      <td>${empty text ? '' : Tool.hash(text, 'SHA-1')}</td>
+      <td>${f('SHA-1')}</td>
     </tr>
     <tr>
       <th>SHA-256</th>
-      <td>${empty text ? '' : Tool.hash(text, 'SHA-256')}</td>
+      <td>${f('SHA-256')}</td>
     </tr>
     <tr>
       <th>SHA-384</th>
-      <td>${empty text ? '' : Tool.hash(text, 'SHA-384')}</td>
+      <td>${f('SHA-384')}</td>
     </tr>
     <tr>
       <th>SHA-512</th>
-      <td>${empty text ? '' : Tool.hash(text, 'SHA-512')}</td>
+      <td>${f('SHA-512')}</td>
     </tr>
     <tr>
       <th>Base64 encode</th>

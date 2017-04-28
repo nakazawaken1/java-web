@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -56,7 +57,7 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static <T> Optional<Constructor<T>> constructor(Class<T> clazz, Class<?>... args) {
         try {
-            return Optional.ofNullable((Constructor<T>) constructors.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> {
+            return Tool.of((Constructor<T>) constructors.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> {
                 Constructor<?> result = pair.l.getDeclaredConstructor(args);
                 result.setAccessible(true);
                 return result;
@@ -108,7 +109,7 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static <T> Optional<Class<T>> clazz(String clazz) {
         try {
-            return Optional.ofNullable((Class<T>) Class.forName(clazz));
+            return Tool.of((Class<T>) Class.forName(clazz));
         } catch (ClassNotFoundException e) {
             Log.info(e, () -> "class error");
             return Optional.empty();
@@ -121,7 +122,7 @@ public class Reflector {
      * @return field
      */
     public static Optional<Field> field(Class<?> clazz, String name) {
-        return Optional.ofNullable(fields(clazz).get(name));
+        return Tool.of(fields(clazz).get(name));
     }
 
     /**
@@ -139,7 +140,7 @@ public class Reflector {
      * @return field
      */
     public static Optional<Field> mappingField(Class<?> clazz, String name) {
-        return Optional.ofNullable(mappingFields(clazz).get(name));
+        return Tool.of(mappingFields(clazz).get(name));
     }
 
     /**
@@ -184,7 +185,7 @@ public class Reflector {
      * @return method
      */
     public static Optional<Method> method(Class<?> clazz, String name, Class<?>... args) {
-        return Optional.ofNullable(methods.computeIfAbsent(Tuple.of(clazz, Arrays.hashCode(args)), Try.f(pair -> pair.l.getMethod(name, args), (e, pair) -> {
+        return Tool.of(methods.computeIfAbsent(Tuple.of(clazz, Objects.hash(name, Arrays.hashCode(args))), Try.f(pair -> pair.l.getMethod(name, args), (e, pair) -> {
             Method result = Try.s(() -> pair.l.getDeclaredMethod(name, args), ee -> null).get();
             if (result != null) {
                 result.setAccessible(true);
@@ -199,7 +200,7 @@ public class Reflector {
      * @return field to annotation function
      */
     public static <T extends Annotation> Function<Field, Optional<T>> annotation(Class<T> annotationClass) {
-        return field -> Optional.ofNullable(field.getAnnotation(annotationClass));
+        return field -> Tool.of(field.getAnnotation(annotationClass));
     }
 
     /**

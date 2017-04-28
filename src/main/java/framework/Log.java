@@ -14,7 +14,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -76,9 +75,8 @@ public class Log extends Handler {
         public String format(LogRecord record) {
             return String.format(format, record.getMillis(), record.getSourceClassName() + '.' + record.getSourceMethodName(),
                     editor.apply(record.getLoggerName()), record.getLevel().getName(), formatMessage(record),
-                    Optional.ofNullable(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""),
-                    Request.current().map(Request::getId).orElse(0), Session.current().map(Session::getId).orElse(0),
-                    Application.current().map(Application::getId).orElse(0));
+                    Tool.of(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""), Request.current().map(Request::getId).orElse(0),
+                    Session.current().map(Session::getId).orElse(0), Application.current().map(Application::getId).orElse(0));
         }
 
         /**
@@ -160,7 +158,7 @@ public class Log extends Handler {
                 realFile = file.replace("ll", level.getName().toLowerCase());
             }
             String message = getFormatter().format(record);
-            Charset encoding = Optional.ofNullable(getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset());
+            Charset encoding = Tool.of(getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset());
             FileChannel channel = outMap.computeIfAbsent(level, i -> {
                 FileChannel c = null;
                 try {
@@ -454,18 +452,17 @@ public class Log extends Handler {
         for (int i = 0; i < depth; i++) {
             StackTraceElement frame = access.getStackTraceElement(throwable, i);
             String className = frame.getClassName();
-            if (Log.class.getName().equals(className)) {
-                continue;
+            if (!Log.class.getName().equals(className)) {
+                String methodName = frame.getMethodName();
+                record.setSourceClassName(className);
+                record.setSourceMethodName(methodName);
+                record.setLoggerName(className + "." + methodName + "(" + frame.getLineNumber() + ")");
+                break;
             }
-            String methodName = frame.getMethodName();
-            record.setSourceClassName(className);
-            record.setSourceMethodName(methodName);
-            record.setLoggerName(className + "." + methodName + "(" + frame.getLineNumber() + ")");
-            break;
         }
         for (Logger logger = Logger.getGlobal(); logger != null; logger = logger.getParent()) {
             for (Handler handler : logger.getHandlers()) {
-                if (levelValue >= handler.getLevel().intValue() && Optional.ofNullable(handler.getFilter()).map(f -> f.isLoggable(record)).orElse(true)) {
+                if (levelValue >= handler.getLevel().intValue() && Tool.of(handler.getFilter()).map(f -> f.isLoggable(record)).orElse(true)) {
                     handler.publish(record);
                 }
             }
