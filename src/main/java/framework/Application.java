@@ -18,9 +18,10 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import app.config.Sys;
+import app.controller.Main;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Response.Status;
-import framework.annotation.Config.Injector;
+import framework.annotation.Config;
 import framework.annotation.Content;
 import framework.annotation.Job;
 import framework.annotation.Letters;
@@ -84,9 +85,12 @@ public abstract class Application implements Attributes<Object> {
             throw new InternalError(e);
         }
 
-        Injector.inject(Sys.class);
+        /* load config */
+        try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage().getName())) {
+            cs.filter(c -> c.getAnnotation(Config.class) != null).forEach(Config.Injector::inject);
+        }
         Log.startup();
-        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Injector.dump(Sys.class, true)));
+        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
 
         Log.info(Application.current().get()::toString);
 
@@ -98,20 +102,18 @@ public abstract class Application implements Attributes<Object> {
         /* setup routing */
         if (table == null) {
             table = new TreeMap<>();
-            Sys.controller_packages.stream().forEach(p -> {
-                try (Stream<Class<?>> cs = Tool.getClasses(p)) {
-                    cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
-                            .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
-                                Class<?> c = trio.l;
-                                Method m = trio.r.l;
-                                String left = Tool.of(c.getAnnotation(Route.class))
-                                        .map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/')).orElse("");
-                                String right = Tool.string(trio.r.r.path()).orElse(m.getName());
-                                m.setAccessible(true);
-                                map.put(left + right, Tuple.of(c, m));
-                            }, Map::putAll);
-                }
-            });
+            try (Stream<Class<?>> cs = Tool.getClasses(Main.class.getPackage().getName())) {
+                cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
+                        .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
+                            Class<?> c = trio.l;
+                            Method m = trio.r.l;
+                            String left = Tool.of(c.getAnnotation(Route.class)).map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/'))
+                                    .orElse("");
+                            String right = Tool.string(trio.r.r.path()).orElse(m.getName());
+                            m.setAccessible(true);
+                            map.put(left + right, Tuple.of(c, m));
+                        }, Map::putAll);
+            }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
                 table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
@@ -177,7 +179,7 @@ public abstract class Application implements Attributes<Object> {
         }
         final Tuple<Class<?>, Method> pair = table.get(action);
         if (pair != null && Tool.val(pair.r.getAnnotation(Route.class).extensions(),
-                        extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension)))) {
+                extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension)))) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);

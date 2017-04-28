@@ -28,8 +28,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.function.Consumer;
@@ -44,6 +46,7 @@ import java.util.stream.StreamSupport;
 import javax.sql.DataSource;
 
 import app.config.Sys;
+import app.model.Account;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
@@ -210,6 +213,11 @@ public class Db implements AutoCloseable {
     private String schema;
 
     /**
+     * locale
+     */
+    private Locale locale = Locale.getDefault();
+
+    /**
      * ResultSet to array
      */
     public static final Function<ResultSet, Object[]> toArray = Try
@@ -242,7 +250,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.<String>get("sys.db" + suffix).orElseThrow(SQLException::new));
+            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Locale.getDefault()).getProperty("sys.db" + suffix));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -388,9 +396,10 @@ public class Db implements AutoCloseable {
      */
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
-            String url = Config.Injector.<String>get("sys.db" + key).orElseThrow(RuntimeException::new);
+            Properties p = Config.Injector.getSource(Sys.class, Locale.getDefault());
+            String url = p.getProperty("sys.db" + key);
             Type type = Type.fromUrl(url);
-            String name = Tool.string(Config.Injector.getSource(Sys.class).getProperty("sys.db.datasource_class")).orElse(type.dataSource);
+            String name = Tool.string(p.getProperty("sys.db.datasource_class" + key)).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
             if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
@@ -495,7 +504,7 @@ public class Db implements AutoCloseable {
      * @return raw sql
      */
     public String sql(String sql, Map<String, Object> map, Object... values) {
-        return Formatter.format(sql, Formatter::excludeForSql, builder::escape, map, values);
+        return Formatter.format(sql, Formatter::excludeForSql, builder::escape, locale, map, values);
     }
 
     /**
@@ -941,14 +950,11 @@ public class Db implements AutoCloseable {
 
             List<Tuple<String, Class<?>>> models = new ArrayList<>();
             List<Tuple<String, InitialData>> modelDatas = new ArrayList<>();
-            Sys.model_packages.stream().forEach(p -> {
-                try (Stream<Class<?>> classes = Tool.getClasses(p)) {
-                    classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c))
-                            .peek(t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
-                                    .ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
-                            .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
-                }
-            });
+            try (Stream<Class<?>> classes = Tool.getClasses(Account.class.getPackage().getName())) {
+                classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c)).peek(
+                        t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l)).ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
+                        .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
+            }
 
             /* get exists tables */
             Set<String> existTables = db.tables().collect(Collectors.toSet());

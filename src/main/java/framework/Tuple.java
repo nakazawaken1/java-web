@@ -122,7 +122,7 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
      * 
      * @param <A> 1 type
      */
-    public static class Tuple1<A> extends Tuple<A, Object> {
+    public static class Tuple1<A> extends Tuple<A, Void> {
         /**
          * @param a 1 value
          */
@@ -223,7 +223,7 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
      */
     public static void main(String[] args) {
         Consumer<Object> echo = System.out::println;
-        echo.accept(Tuple.of(1).equals(Tuple.of(1)));
+        echo.accept(Tuple.of(1).equals(Tuple.of(Integer.parseInt("1"))));
         echo.accept(Tuple.of(1, 2).equals(Tuple.of(1, 2)));
         echo.accept(Tuple.of(1, 2, 3).equals(Tuple.of(1, 2, 3)));
         java.util.stream.IntStream.rangeClosed(1, 100).mapToObj(i -> Tuple.of(i % 3 == 0 ? "Fizz" : "", i))

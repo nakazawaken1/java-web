@@ -41,6 +41,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
@@ -143,9 +144,10 @@ public class Standalone {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Config.Injector.getSource(Sys.class).entrySet().stream().sorted((a, b) -> ((String) b.getKey()).compareTo((String) a.getKey()))
-                        .map(p -> Tuple.of((String) p.getKey(), (String) p.getValue())).filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
-                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\="))
+                Tool.val(Config.Injector.getSource(Sys.class, Locale.getDefault()), properties -> properties.stringPropertyNames().stream()
+                        .sorted((a, b) -> b.compareTo(a)).map(p -> Tuple.of(p, properties.getProperty(p)))
+                        .filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
+                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();

@@ -9,11 +9,14 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
+import app.controller.Main;
 import app.model.Account;
 import framework.Db.Setup;
+import framework.Message;
 import framework.Tool;
 import framework.annotation.Config;
 import framework.annotation.Help;
+import framework.annotation.Mapping;
 import framework.annotation.Separator;
 
 /** not use primitive type because not apply property by optimized */
@@ -26,7 +29,7 @@ public interface Sys {
         String folder = "/temp/";
 
         @Help("log filename pattern(DateTimeFormatter format, 'll' replace to level)")
-        DateTimeFormatter file_pattern = DateTimeFormatter.ofPattern("'ll_'yyyyMMdd'.log'");
+        DateTimeFormatter file_pattern = Tool.getFormat("'ll_'yyyyMMdd'.log'");
 
         @Help("log line format(1: timestamp, 2: called method, 3: logger name, 4: level, 5: message, 6: exception, 7: request id, 8: session id, 9: application id)")
         String format = "%1$tY/%1$tm/%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-6s %9$08X|%8$08X|%7$08X [%3$s] %5$s %6$s%n";
@@ -135,45 +138,62 @@ public interface Sys {
     @Help("cluster node name suffix(for session cookie)")
     String cluster_suffix = "";
 
-    @Help("controller packages")
-    List<String> controller_packages = Collections.unmodifiableList(Arrays.asList("app.controller", "app.job"));
-
     @Help("job packages")
-    List<String> job_packages = Collections.unmodifiableList(Arrays.asList("app.job"));
+    List<String> job_packages = Collections.unmodifiableList(Arrays.asList(Main.class.getPackage().getName()));
 
-    @Help("model packages")
-    List<String> model_packages = Collections.unmodifiableList(Arrays.asList("app.model"));
+    enum Item implements Message {
+        title,
+        login,
+        logout,
+        error,
+        login_id,
+        password,
+        update,
+        insert,
+        delete,
+        before,
+        after,
+        back,
+        quit,
+        diff,
+        index,
+        compact,
+        full,
+        @Mapping("©2016, All Rights Reserved.")
+        copyright,
+        @Mapping("...")
+        reader,
+        run,
+        clear,
+        ;
 
-    interface Item {
-        String title = "タイトル";
-        String login = "ログイン";
-        String logout = "ログアウト";
-        String error = "何か間違っていませんか？";
-        String loginId = "ログインID";
-        String password = "パスワード";
-        String update = "変更";
-        String insert = "追加";
-        String delete = "削除";
-        String before = "変更前";
-        String after = "変更後";
-        String back = "戻る";
-        String quit = "終了";
-        String diff = "差分表示";
-        String index = "行";
-        String compact = "省略表示";
-        String full = "全行表示";
-        String copyright = "©2016, All Rights Reserved.";
-        String reader = "&#xFE19;";
-        String run = "実行";
-        String clear = "クリア";
+        @Override
+        public String toString() {
+            return message();
+        }
     }
 
-    interface Alert {
-        String forbidden = "アクセス権限がありません。権限のあるアカウントでログインしてください。";
-        String login_failed = "ログインIDまたはパスワードが違います。";
+    enum Alert implements Message {
+        @Mapping("You do not have access rights. Please login with authorized account.")
+        forbidden,
+        @Mapping("Login ID or password is wrong.")
+        login_failed,
+        ;
+
+        @Override
+        public String toString() {
+            return message();
+        }
     }
 
-    interface Prompt {
-        String login = "ユーザ ID・ パスワードを入力して、 ログインボタンを押して下さい。";
+    enum Prompt implements Message {
+        @Mapping("Please input user ID and password and press the login button.")
+        login,
+        ;
+
+        @Override
+        public String toString() {
+            return message();
+        }
     }
 }

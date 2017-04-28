@@ -1,7 +1,6 @@
 package framework.annotation;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -10,7 +9,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -24,7 +22,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 
 import app.config.Sys;
 import framework.Log;
+import framework.Message;
 import framework.Reflector;
 import framework.Tool;
 import framework.Tuple;
@@ -62,11 +63,10 @@ public @interface Config {
          * inject from class
          * 
          * @param clazz target class(get source properties by annotation)
-         * @return real properties
          */
-        public static Properties inject(Class<?> clazz) {
+        public static void inject(Class<?> clazz) {
 
-            Properties sourceProperties = new Properties();
+            Properties sourceProperties = inject(clazz, new Properties(), "");
 
             /* load config files form Config or classname.config */
             String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value)
@@ -110,19 +110,18 @@ public @interface Config {
                 }
             }
 
-            return inject(clazz, sourceProperties);
-        }
-
-        /**
-         * inject from properties
-         * 
-         * @param clazz target class
-         * @param properties source properties
-         * @return real properties
-         */
-        public static Properties inject(Class<?> clazz, Properties properties) {
             defaultMap.put(clazz, String.join(Letters.CRLF, dump(clazz, true)));
-            return Tool.peek(inject(clazz, properties, ""), p -> sourceMap.put(clazz, p));
+            Map<String, Properties> propertiesMap = Tool.map("", sourceProperties);
+            Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).forEach(trio -> {
+                try (Stream<String> list = Tool.getResources(trio.l)) {
+                    list.filter(i -> i.startsWith(trio.r.l) && i.endsWith(trio.r.r))
+                            .forEach(i -> propertiesMap.compute(i.substring(trio.r.l.length() + 1, i.length() - trio.r.r.length()),
+                                    (k, v) -> v == null ? getProperties(i) : Tool.peek(v, vv -> vv.putAll(getProperties(i)))));
+                }
+            });
+            sourceMap.put(clazz, propertiesMap);
+
+            inject(clazz, getSource(clazz, Locale.getDefault()), "");
         }
 
         /**
@@ -151,10 +150,11 @@ public @interface Config {
         /**
          * @param <T> Return type
          * @param name property name
+         * @param locale locale
          * @return property value
          */
         @SuppressWarnings("unchecked")
-        public static <T> Optional<T> get(String name) {
+        public static <T> Optional<T> get(String name, Locale locale) {
             Field field = fieldCache.computeIfAbsent(name, fullName -> {
                 int classIndex = fullName.indexOf('.');
                 int fieldIndex = fullName.lastIndexOf('.');
@@ -188,7 +188,7 @@ public @interface Config {
                 return Optional.empty();
             }
             try {
-                return Tool.of((T) field.get(null));
+                return Tool.of(field.get(null)).map(i -> (T) (i instanceof Message ? ((Message) i).message(locale) : i));
             } catch (IllegalArgumentException | IllegalAccessException e) {
                 return Optional.empty();
             }
@@ -204,10 +204,17 @@ public @interface Config {
 
         /**
          * @param clazz Class
+         * @param locale locale
          * @return Properties
          */
-        public static Properties getSource(Class<?> clazz) {
-            return sourceMap.get(clazz);
+        public static Properties getSource(Class<?> clazz, Locale locale) {
+            Map<String, Properties> map = Objects.requireNonNull(sourceMap.get(clazz));
+            return sourceCache.computeIfAbsent(Tuple.of(clazz, locale), t -> {
+                Properties p = new Properties();
+                map.entrySet().stream().filter(pair -> locale.toString().startsWith(pair.getKey())).sorted((a, b) -> a.getKey().compareTo(b.getKey()))
+                        .map(Map.Entry::getValue).forEach(p::putAll);
+                return p;
+            });
         }
 
         /**
@@ -237,9 +244,14 @@ public @interface Config {
         static final Map<Class<?>, String> defaultMap = new ConcurrentHashMap<>();
 
         /**
-         * source properties
+         * source properties(class: (locale prefix: properties))
          */
-        static final Map<Class<?>, Properties> sourceMap = new ConcurrentHashMap<>();
+        static final Map<Class<?>, Map<String, Properties>> sourceMap = new ConcurrentHashMap<>();
+
+        /**
+         * source cache
+         */
+        static final Map<Tuple<Class<?>, Locale>, Properties> sourceCache = new ConcurrentHashMap<>();
 
         /**
          * class cache
@@ -277,62 +289,68 @@ public @interface Config {
             realProperties.putAll(properties);
             String newPrefix = prefix + clazz.getSimpleName().toLowerCase() + '.';
             classCache.put(newPrefix.substring(0, newPrefix.length() - 1), clazz);
-            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
-                String key = newPrefix + f.getName();
-                String raw = properties.getProperty(key);
-                int modifiers = f.getModifiers();
-                if ((modifiers & Modifier.FINAL) == Modifier.FINAL) {
-                    try {
-                        modifiersField.setInt(f, modifiers & ~Modifier.FINAL); // must to be before Field.get
-                    } catch (IllegalArgumentException | IllegalAccessException e) {
-                        throw new InternalError(e);
-                    }
-                }
-                f.setAccessible(true);
-                Object value;
-                try {
-                    value = f.get(null);
-                } catch (IllegalArgumentException | IllegalAccessException e) {
-                    throw new InternalError(e);
-                }
-                if (properties.containsKey(key) || value == null) {
-                    Class<?> type = f.getType();
-                    if (type == Optional.class) {
-                        value = raw == null ? Optional.empty() : Optional.of(getValue(f, Reflector.getGenericParameter(f, 0), raw));
-                    } else if (type.isArray()) {
-                        Class<?> componentType = type.getComponentType();
-                        Object[] array = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, componentType, i)).toArray();
-                        value = Array.newInstance(componentType, array.length);
-                        int i = 0;
-                        for (Object v : array) {
-                            Array.set(value, i, v);
-                            i++;
+            if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
+                if (Message.class.isAssignableFrom(clazz)) {
+                    Stream.of(clazz.getEnumConstants()).forEach(i -> realProperties.put(newPrefix + ((Enum<?>) i).name(), ((Message) i).defaultMessage()));
+                } else {
+                    Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
+                        String key = newPrefix + f.getName();
+                        String raw = properties.getProperty(key);
+                        int modifiers = f.getModifiers();
+                        if ((modifiers & Modifier.FINAL) == Modifier.FINAL) {
+                            try {
+                                modifiersField.setInt(f, modifiers & ~Modifier.FINAL); // must to be before Field.get
+                            } catch (IllegalArgumentException | IllegalAccessException e) {
+                                throw new InternalError(e);
+                            }
                         }
-                    } else if (type == List.class) {
-                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
-                                .collect(Collectors.toList());
-                    } else if (type == Set.class) {
-                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
-                                .collect(Collectors.toSet());
-                    } else if (type == Map.class) {
-                        value = split(raw, f.getAnnotation(Separator.class)).map(i -> {
-                            String[] pair = i.split(Tool.val(f.getAnnotation(Separator.class),
-                                    s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
-                            return Tuple.of(getValue(f, Reflector.getGenericParameter(f, 0), pair[0]),
-                                    getValue(f, Reflector.getGenericParameter(f, 1), pair[1]));
-                        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                    } else {
-                        value = getValue(f, type, raw);
-                    }
-                    try {
-                        f.set(null, value);
-                    } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
-                        throw new InternalError(e);
-                    }
+                        f.setAccessible(true);
+                        Object value;
+                        try {
+                            value = f.get(null);
+                        } catch (IllegalArgumentException | IllegalAccessException e) {
+                            throw new InternalError(e);
+                        }
+                        if (properties.containsKey(key) || value == null) {
+                            Class<?> type = f.getType();
+                            if (type == Optional.class) {
+                                value = Tool.string(raw).map(s -> getValue(f, Reflector.getGenericParameter(f, 0), s));
+                            } else if (type.isArray()) {
+                                Class<?> componentType = type.getComponentType();
+                                Object[] array = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, componentType, i)).toArray();
+                                value = Array.newInstance(componentType, array.length);
+                                int i = 0;
+                                for (Object v : array) {
+                                    Array.set(value, i, v);
+                                    i++;
+                                }
+                            } else if (type == List.class) {
+                                value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
+                                        .collect(Collectors.toList());
+                            } else if (type == Set.class) {
+                                value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
+                                        .collect(Collectors.toSet());
+                            } else if (type == Map.class) {
+                                value = split(raw, f.getAnnotation(Separator.class)).map(i -> {
+                                    String[] pair = i.split(Tool.val(f.getAnnotation(Separator.class),
+                                            s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
+                                    return Tuple.of(getValue(f, Reflector.getGenericParameter(f, 0), pair[0]),
+                                            getValue(f, Reflector.getGenericParameter(f, 1), pair[1]));
+                                }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                            } else {
+                                value = getValue(f, type, raw);
+                            }
+                            try {
+                                f.set(null, value);
+                            } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
+                                throw new InternalError(e);
+                            }
+                        }
+                        realProperties.setProperty(key, toString(f, value));
+                    });
                 }
-                realProperties.setProperty(key, toString(f, value));
-            });
-            Stream.of(clazz.getClasses()).filter(i -> !Enum.class.isAssignableFrom(i)).forEach(c -> realProperties.putAll(inject(c, properties, newPrefix)));
+            }
+            Stream.of(clazz.getClasses()).forEach(c -> realProperties.putAll(inject(c, properties, newPrefix)));
             return realProperties;
         }
 
@@ -347,20 +365,26 @@ public @interface Config {
         static List<String> dump(Class<?> clazz, String prefix, boolean sort) {
             String newPrefix = prefix + clazz.getSimpleName().replace('$', '.').toLowerCase() + '.';
             List<String> lines = new ArrayList<>();
-            Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
-                try {
-                    String key = newPrefix + f.getName();
-                    Object value = f.get(null);
-                    List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
-                    if (comments != null) {
-                        Collections.reverse(comments);
-                    }
-                    lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
-                } catch (IllegalArgumentException | IllegalAccessException e) {
-                    throw new InternalError(e);
+            if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
+                if (Message.class.isAssignableFrom(clazz)) {
+                    Stream.of(clazz.getEnumConstants()).forEach(i -> lines.add('\b' + newPrefix + ((Enum<?>) i).name() + " = " + ((Message) i).defaultMessage()));
+                } else {
+                    Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
+                        try {
+                            String key = newPrefix + f.getName();
+                            Object value = f.get(null);
+                            List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
+                            if (comments != null) {
+                                Collections.reverse(comments);
+                            }
+                            lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
+                        } catch (IllegalArgumentException | IllegalAccessException e) {
+                            throw new InternalError(e);
+                        }
+                    });
                 }
-            });
-            Stream.of(clazz.getClasses()).filter(c -> !Enum.class.isAssignableFrom(c)).forEach(c -> lines.addAll(dump(c, newPrefix, false)));
+            }
+            Stream.of(clazz.getClasses()).forEach(c -> lines.addAll(dump(c, newPrefix, false)));
             if (sort) {
                 Collections.sort(lines);
                 return lines.stream().flatMap(line -> {
@@ -390,7 +414,7 @@ public @interface Config {
          */
         static Properties getProperties(String path) {
             Properties p = new Properties();
-            try (Reader reader = new InputStreamReader(Thread.currentThread().getContextClassLoader().getResourceAsStream(path), StandardCharsets.UTF_8)) {
+            try (Reader reader = Tool.newReader(Tool.toURL(path).orElse(null).openStream())) {
                 p.load(reader);
             } catch (IOException | NullPointerException e) {
                 Log.warning("cannot read " + path);
@@ -502,14 +526,17 @@ public @interface Config {
             }
             if (clazz == Map.class) {
                 char pairSeparator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::pair).orElse(pairDefault);
-                return ((Map<?, ?>) value).entrySet().stream().map(pair -> String.valueOf(pair.getKey()) + pairSeparator + pair.getValue())
-                        .collect(Collectors.joining(String.valueOf(separator)));
+                return Tool.peek(new StringBuilder(), s -> ((Map<?, ?>) value).forEach((k, v) -> s.append(separator).append(k).append(pairSeparator).append(v)))
+                        .substring(1);
             }
             if (value instanceof Temporal) {
                 Optional<DateTimeFormatter> formatter = getFormat(field);
                 if (formatter.isPresent()) {
                     return formatter.get().format((Temporal) value);
                 }
+            }
+            if (value instanceof DateTimeFormatter) {
+                return Tool.val(((DateTimeFormatter) value).toString(), s -> Tool.formatCache.getOrDefault(s, s));
             }
             return String.valueOf(value);
         }

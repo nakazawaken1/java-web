@@ -21,6 +21,9 @@ table.full {
   min-width: 966px;
 }
 
+textarea {
+  width: 100%;
+}
 #menu {
   padding: 4px;
   background-color: #ffffee;
@@ -123,4 +126,10 @@ width: 48%;
     <th>${empty after ? sys.item.after : after}</th>
   </tr>
   <!--{F:includeFor('parts/diff.html', diffs)}-->
+  <tr>
+    <th>raw</th>
+    <td><textarea rows="10">${S.before}</textarea></td>
+    <th>raw</th>
+    <td><textarea rows="10">${S.after}</textarea></td>
+  </tr>
 </table>

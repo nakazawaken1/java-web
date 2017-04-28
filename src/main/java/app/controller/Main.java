@@ -156,7 +156,7 @@ public class Main {
      * @param after after
      * @return response
      */
-    @Route(extensions=".html")
+    @Route(extensions = ".html")
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -169,7 +169,7 @@ public class Main {
             session.put("after", a);
             return Response.template("diff.html").bind("isFull", isFull).bind("diffs",
                     Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
-                            Sys.Item.reader));
+                            Sys.Item.reader.toString()));
         })).orElseGet(() -> Response.file("diff.html"));
     }
 }

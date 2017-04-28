@@ -16,6 +16,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -242,6 +243,11 @@ public class Formatter implements AutoCloseable {
     Function<Object, String> escape;
 
     /**
+     * locale
+     */
+    Locale locale;
+
+    /**
      * map
      */
     Map<String, Object> map;
@@ -256,12 +262,14 @@ public class Formatter implements AutoCloseable {
      *
      * @param exclude exclude expression
      * @param escape escape text
+     * @param locale locale
      * @param map map
      * @param values values
      */
-    Formatter(Function<Formatter, Result> exclude, Function<Object, String> escape, Map<String, Object> map, Object... values) {
+    Formatter(Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map, Object... values) {
         this.exclude = exclude;
         this.escape = escape;
+        this.locale = locale;
         this.map = map;
         this.values = values;
         if (current.get() == null) {
@@ -273,7 +281,7 @@ public class Formatter implements AutoCloseable {
      * @return formatter
      */
     Formatter copy() {
-        Formatter result = new Formatter(exclude, escape, map, values);
+        Formatter result = new Formatter(exclude, escape, locale, map, values);
         result.el = el;
         result.cache = cache;
         return result;
@@ -436,12 +444,13 @@ public class Formatter implements AutoCloseable {
      * @param text target({key} replace messages, ${expression} replace el value with escape, #{expression} replace el value with no escape)
      * @param exclude exclude
      * @param escape escape
+     * @param locale locale
      * @param map ${key} replace to value
      * @param values {0}, {1}... replace to value
      * @return result text
      */
-    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Map<String, Object> map, Object... values) {
-        try (Formatter formatter = new Formatter(exclude, escape, map, values)) {
+    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map, Object... values) {
+        try (Formatter formatter = new Formatter(exclude, escape, locale, map, values)) {
             return formatter.format(text);
         }
     }
@@ -517,7 +526,7 @@ public class Formatter implements AutoCloseable {
                 try {
                     if (el == null) {
                         el = new ELProcessor();
-                        el.getELManager().addELResolver(new ELResolver() { /* top level empty, Optional.map, Optional.flatMap resolver */
+                        el.getELManager().addELResolver(new ELResolver() { /* top level empty, Optional.map, Optional.flatMap, Optional.orElseGet resolver */
 
                             @Override
                             public Object getValue(ELContext context, Object base, Object property) {
@@ -537,15 +546,20 @@ public class Formatter implements AutoCloseable {
 
                             @Override
                             public Object invoke(ELContext context, Object base, Object method, Class<?>[] paramTypes, Object[] params) {
-                                if (base instanceof Optional && params.length == 1 && params[0] instanceof LambdaExpression) {
+                                if (base instanceof Optional && method instanceof String && params.length == 1 && params[0] instanceof LambdaExpression) {
                                     LambdaExpression lambda = (LambdaExpression) params[0];
-                                    Optional<?> o = (Optional<?>) base;
-                                    if ("map".equals(method)) {
+                                    @SuppressWarnings("unchecked")
+                                    Optional<Object> o = (Optional<Object>) base;
+                                    switch ((String) method) {
+                                    case "map":
                                         context.setPropertyResolved(true);
                                         return o.map(e -> lambda.invoke(context, e));
-                                    } else if ("flatMap".equals(method)) {
+                                    case "flatMap":
                                         context.setPropertyResolved(true);
                                         return o.flatMap(e -> (Optional<?>) lambda.invoke(context, e));
+                                    case "orElseGet":
+                                        context.setPropertyResolved(true);
+                                        return o.orElseGet(() -> lambda.invoke(context));
                                     }
                                 }
                                 return super.invoke(context, base, method, paramTypes, params);
@@ -766,11 +780,12 @@ public class Formatter implements AutoCloseable {
                 if (hasParameter) {
                     key = keys[0];
                 }
-                Optional<String> message = Config.Injector.get(key);
+                Optional<String> message = Config.Injector.get(key, locale);
                 if (message.isPresent()) {
                     return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
                             "config");
                 }
+                Log.info("not found config: " + key);
             }
             return s;
         };

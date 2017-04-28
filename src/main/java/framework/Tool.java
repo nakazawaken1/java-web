@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
@@ -42,6 +43,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,6 +53,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -863,8 +866,8 @@ public class Tool {
         for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
             if (Character.isUpperCase(c)) {
-                if (i > 0 && (i + 1 >= length || !Character.isUpperCase(text.charAt(i + 1)))) {
-                    result.append("_");
+                if(i > 0 && !Character.isUpperCase(text.charAt(i - 1))) {
+                    result.append('_');
                 }
                 result.append(Character.toLowerCase(c));
                 continue;
@@ -1264,6 +1267,8 @@ public class Tool {
         // password));
         Log.info("base128encoded: " + base128Decode(text));
         Log.info("base128decoded: " + base128Decode(base128Encode(text)));
+        Log.info(Locale.getDefault().toString());
+        Log.info(camelToSnake("LoginURL"));
     }
 
     /**
@@ -1447,6 +1452,24 @@ public class Tool {
 
     /**
      * @param path path
+     * @return folder name(with end separator)
+     */
+    public static String getFolder(String path) {
+        if (path == null) {
+            return null;
+        }
+        int end = path.lastIndexOf('/');
+        if (end < 0) {
+            end = path.lastIndexOf('\\');
+            if (end < 0) {
+                end = 0;
+            }
+        }
+        return path.substring(0, end);
+    }
+
+    /**
+     * @param path path
      * @return file name(without extension)
      */
     public static String getName(String path) {
@@ -1488,5 +1511,18 @@ public class Tool {
      */
     public static Character[] toCharacterArray(String text) {
         return text.chars().mapToObj(j -> Character.valueOf((char) j)).toArray(Character[]::new);
+    }
+    
+    /**
+     * DateTimeFormatter toString cache
+     */
+    public static final Map<String, String> formatCache = new ConcurrentHashMap<>();
+
+    /**
+     * @param pattern pattern
+     * @return DateTimeFormatter
+     */
+    public static DateTimeFormatter getFormat(String pattern) {
+        return peek(DateTimeFormatter.ofPattern(pattern), format -> formatCache.computeIfAbsent(format.toString(), key -> pattern));
     }
 }

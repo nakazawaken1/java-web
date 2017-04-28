@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -115,6 +116,11 @@ public abstract class Response {
      * encoding
      */
     Optional<Charset> charset = Optional.empty();
+    
+    /**
+     * locale
+     */
+    Optional<Locale> locale = Optional.empty();
 
     /**
      * attributes
@@ -315,6 +321,22 @@ public abstract class Response {
     }
 
     /**
+     * @param locale locale
+     * @return self
+     */
+    public Response locale(Locale locale) {
+        this.locale = Tool.of(locale);
+        return this;
+    }
+
+    /**
+     * @return locale
+     */
+    public Locale locale() {
+        return locale.orElse(Locale.getDefault());
+    }
+
+    /**
      * @param contentType contentType
      * @param charset charset
      * @return contentType with charset
@@ -442,7 +464,7 @@ public abstract class Response {
                                                 exclude = Formatter::excludeForHtml;
                                                 escape = Formatter::htmlEscape;
                                             }
-                                            try (Formatter formatter = new Formatter(exclude, escape, response.map, response.values)) {
+                                            try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, response.values)) {
                                                 lines.forEach(line -> writer.println(formatter.format(line)));
                                             }
                                         }
@@ -475,7 +497,7 @@ public abstract class Response {
                         response.contentType(Tool.getContentType(template.name), response.charset());
                         try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
                                 Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
-                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, null)) {
+                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, response.locale(), null)) {
                             lines.map(formatter::format).forEach(line -> {
                                 Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                                 writer.println();
