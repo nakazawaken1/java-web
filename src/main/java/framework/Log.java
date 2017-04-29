@@ -75,8 +75,8 @@ public class Log extends Handler {
         public String format(LogRecord record) {
             return String.format(format, record.getMillis(), record.getSourceClassName() + '.' + record.getSourceMethodName(),
                     editor.apply(record.getLoggerName()), record.getLevel().getName(), formatMessage(record),
-                    Tool.of(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""), Request.current().map(Request::getId).orElse(0),
-                    Session.current().map(Session::getId).orElse(0), Application.current().map(Application::getId).orElse(0));
+                    Tool.of(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""), Request.current().map(Object::hashCode).orElse(0),
+                    Session.current().map(Object::hashCode).orElse(0), Application.current().map(Object::hashCode).orElse(0));
         }
 
         /**
@@ -210,7 +210,7 @@ public class Log extends Handler {
     public void close() throws SecurityException {
         for (Iterator<Map.Entry<Level, FileChannel>> i = outMap.entrySet().iterator(); i.hasNext();) {
             try {
-                Tool.peek(i.next().getValue(), c -> System.out.println("log close #" + c.hashCode())).close();
+                Tool.peek(i.next().getValue(), c -> System.err.println("log close #" + c.hashCode())).close();
                 i.remove();
             } catch (Exception e) {
                 reportError(null, e, ErrorManager.CLOSE_FAILURE);

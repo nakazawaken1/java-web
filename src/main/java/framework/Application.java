@@ -51,13 +51,6 @@ public abstract class Application implements Attributes<Object> {
     }
 
     /**
-     * @return request id
-     */
-    public int getId() {
-        return hashCode();
-    }
-
-    /**
      * @return context path
      */
     abstract String getContextPath();
@@ -153,7 +146,7 @@ public abstract class Application implements Attributes<Object> {
      * @param request request
      * @param session session
      */
-    void handle(Request request, Lazy<Session> session) {
+    void handle(Request request, Session session) {
         Log.info(request::toString);
 
         /* no slash root access */
@@ -187,12 +180,12 @@ public abstract class Application implements Attributes<Object> {
                     break;
                 }
                 Only only = method.getAnnotation(Only.class);
-                boolean forbidden = only != null && !session.get().isLoggedIn();
+                boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
-                    forbidden = !session.get().getAccount().hasAnyRole(only.value());
+                    forbidden = !session.getAccount().hasAnyRole(only.value());
                 }
                 if (forbidden) {
-                    session.get().setAttr("alert", Sys.Alert.forbidden);
+                    session.setAttr("alert", Sys.Alert.forbidden);
                     Response.redirect(getContextPath()).flush();
                     return;
                 }
@@ -206,7 +199,7 @@ public abstract class Application implements Attributes<Object> {
                                         return request;
                                     }
                                     if (Session.class.isAssignableFrom(type)) {
-                                        return session.get();
+                                        return session;
                                     }
                                     if (Application.class.isAssignableFrom(type)) {
                                         return this;

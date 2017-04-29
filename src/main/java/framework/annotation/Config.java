@@ -20,6 +20,7 @@ import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -329,14 +330,14 @@ public @interface Config {
                                         .collect(Collectors.toList());
                             } else if (type == Set.class) {
                                 value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
-                                        .collect(Collectors.toSet());
+                                        .collect(LinkedHashSet::new, (set, v) -> set.add(v), (a, b) -> a.addAll(b));
                             } else if (type == Map.class) {
                                 value = split(raw, f.getAnnotation(Separator.class)).map(i -> {
                                     String[] pair = i.split(Tool.val(f.getAnnotation(Separator.class),
                                             s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
                                     return Tuple.of(getValue(f, Reflector.getGenericParameter(f, 0), pair[0]),
                                             getValue(f, Reflector.getGenericParameter(f, 1), pair[1]));
-                                }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                                }).collect(LinkedHashMap::new, (map, tuple) -> map.put(tuple.l, tuple.r), (a, b) -> a.putAll(b));
                             } else {
                                 value = getValue(f, type, raw);
                             }
@@ -507,10 +508,10 @@ public @interface Config {
                 return "";
             }
             Class<?> clazz = field.getType();
-            char separator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
             if (clazz == Optional.class) {
                 return ((Optional<?>) value).map(String::valueOf).orElse("");
             }
+            char separator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
             if (clazz.isArray()) {
                 StringBuilder s = new StringBuilder();
                 for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {

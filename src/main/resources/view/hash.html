@@ -1,20 +1,18 @@
+#{F:include('parts/header.html')}
 <style type="text/css">
-* {
+td {
   font-family: monospace;
   font-size: 11pt;
-}
-table {
-  border-collapse: collapse;
 }
 th, td {
   border: 1px solid #e2e2e2;
 }
 </style>
-<form method="post">
+<form method="post" class="padding">
   <table>
     <tr>
       <th>source</th>
-      <td><input type="text" name="text" value="${text = R.firstParameters.text}" /> <input type="submit" value="{sys.item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{sys.item.clear}" /></td>
+      <td><input type="text" name="text" value="${text = R.firstParameters.text}" /> <input type="submit" value="{sys.item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{sys.item.clear}" /> <a href="${A.contextPath}">{sys.item.back}</a></td>
     </tr>
     <tr>
       <th>MD2</th>
@@ -66,3 +64,4 @@ th, td {
     </tr>
   </table>
 </form>
+#{F:include('parts/footer.html')}

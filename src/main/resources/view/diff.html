@@ -1,13 +1,17 @@
-<form method="post">
+#{F:include('parts/header.html')}
+<form method="post" class="padding">
   <table style="width: 100%">
     <tr>
       <th>{sys.item.before}</th>
       <th>{sys.item.after}</th>
     </tr>
     <tr>
-      <td><textarea name="before" rows="50" style="width: 100%">${S.before}</textarea></td>
-      <td><textarea name="after" rows="50" style="width: 100%">${S.after}</textarea></td>
+      <td style="padding: 0; text-align: center"><textarea name="before" rows="30" style="width: 98%">${S.before}</textarea></td>
+      <td style="padding: 0; text-align: center"><textarea name="after" rows="30" style="width: 98%">${S.after}</textarea></td>
     </tr>
   </table>
-  <input type="submit" value="{sys.item.diff}" />
+  <div class="padding">
+    <input type="submit" value="{sys.item.diff}" /> <a href="${A.contextPath}">{sys.item.back}</a>
+  </div>
 </form>
+#{F:include('parts/footer.html')}

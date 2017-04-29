@@ -39,12 +39,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -90,13 +93,8 @@ public class Standalone {
         new ApplicationImpl(contextPath).setup(ResponseImpl::new);
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
-            try (Defer<Request> request = new Defer<>(new RequestImpl(exchange), r -> Request.CURRENT.remove());
-                    Defer<Lazy<Session>> session = new Defer<>(new Lazy<>(() -> {
-                        Session s = new SessionImpl(exchange);
-                        Session.CURRENT.set(s);
-                        return s;
-                    }), s -> s.ifGot(i -> Session.CURRENT.remove()).close())) {
-                Request.CURRENT.set(request.get());
+            try (Defer<RequestImpl> request = new Defer<>(Tool.peek(new RequestImpl(exchange), Request.CURRENT::set), r -> Request.CURRENT.remove());
+                    Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(exchange), Session.CURRENT::set), s -> Session.CURRENT.remove())) {
                 Application.current().get().handle(request.get(), session.get());
             } catch (Exception e) {
                 Log.warning(e, () -> "500");
@@ -323,12 +321,7 @@ public class Standalone {
     /**
      * Session implementation
      */
-    public static class SessionImpl extends Session implements AutoCloseable {
-
-        /**
-         * session cookie name
-         */
-        static final String NAME = Sys.session_name;
+    public static class SessionImpl extends Session {
 
         /**
          * session id
@@ -336,45 +329,68 @@ public class Standalone {
         String id;
 
         /**
-         * Attributes
+         * Old attributes
          */
-        Map<String, Serializable> attributes;
+        Map<String, Serializable> oldAttributes;
 
         /**
-         * saved attributes
+         * New attributes
          */
-        boolean saved = false;
+        Map<String, Serializable> newAttributes;
+
+        /**
+         * Remove attributes
+         */
+        Set<String> removeAttributes;
 
         /**
          * @param exchange exchange
          */
-        @SuppressWarnings("unchecked")
         SessionImpl(HttpExchange exchange) {
-            id = Tool.of(exchange.getRequestHeaders().getFirst("Cookie")).map(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2))
-                    .filter(a -> NAME.equalsIgnoreCase(a[0])).findAny().map(a -> a[1].replaceFirst("\\..*$", "")).orElse(null)).orElse(null);
-            if (id == null) {
-                id = Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random());
-                exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(NAME, id + Sys.cluster_suffix, null, -1, null,
-                        Application.current().map(Application::getContextPath).orElse(null), false, true));
-            } else {
+            id = Tool.of(exchange.getRequestHeaders().getFirst("Cookie"))
+                    .flatMap(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2)).filter(a -> Sys.session_name.equalsIgnoreCase(a[0])).findAny()
+                            .map(a -> a[1].substring(0, a[1].length() - Sys.cluster_suffix.length())))
+                    .orElseGet(() -> Tool.peek(Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()),
+                            i -> exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(Sys.session_name, i + Sys.cluster_suffix, null, -1, null,
+                                    Application.current().map(Application::getContextPath).orElse(null), false, true))));
+        }
+
+        /**
+         * @return Non null old attributes
+         */
+        Map<String, Serializable> oldAttributes() {
+            if (oldAttributes == null) {
                 try (Db db = Db.connect()) {
                     int timeout = Sys.session_timeout_minutes;
                     if (timeout > 0) {
                         db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
                     }
-                    db.select("value").from("t_session").where("id", id).row(rs -> {
-                        try (InputStream in = rs.getBinaryStream(1)) {
+                    db.select("name", "value").from("t_session").where("id", id).rows(rs -> {
+                        try (InputStream in = rs.getBinaryStream(2); ObjectInputStream i = new ObjectInputStream(in)) {
                             if (in != null) {
-                                ObjectInputStream o = new ObjectInputStream(in);
-                                attributes = (Map<String, Serializable>) o.readObject();
+                                if (oldAttributes == null) {
+                                    oldAttributes = new ConcurrentHashMap<>();
+                                }
+                                oldAttributes.put(rs.getString(1), (Serializable) i.readObject());
                             }
                         }
                     });
                 }
             }
-            if (attributes == null) {
-                attributes = new ConcurrentHashMap<>();
+            if (oldAttributes == null) {
+                oldAttributes = new ConcurrentHashMap<>();
             }
+            return oldAttributes;
+        }
+
+        /**
+         * @return Non null new attributes
+         */
+        Map<String, Serializable> newAttributes() {
+            if (newAttributes == null) {
+                newAttributes = new ConcurrentHashMap<>();
+            }
+            return newAttributes;
         }
 
         /**
@@ -406,9 +422,13 @@ public class Standalone {
             return result.toString();
         }
 
+        /*
+         * (non-Javadoc)
+         * @see java.lang.Object#hashCode()
+         */
         @Override
-        public int getId() {
-            return id.hashCode();
+        public int hashCode() {
+            return id == null ? 0 : id.hashCode();
         }
 
         @Override
@@ -418,62 +438,105 @@ public class Standalone {
 
         @Override
         public Stream<String> names() {
-            return attributes.keySet().stream();
+            return Stream.concat(oldAttributes().keySet().stream(), newAttributes().keySet().stream()).distinct()
+                    .filter(Tool.of(removeAttributes).map(a -> Tool.not(a::contains)).orElse(i -> true));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(newAttributes().containsKey(name) ? (T) newAttributes().get(name)
+                    : oldAttributes().containsKey(name) && !Tool.of(removeAttributes).map(a -> a.contains(name)).orElse(false) ? (T) oldAttributes().get(name)
+                            : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
         public void setAttr(String name, Serializable value) {
-            attributes.put(name, value);
+            if (!Objects.equals(value, oldAttributes().get(name))) {
+                newAttributes().put(name, value);
+                Tool.of(removeAttributes).ifPresent(a -> a.remove(name));
+            }
         }
 
         @Override
         public void removeAttr(String name) {
-            attributes.remove(name);
+            if (oldAttributes().containsKey(name)) {
+                newAttributes().remove(name);
+                if (removeAttributes == null) {
+                    removeAttributes = new HashSet<>();
+                }
+                removeAttributes.add(name);
+            }
         }
 
         /**
          * save session attributes
          */
         public void save() {
-            if (saved) {
+            boolean hasNew = newAttributes != null && !newAttributes.isEmpty();
+            boolean hasRemove = removeAttributes != null && !removeAttributes.isEmpty();
+            if (!hasNew && !hasRemove) {
                 return;
             }
-            try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream o = new ObjectOutputStream(out)) {
-                o.writeObject(attributes);
-                Timestamp now = Timestamp.valueOf(LocalDateTime.now());
-                if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? FOR UPDATE", ps -> {
-                    ps.setString(1, id);
-                    return Tool.array(id);
-                }, rs -> db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ?", ps -> {
-                    ps.setBytes(1, out.toByteArray());
-                    ps.setTimestamp(2, now);
-                    ps.setString(3, id);
-                    ps.executeUpdate();
-                    return Tool.array("(blob)", now, id);
-                })) <= 0) {
-                    db.prepare("INSERT INTO t_session(id, value, last_access) VALUES(?, ?, ?)", ps -> {
-                        ps.setString(1, id);
-                        ps.setBytes(2, out.toByteArray());
-                        ps.setTimestamp(3, now);
-                        ps.executeUpdate();
-                        return Tool.array(id, "(blob)", now);
+            try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                if (hasNew) {
+                    Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                    db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ? AND name = ?", update -> {
+                        update.setString(3, id);
+                        List<String> namesUpdate = new ArrayList<>();
+                        List<String> valuesUpdate = new ArrayList<>();
+                        db.prepare("INSERT INTO t_session(id, name, value, last_access) VALUES(?, ?, ?, ?)", insert -> {
+                            insert.setString(1, id);
+                            List<String> namesInsert = new ArrayList<>();
+                            List<String> valuesInsert = new ArrayList<>();
+                            newAttributes.forEach(Try.biC((name, object) -> {
+                                try (ObjectOutputStream o = new ObjectOutputStream(out)) {
+                                    o.writeObject(object);
+                                }
+                                byte[] value = out.toByteArray();
+                                out.reset();
+                                if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? AND name = ? FOR UPDATE", select -> {
+                                    select.setString(1, id);
+                                    select.setString(2, name);
+                                    return Tool.array(id, name);
+                                }, rs -> {
+                                    namesUpdate.add(name);
+                                    valuesUpdate.add(Objects.toString(object));
+                                    update.setBytes(1, value);
+                                    update.setTimestamp(2, now);
+                                    update.setString(4, name);
+                                    update.executeUpdate();
+                                }) <= 0) {
+                                    namesInsert.add(name);
+                                    valuesInsert.add(Objects.toString(object));
+                                    insert.setString(2, name);
+                                    insert.setBytes(3, value);
+                                    insert.setTimestamp(4, now);
+                                    insert.executeUpdate();
+                                }
+                            }));
+                            return namesInsert.isEmpty() ? null : Tool.array(id, namesInsert, valuesInsert, now);
+                        });
+                        return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, now, id, namesUpdate);
                     });
+                    newAttributes.forEach(oldAttributes::put);
+                    newAttributes = null;
                 }
-                saved = true;
+                if (hasRemove) {
+                    db.prepare("DELETE FROM t_session WHERE id = ? AND name = ?", delete -> {
+                        delete.setString(1, id);
+                        removeAttributes.forEach(Try.c(name -> {
+                            delete.setString(2, name);
+                            delete.executeUpdate();
+                        }));
+                        return Tool.array(id, removeAttributes);
+                    });
+                    removeAttributes.forEach(oldAttributes::remove);
+                    removeAttributes = null;
+                }
             } catch (IOException e) {
                 Log.severe(e, () -> "session save error");
             }
-        }
-
-        @Override
-        public void close() throws Exception {
-            save();
         }
     }
 
@@ -859,10 +922,15 @@ public class Standalone {
     static class ResponseImpl extends Response {
 
         @Override
+        void flush() {
+            Session.current().filter(s -> s instanceof SessionImpl).ifPresent(s -> ((SessionImpl) s).save());
+            super.flush();
+        }
+
+        @Override
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
             HttpExchange exchange = ((RequestImpl) Request.current().get()).exchange;
             TryConsumer<Long> action = contentLength -> {
-                Session.current().map(s -> (SessionImpl) s).ifPresent(SessionImpl::save);
                 Sys.headers.forEach((key, value) -> exchange.getResponseHeaders().set(key, value));
                 if (headers != null) {
                     headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));

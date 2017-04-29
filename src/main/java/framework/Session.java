@@ -25,14 +25,9 @@ public abstract class Session implements Attributes<Serializable> {
     }
 
     /**
-     * @return request id
-     */
-    public abstract int getId();
-
-    /**
      * session key of account
      */
-    public static final String sessionKey = "\naccount\n";
+    public static final String sessionKey = "$account$";
 
     /**
      * @return account

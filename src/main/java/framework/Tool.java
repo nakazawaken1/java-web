@@ -102,7 +102,15 @@ public class Tool {
     /**
      * not empty string
      */
-    public static final Predicate<String> notEmpty = ((Predicate<String>) String::isEmpty).negate();
+    public static final Predicate<String> notEmpty = Tool.not(String::isEmpty);
+
+    /**
+     * @param predicate predicate
+     * @return negate predicate
+     */
+    public static <T> Predicate<T> not(Predicate<T> predicate) {
+        return predicate.negate();
+    }
 
     /**
      * @param relativePath relative path
@@ -617,6 +625,17 @@ public class Tool {
     }
 
     /**
+     * @param text Text
+     * @param separator Separator
+     * @param pairSeparator Pair separator
+     * @return Map
+     */
+    public static Map<String, String> parseMap(String text, String separator, String pairSeparator) {
+        return string(text).map(s -> Stream.of(s.split(separator)).collect(() -> (Map<String, String>) new LinkedHashMap<String, String>(),
+                (map, ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), (a, b) -> a.putAll(b))).orElseGet(Collections::emptyMap);
+    }
+
+    /**
      * JSON Mapper
      */
     @SuppressWarnings("rawtypes")
@@ -866,7 +885,7 @@ public class Tool {
         for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
             if (Character.isUpperCase(c)) {
-                if(i > 0 && !Character.isUpperCase(text.charAt(i - 1))) {
+                if (i > 0 && !Character.isUpperCase(text.charAt(i - 1))) {
                     result.append('_');
                 }
                 result.append(Character.toLowerCase(c));
@@ -1512,7 +1531,7 @@ public class Tool {
     public static Character[] toCharacterArray(String text) {
         return text.chars().mapToObj(j -> Character.valueOf((char) j)).toArray(Character[]::new);
     }
-    
+
     /**
      * DateTimeFormatter toString cache
      */

@@ -81,8 +81,8 @@ public interface Sys {
             "X-Download-Options: noopen #IE direct open disabled",
             "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache # cache disabled" })
     @Separator(value = '|', pair = ':')
-    Map<String, String> headers = Tool.map("X-UA-Compatible", "IE=edge", "X-Content-Type-Options", "nosniff", "X-Download-Options", "noopen", "Cache-Control",
-            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0", "Expires", "-1", "Pragma", "no-cache");
+    Map<String, String> headers = Tool.map("X-UA-Compatible", "IE=edge", "Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+            "X-Content-Type-Options", "nosniff", "X-Download-Options", "noopen", "Pragma", "no-cache", "Expires", "-1");
 
     @Help("htdocs folder")
     String document_root_folder = "view/";
@@ -135,37 +135,16 @@ public interface Sys {
     @Help("h2 web console using https")
     Boolean h2_ssl = false;
 
-    @Help("cluster node name suffix(for session cookie)")
+    @Help("cluster node name suffix(for session cookie, It must be the same length in each cluster)")
     String cluster_suffix = "";
 
     @Help("job packages")
     List<String> job_packages = Collections.unmodifiableList(Arrays.asList(Main.class.getPackage().getName()));
 
     enum Item implements Message {
-        title,
-        login,
-        logout,
-        error,
-        login_id,
-        password,
-        update,
-        insert,
-        delete,
-        before,
-        after,
-        back,
-        quit,
-        diff,
-        index,
-        compact,
-        full,
-        @Mapping("©2016, All Rights Reserved.")
-        copyright,
-        @Mapping("...")
-        reader,
-        run,
-        clear,
-        ;
+        title, login, logout, error, login_id, password, update, insert, delete, before, after, back, quit, diff, index, compact, full, @Mapping("©2016, All Rights Reserved.")
+        copyright, @Mapping("...")
+        reader, run, clear,;
 
         @Override
         public String toString() {
@@ -175,10 +154,8 @@ public interface Sys {
 
     enum Alert implements Message {
         @Mapping("You do not have access rights. Please login with authorized account.")
-        forbidden,
-        @Mapping("Login ID or password is wrong.")
-        login_failed,
-        ;
+        forbidden, @Mapping("Login ID or password is wrong.")
+        login_failed,;
 
         @Override
         public String toString() {
@@ -188,8 +165,7 @@ public interface Sys {
 
     enum Prompt implements Message {
         @Mapping("Please input user ID and password and press the login button.")
-        login,
-        ;
+        login,;
 
         @Override
         public String toString() {

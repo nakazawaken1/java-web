@@ -24,6 +24,7 @@ import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -111,7 +112,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.lang.Enum#toString()
          */
         @Override
@@ -473,7 +473,6 @@ public class Db implements AutoCloseable {
 
     /*
      * (non-Javadoc)
-     * 
      * @see java.lang.AutoCloseable#close()
      */
     @Override
@@ -1137,7 +1136,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1164,7 +1162,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
@@ -1186,7 +1183,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1234,7 +1230,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#escape(java.lang.Object)
          */
         @Override
@@ -1253,7 +1248,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#countSql(java.lang.String)
          */
         @Override
@@ -1280,7 +1274,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
@@ -1298,7 +1291,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1333,7 +1325,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see framework.Db.Builder#replace(java.lang.String)
          */
         @Override
@@ -1522,7 +1513,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.lang.AutoCloseable#close()
          */
         @Override
@@ -1549,7 +1539,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.util.Spliterator#tryAdvance(java.util.function.Consumer)
          */
         @Override
@@ -1575,7 +1564,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.util.Spliterator#trySplit()
          */
         @Override
@@ -1585,7 +1573,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.util.Spliterator#estimateSize()
          */
         @Override
@@ -1595,7 +1582,6 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
-         * 
          * @see java.util.Spliterator#characteristics()
          */
         @Override
@@ -1909,10 +1895,11 @@ public class Db implements AutoCloseable {
      * @return executable SQL
      */
     public String preparedSQL(String sql, Object... values) {
-        for (Object i : values) {
-            sql = sql.replaceFirst("\\?", builder.escape(i));
-        }
-        return sql;
+        Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters);
+        Function<Object, String> to = v -> v instanceof Collection
+                ? ((Collection<?>) v).stream().map(cut).map(builder::escape).collect(Collectors.joining(", ", "[", "]")) : builder.escape(v);
+        return Tool.trim(null, Tool.zip(Stream.of(sql.split("[?]")), Stream.concat(Stream.of(values).map(to), Stream.generate(() -> "?"))).map(t -> t.l + t.r)
+                .collect(Collectors.joining()), "?");
     }
 
     /**
@@ -1924,7 +1911,9 @@ public class Db implements AutoCloseable {
     public void prepare(String sql, TryFunction<PreparedStatement, Object[]> prepare) {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             Object[] values = Try.f(prepare).apply(ps);
-            Log.info(() -> preparedSQL(sql, values));
+            if (values != null) {
+                Log.info(() -> preparedSQL(sql, values));
+            }
         } catch (SQLException e) {
             Try.r(connection::rollback).run();
             throw new UncheckedSQLException(e);
@@ -1943,7 +1932,9 @@ public class Db implements AutoCloseable {
         long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             Object[] values = Try.f(prepare).apply(ps);
-            Log.info(() -> preparedSQL(sql, values));
+            if (values != null) {
+                Log.info(() -> preparedSQL(sql, values));
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     count++;

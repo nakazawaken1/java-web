@@ -81,13 +81,10 @@ public class ServletImpl implements javax.servlet.Servlet {
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
-        try (Defer<Request> request = new Defer<>(new RequestImpl((HttpServletRequest) req, (HttpServletResponse) res), r -> Request.CURRENT.remove());
-                Defer<Lazy<Session>> session = new Defer<>(new Lazy<>(() -> {
-                    Session s = new SessionImpl(((HttpServletRequest) req).getSession());
-                    Session.CURRENT.set(s);
-                    return s;
-                }), s -> s.ifGot(i -> Session.CURRENT.remove()).close())) {
-            Request.CURRENT.set(request.get());
+        try (Defer<RequestImpl> request = new Defer<>(Tool.peek(new RequestImpl((HttpServletRequest) req, (HttpServletResponse) res), Request.CURRENT::set),
+                r -> Request.CURRENT.remove());
+                Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(((HttpServletRequest) req).getSession()), Session.CURRENT::set),
+                        s -> Session.CURRENT.remove())) {
             Application.current().get().handle(request.get(), session.get());
         }
     }
@@ -183,9 +180,20 @@ public class ServletImpl implements javax.servlet.Servlet {
             session.setMaxInactiveInterval(Sys.session_timeout_minutes * 60);
         }
 
+        /* (non-Javadoc)
+         * @see java.lang.Object#hashCode()
+         */
         @Override
-        public int getId() {
+        public int hashCode() {
             return session.getId().hashCode();
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#toString()
+         */
+        @Override
+        public String toString() {
+            return session.getId();
         }
 
         /*
@@ -417,8 +425,9 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> (RequestImpl) i).map(i -> "-> " + i.request.getProtocol() + " " + i.response.getStatus() + " "
-                    + Tool.string(i.response.getContentType()).orElse("")).orElse("");
+            return Request.current().map(i -> (RequestImpl) i)
+                    .map(i -> "-> " + i.request.getProtocol() + " " + i.response.getStatus() + " " + Tool.string(i.response.getContentType()).orElse(""))
+                    .orElse("");
         }
     }
 }

@@ -46,13 +46,6 @@ public abstract class Request implements Attributes<Object> {
     }
 
     /**
-     * @return request id
-     */
-    public int getId() {
-        return hashCode();
-    }
-
-    /**
      * @return path
      */
     public abstract String getPath();

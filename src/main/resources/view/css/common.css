@@ -1,28 +1,27 @@
 * {
-    font-family: 'メイリオ';
+  font-family: 'メイリオ';
 }
 
 body {
-    margin: 0;
+  margin: 0;
 }
 
 nav {
-    background-color: #eeeeff;
-    display: table;
-    width: 100%;
+  background-color: #eeeeff;
+  display: table;
+  width: 100%;
+  position: fixed;
 }
 
-nav span {
-    display: table-cell;
+nav div {
+  display: table-cell;
+  padding: 5px;
 }
 
 nav form {
-    display: table-cell;
-    text-align: right;
-}
-
-form {
-    display: inline;
+  display: table-cell;
+  padding: 5px;
+  text-align: right;
 }
 
 table {
@@ -31,9 +30,13 @@ table {
 
 th, td {
   border: 1px solid black;
-  padding: 2px;
+  padding: 4px;
 }
 
 [data-load=alert] {
   color: red;
+}
+
+.padding {
+  padding: 5px;
 }
