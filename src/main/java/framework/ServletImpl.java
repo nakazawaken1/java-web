@@ -189,6 +189,14 @@ public class ServletImpl implements javax.servlet.Servlet {
         }
 
         /* (non-Javadoc)
+         * @see java.lang.Object#equals(java.lang.Object)
+         */
+        @Override
+        public boolean equals(Object obj) {
+            return obj != null && hashCode() == obj.hashCode();
+        }
+
+        /* (non-Javadoc)
          * @see java.lang.Object#toString()
          */
         @Override
