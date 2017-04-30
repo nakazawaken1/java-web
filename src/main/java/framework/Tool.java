@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -76,6 +77,13 @@ import javax.crypto.CipherOutputStream;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.mail.Authenticator;
+import javax.mail.Message.RecipientType;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import javax.xml.bind.DatatypeConverter;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
@@ -1413,8 +1421,8 @@ public class Tool {
      * @param value value
      * @return values
      */
-    public static List<String> addValue(Map<String, List<String>> map, String name, String value) {
-        List<String> list = map.get(name);
+    public static <T, U> List<U> addValue(Map<T, List<U>> map, T name, U value) {
+        List<U> list = map.get(name);
         if (list == null) {
             list = new ArrayList<>();
             map.put(name, list);
@@ -1429,8 +1437,8 @@ public class Tool {
      * @param value value
      * @return self
      */
-    public static List<String> setValue(Map<String, List<String>> map, String name, String value) {
-        List<String> list = new ArrayList<>();
+    public static <T, U> List<U> setValue(Map<T, List<U>> map, T name, U value) {
+        List<U> list = new ArrayList<>();
         list.add(value);
         map.put(name, list);
         return list;
@@ -1441,7 +1449,7 @@ public class Tool {
      * @param name name
      * @return first value
      */
-    public static Optional<String> getFirst(Map<String, List<String>> map, String name) {
+    public static <T, U> Optional<U> getFirst(Map<T, List<U>> map, T name) {
         return Tool.of(map).map(m -> m.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
     }
 
@@ -1543,5 +1551,198 @@ public class Tool {
      */
     public static DateTimeFormatter getFormat(String pattern) {
         return peek(DateTimeFormatter.ofPattern(pattern), format -> formatCache.computeIfAbsent(format.toString(), key -> pattern));
+    }
+
+    /**
+     * Mail settings
+     */
+    public static class Mail {
+        static {
+            System.setProperty("sun.nio.cs.map", "x-windows-iso2022jp/ISO-2022-JP");
+        }
+        /**
+         * Users
+         */
+        protected final Map<RecipientType, InternetAddress[]> users = new LinkedHashMap<>();
+
+        /**
+         * Properties
+         */
+        protected final Properties properties = new Properties();
+        {
+            properties.put("mail.smtp.host", Sys.Mail.host);
+            properties.put("mail.smtp.port", Sys.Mail.port);
+            properties.put("mail.smtp.auth", Sys.Mail.auth);
+            properties.put("mail.smtp.starttls.enable", Sys.Mail.startTls);
+            properties.put("mail.smtp.connectiontimeout", Sys.Mail.connectionTimeout);
+            properties.put("mail.smtp.timeout", Sys.Mail.readTimeout);
+            properties.put("mail.user", Sys.Mail.user);
+            properties.put("mail.host", Sys.Mail.host);
+            properties.put("mail.debug", Sys.Mail.debug);
+        }
+
+        /**
+         * From address
+         */
+        protected InternetAddress from;
+
+        /**
+         * Reply to address
+         */
+        protected InternetAddress[] replyTo;
+
+        /**
+         * Authenticator
+         */
+        protected Authenticator authenticator = new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(Sys.Mail.user, Sys.Mail.password);
+            }
+        };
+
+        /**
+         * Constructor
+         */
+        protected Mail() {
+        }
+
+        /**
+         * @param type TO or CC or BCC
+         * @param addresses E-mail address
+         * @return Self
+         */
+        public Mail address(RecipientType type, String... addresses) {
+            users.put(type, Stream.of(addresses).map(Try.f(InternetAddress::new)).toArray(InternetAddress[]::new));
+            return this;
+        }
+
+        /**
+         * @param type TO or CC or BCC
+         * @param addressNames pair of E-mail address and display name
+         * @return Self
+         */
+        public Mail addressWithName(RecipientType type, String... addressNames) {
+            users.put(type, parse(addressNames));
+            return this;
+        }
+
+        /**
+         * @param addressNames pair of E-mail address and display name
+         * @return Array of InternetAddress
+         */
+        static InternetAddress[] parse(String... addressNames) {
+            return IntStream.range(0, addressNames.length / 2).map(i -> i * 2)
+                    .<InternetAddress>mapToObj(Try.intF(i -> new InternetAddress(addressNames[i], addressNames[i + 1], Sys.Mail.charset)))
+                    .toArray(InternetAddress[]::new);
+        }
+
+        /**
+         * @param authenticator Authenticator
+         * @return Self
+         */
+        public Mail authenticator(Authenticator authenticator) {
+            this.authenticator = authenticator;
+            return this;
+        }
+
+        /**
+         * @param from From e-mail address
+         * @param name Display name
+         * @return Self
+         */
+        public Mail from(String from, String name) {
+            this.from = Try.s(() -> new InternetAddress(from, name, Sys.Mail.charset)).get();
+            return this;
+        }
+
+        /**
+         * @param addressNames pair of E-mail address and display name
+         * @return Self
+         */
+        public Mail replyTo(String... addressNames) {
+            this.replyTo = parse(addressNames);
+            return this;
+        }
+
+        /**
+         * @param addressNames pair of E-mail address and display name
+         * @return Self
+         */
+        public Mail toWithName(String... addressNames) {
+            return addressWithName(RecipientType.TO, addressNames);
+        }
+
+        /**
+         * @param addresses Array of E-mail address
+         * @return Self
+         */
+        public Mail to(String... addresses) {
+            return address(RecipientType.TO, addresses);
+        }
+
+        /**
+         * @param addressNames pair of E-mail address and display name
+         * @return Self
+         */
+        public Mail ccWithName(String... addressNames) {
+            return addressWithName(RecipientType.CC, addressNames);
+        }
+
+        /**
+         * @param addresses Array of E-mail address
+         * @return Self
+         */
+        public Mail cc(String... addresses) {
+            return address(RecipientType.CC, addresses);
+        }
+
+        /**
+         * @param addressNames pair of E-mail address and display name
+         * @return Self
+         */
+        public Mail bccWithName(String... addressNames) {
+            return addressWithName(RecipientType.BCC, addressNames);
+        }
+
+        /**
+         * @param addresses Array of E-mail address
+         * @return Self
+         */
+        public Mail bcc(String... addresses) {
+            return address(RecipientType.BCC, addresses);
+        }
+    }
+
+    /**
+     * @param subject Mail subject
+     * @param body Mail body
+     * @param to To e-mail address
+     */
+    public static void mail(String subject, String body, String... to) {
+        mail(subject, body, mail -> mail.to(to));
+    }
+
+    /**
+     * @param subject Mail subject
+     * @param body Mail body
+     * @param set setter
+     */
+    public static void mail(String subject, String body, Consumer<Mail> set) {
+        Mail mail = new Mail();
+        set.accept(mail);
+        MimeMessage message = new MimeMessage(javax.mail.Session.getInstance(mail.properties, mail.authenticator));
+        InternetAddress from = Tool.of(mail.from).orElseGet(Try.s(() -> new InternetAddress(Sys.Mail.user)));
+        try {
+            message.setFrom(from);
+            message.setReplyTo(Tool.array(from));
+            mail.users.forEach(Try.biC((type, users) -> message.setRecipients(type, users)));
+            message.setSubject(subject, Sys.Mail.charset);
+            message.setText(body, Sys.Mail.charset);
+            message.setHeader("Content-Transfer-Encoding", Sys.Mail.encoding);
+            Transport.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

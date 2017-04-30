@@ -1,5 +1,6 @@
 package app.config;
 
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,6 +50,21 @@ public interface Sys {
 
         @Help("request parameter max output letters")
         Integer parameter_max_letters = 50;
+    }
+    
+    static class Mail {
+        public static String user = "";
+        public static String password = "";
+        public static String host = "smtp.gmail.com";
+        @Help("ISO-2022-JP or UTF-8 in Japan")
+        public static String charset = StandardCharsets.UTF_8.name();
+        public static String encoding = "base64";
+        public static Integer port = 587;
+        public static Boolean auth = true;
+        public static Boolean startTls = true;
+        public static Integer connectionTimeout = 10 * 1000;
+        public static Integer readTimeout = 10 * 1000;
+        public static Boolean debug = true;
     }
 
     @Help("database connection string(inclucde id and password)")
