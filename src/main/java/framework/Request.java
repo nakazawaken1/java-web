@@ -167,7 +167,7 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public String put(String key, String value) {
-                return Tool.setValue(map, key, value).get(0);
+                return Tool.setValue(map, key, value);
             }
 
             @Override

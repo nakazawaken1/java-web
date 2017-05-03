@@ -52,7 +52,7 @@ public interface Sys {
         Integer parameter_max_letters = 50;
     }
     
-    static class Mail {
+    class Mail {
         public static String user = "";
         public static String password = "";
         public static String host = "smtp.gmail.com";

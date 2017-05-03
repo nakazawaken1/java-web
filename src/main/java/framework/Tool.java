@@ -113,11 +113,21 @@ public class Tool {
     public static final Predicate<String> notEmpty = Tool.not(String::isEmpty);
 
     /**
-     * @param predicate predicate
-     * @return negate predicate
+     * @param <T> Value type
+     * @param predicate Predicate
+     * @return Negate predicate
      */
     public static <T> Predicate<T> not(Predicate<T> predicate) {
         return predicate.negate();
+    }
+    
+    /**
+     * @param <T> Value type
+     * @param value value
+     * @return Equal predicate
+     */
+    public static <T> Predicate<T> equal(T value) {
+        return i -> value.equals(i);
     }
 
     /**
@@ -630,6 +640,16 @@ public class Tool {
             map.put((K) keyValues[i], (V) keyValues[i + 1]);
         }
         return map;
+    }
+    
+    /**
+     * @param <T> Value type
+     * @param values Values
+     * @return Set
+     */
+    @SafeVarargs
+    public static <T> Set<T> set(T... values) {
+        return new HashSet<T>(Arrays.asList(values));
     }
 
     /**
@@ -1416,38 +1436,44 @@ public class Tool {
     }
 
     /**
-     * @param map map
-     * @param name name
-     * @param value value
-     * @return values
+     * @param <T> Name type
+     * @param <U> Value type
+     * @param map Map
+     * @param name Name
+     * @param value Value
+     * @return Value
      */
-    public static <T, U> List<U> addValue(Map<T, List<U>> map, T name, U value) {
+    public static <T, U> U addValue(Map<T, List<U>> map, T name, U value) {
         List<U> list = map.get(name);
         if (list == null) {
             list = new ArrayList<>();
             map.put(name, list);
         }
         list.add(value);
-        return list;
+        return value;
     }
 
     /**
-     * @param map map
-     * @param name name
-     * @param value value
-     * @return self
+     * @param <T> Name type
+     * @param <U> Value type
+     * @param map Map
+     * @param name Name
+     * @param value Value
+     * @return Value
      */
-    public static <T, U> List<U> setValue(Map<T, List<U>> map, T name, U value) {
+    public static <T, U> U setValue(Map<T, List<U>> map, T name, U value) {
         List<U> list = new ArrayList<>();
         list.add(value);
         map.put(name, list);
-        return list;
+        return value;
     }
 
     /**
-     * @param map map
-     * @param name name
-     * @return first value
+     * @param <T> Name type
+     * @param <U> Value type
+     * @param map Map
+     * @param name Name
+     * @return First value
      */
     public static <T, U> Optional<U> getFirst(Map<T, List<U>> map, T name) {
         return Tool.of(map).map(m -> m.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
