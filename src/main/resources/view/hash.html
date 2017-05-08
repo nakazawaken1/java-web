@@ -62,6 +62,10 @@ th, td {
       <th>URL decode</th>
       <td>${empty text ? '' : Tool.urlDecode(text)}</td>
     </tr>
+    <tr>
+      <th>HTML escape</th>
+      <td>${empty text ? '' : Tool.htmlEscape(text)}</td>
+    </tr>
   </table>
 </form>
 #{F:include('parts/footer.html')}

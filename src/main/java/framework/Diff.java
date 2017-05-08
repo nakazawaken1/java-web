@@ -103,8 +103,8 @@ public class Diff<T> {
      * HTML escape editor
      */
     public static Consumer<Diff<String>> ESCAPE = d -> {
-        d.before = d.before.map(Formatter::htmlEscape);
-        d.after = d.after.map(Formatter::htmlEscape);
+        d.before = d.before.map(Tool::htmlEscape);
+        d.after = d.after.map(Tool::htmlEscape);
     };
 
     /**
@@ -124,8 +124,8 @@ public class Diff<T> {
      */
     public static Consumer<Diff<String>> INLINE(String tag, int limit) {
         return d -> {
-            d.before = d.before.map(Formatter::htmlEscape);
-            d.after = d.after.map(Formatter::htmlEscape);
+            d.before = d.before.map(Tool::htmlEscape);
+            d.after = d.after.map(Tool::htmlEscape);
             if (d.type != Type.CHANGE) {
                 return;
             }
@@ -260,12 +260,9 @@ public class Diff<T> {
      * @param args not use
      */
     public static void main(String[] args) {
-        System.out
-                .print(Tool
-                        .dump(Diff.diff(
-                                Formatter.htmlEscape("  <!-- Prevent memory leaks due to use of particular java/javax APIs-->").chars().mapToObj(i -> (char) i)
-                                        .toArray(Character[]::new),
-                                Formatter.htmlEscape("   -->").chars().mapToObj(i -> (char) i).toArray(Character[]::new), DEFAULT(), null)));
+        System.out.print(
+                Tool.dump(Diff.diff(Tool.htmlEscape("  <!-- Prevent memory leaks due to use of particular java/javax APIs-->").chars().mapToObj(i -> (char) i)
+                        .toArray(Character[]::new), Tool.htmlEscape("   -->").chars().mapToObj(i -> (char) i).toArray(Character[]::new), DEFAULT(), null)));
     }
 
     /**
@@ -276,15 +273,15 @@ public class Diff<T> {
      * @return compacted diffs
      */
     public static <T> List<Diff<T>> compact(List<Diff<T>> diffs, int lines, T skipContent) {
-        if(lines <= 0) {
+        if (lines <= 0) {
             return diffs;
         }
         SortedSet<Integer> picks = new TreeSet<>();
         int max = diffs.size();
         int i = 0;
-        for(Diff<T> diff : diffs) {
-            if(diff.type != Type.EQUAL) {
-                for(int j = Math.max(0, i - lines), j2 = Math.min(i + lines + 1, max); j < j2; j++) {
+        for (Diff<T> diff : diffs) {
+            if (diff.type != Type.EQUAL) {
+                for (int j = Math.max(0, i - lines), j2 = Math.min(i + lines + 1, max); j < j2; j++) {
                     picks.add(j);
                 }
             }
@@ -292,8 +289,8 @@ public class Diff<T> {
         }
         List<Diff<T>> result = new ArrayList<>();
         int pick0 = -1;
-        for(int pick : picks) {
-            if(pick0 + 1 != pick) {
+        for (int pick : picks) {
+            if (pick0 + 1 != pick) {
                 result.add(new Diff<>(Type.SKIP, Optional.empty(), Tool.of(skipContent), Optional.empty(), Tool.of(skipContent)));
             }
             pick0 = pick;

@@ -1,12 +1,16 @@
 package framework;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,12 +22,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParserFactory;
-
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * XML builder
@@ -33,32 +32,38 @@ public class Xml {
     /**
      * Indent
      */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static String indent = "  ";
 
     /**
      * Newline
      */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static String newline = "\r\n";
 
     /**
      * No-child tag
      */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static Set<String> singles = Tool.set("area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source");
+
+    /**
+     * Non-parse tags
+     */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
+    public static Set<String> nonParseTags = Tool.set("script", "style");
 
     /**
      * Namespace
      */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static String namespace = "http://vav.jp/java-web";
 
     /**
      * Render attribute name
      */
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static String attribute = "render";
-
-    /**
-     * Parser factory
-     */
-    static SAXParserFactory factory = Tool.peek(SAXParserFactory.newInstance(), f -> f.setNamespaceAware(true));
 
     /**
      * Tag name (exclude &lt;, &gt;. invisible tag if null or empty)
@@ -120,6 +125,236 @@ public class Xml {
     }
 
     /**
+     * Simple API for (X)HTML
+     */
+    static class Sax extends AbstractParser {
+
+        /**
+         * Event handler
+         */
+        interface Handler {
+            /**
+             * @param tag Tag name
+             */
+            void tagStart(CharSequence tag);
+
+            /**
+             * @param tag Tag name
+             * @param name Attribute name
+             * @param value Attribute value
+             */
+            void attribute(CharSequence tag, CharSequence name, CharSequence value);
+
+            /**
+             * @param tag Tag name
+             * @param comment Comment
+             */
+            default void comment(CharSequence tag, CharSequence comment) {
+            }
+
+            /**
+             * @param tag Tag name
+             * @param text Text
+             */
+            void text(CharSequence tag, CharSequence text);
+
+            /**
+             * @param tag Tag name
+             */
+            void tagEnd(CharSequence tag);
+        }
+
+        /**
+         * Tags that can omit the close tag(optional tag: next tags)
+         */
+        Map<String, Set<String>> optionalTags = Tool.map("li", Tool.set("li"), "dd", Tool.set("dt", "dd"), "dt", Tool.set("dt", "dd"), "p",
+                Tool.set("address", "article", "aside", "blockquote", "details", "div", "dl", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2",
+                        "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main", "menu", "nav", "ol", "p", "pre", "section", "table", "ul"),
+                "rp", Tool.set("rp", "rt"), "rt", Tool.set("rp", "rt"), "optgroup", Tool.set("optgroup"), "option", Tool.set("optgroup", "option"), "thead",
+                Tool.set("tbody", "tfoot"), "tbody", Tool.set("thead", "tfoot"), "tr", Tool.set("tr"), "td", Tool.set("td", "th"), "th", Tool.set("td", "th"));
+
+        /**
+         * Tag stack
+         */
+        Deque<String> stack = new LinkedList<>();
+
+        /**
+         * @return Current tag
+         */
+        String peek() {
+            return stack.isEmpty() ? null : stack.peek();
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.AbstractParser#set(java.lang.String)
+         */
+        @Override
+        void set(String text) {
+            stack.clear();
+            super.set(text);
+        }
+
+        /**
+         * @param text target
+         * @param handler Handler
+         */
+        public void parse(String text, Handler handler) {
+            set(text);
+            while (index < lastIndex) {
+                skipSpaces();
+                if (eat("<")) {
+                    if (eat("/")) { /* end tag */
+                        int start = index;
+                        if (skipUntil('>')) {
+                            int end = index;
+                            eat(">");
+                            String name = subSequence(start, end).toString().toLowerCase();
+                            for (;;) {
+                                String s = stack.pop();
+                                handler.tagEnd(s);
+                                if (name.equals(s)) {
+                                    break;
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    if (eat("!") || eat("?")) {
+                        if (eat("--")) {/* comment */
+                            int start = index;
+                            int end = indexOf("-->");
+                            handler.comment(peek(), subSequence(start, end));
+                            index = end + "-->".length();
+                            continue;
+                        }
+                        /* doctype */
+                        int start = index - "<!".length();
+                        skipUntil('>');
+                        eat(">");
+                        int end = index;
+                        handler.text(peek(), subSequence(start, trimRight(end)));
+                        continue;
+                    }
+                    int start = index;
+                    if (skipUntil(' ', '/', '>')) { /* start tag */
+                        int end = index;
+                        String name = subSequence(start, end).toString().toLowerCase();
+                        /* optional tag check */
+                        if (!stack.isEmpty()) {
+                            Set<String> set = optionalTags.get(stack.peek());
+                            if (set != null && set.contains(name)) {
+                                handler.tagEnd(stack.pop());
+                            }
+                        }
+                        handler.tagStart(name);
+                        skipSpaces();
+                        if (eat("/")) { /* single tag */
+                            skipSpaces();
+                            eat(">");
+                            handler.tagEnd(name);
+                            continue;
+                        }
+                        stack.push(name);
+                        while (!(eat(">") || eat("/>"))) { /* attributes */
+                            start = index;
+                            end = indexOf("=");
+                            index = end + 1;
+                            skipSpaces();
+                            int valueStart;
+                            int valueEnd = -1;
+                            if (eat("\"")) {
+                                valueStart = index;
+                                if (skipUntil('"')) {
+                                    valueEnd = index;
+                                    eat("\"");
+                                }
+                            } else {
+                                valueStart = index;
+                                if (skipUntil((spaces + "/>").toCharArray())) {
+                                    valueEnd = index;
+                                }
+                            }
+                            if (valueEnd >= 0) {
+                                handler.attribute(name, subSequence(start, end), subSequence(valueStart, valueEnd));
+                                skipSpaces();
+                            }
+                        }
+                        if (singles.contains(name)) {
+                            skipSpaces();
+                            eat("/");
+                            eat(">");
+                            handler.tagEnd(name);
+                            stack.pop();
+                            continue;
+                        }
+                        if (nonParseTags.contains(name)) {
+                            start = index;
+                            String tag = '/' + name + '>';
+                            do {
+                                skipUntil('<');
+                                eat("<");
+                            } while (index < lastIndex && !tag.equals(subSequence(index, index + tag.length())));
+                            end = index - 1;
+                            handler.text(name, subSequence(start, trimRight(end)));
+                            handler.tagEnd(name);
+                            stack.pop();
+                            index += tag.length();
+                        }
+                    }
+                    continue;
+                }
+                /* text */
+                int start = index;
+                skipUntil('<');
+                if (start < index) {
+                    int end = index;
+                    handler.text(peek(), subSequence(start, trimRight(end)));
+                }
+            }
+        }
+
+        /**
+         * @param path Relative url
+         * @param out Output
+         */
+        public void dump(String path, PrintStream out) {
+            try (InputStream in = Tool.toURL(path).get().openStream()) {
+                parse(Tool.loadText(in), new Handler() {
+
+                    @Override
+                    public void tagStart(CharSequence tag) {
+                        out.println("tagStart: " + tag);
+                    }
+
+                    @Override
+                    public void attribute(CharSequence tag, CharSequence name, CharSequence value) {
+                        out.println("attribute: " + name + " = " + value + " @ " + tag);
+                    }
+
+                    @Override
+                    public void comment(CharSequence tag, CharSequence comment) {
+                        out.println("comment: " + comment + " @ " + tag);
+                    }
+
+                    @Override
+                    public void text(CharSequence tag, CharSequence text) {
+                        out.println("text: " + text + " @ " + tag);
+                    }
+
+                    @Override
+                    public void tagEnd(CharSequence tag) {
+                        out.println("tagEnd: " + tag);
+                    }
+                });
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
      * @param source Source
      * @return Xml
      */
@@ -133,65 +368,75 @@ public class Xml {
      * @return Xml
      */
     public static Xml parse(String source, Map<String, Function<Xml, Xml>> renders) {
-        try {
-            Xml result = of(null);
-            factory.newSAXParser().parse(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), new DefaultHandler() {
+        Xml result = of(null);
+        new Sax().parse(source, new Sax.Handler() {
 
-                Xml xml = result;
+            Xml xml = result;
 
-                /*
-                 * (non-Javadoc)
-                 * @see org.xml.sax.helpers.DefaultHandler#startElement(java.lang.String, java.lang.String, java.lang.String, org.xml.sax.Attributes)
-                 */
-                @Override
-                public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
-                    xml = xml.child(qName);
-                    IntStream.range(0, attributes.getLength())
-                            .forEach(i -> xml.attr(
-                                    namespace.equals(attributes.getURI(i)) ? attributes.getURI(i) + attributes.getLocalName(i) : attributes.getQName(i),
-                                    attributes.getValue(i)));
+            String attribute = Xml.attribute;
+
+            @Override
+            public void tagStart(CharSequence tag) {
+                xml = xml.child(tag.toString());
+            }
+
+            @Override
+            public void attribute(CharSequence tag, CharSequence name, CharSequence value) {
+                String v = value.toString();
+                if (namespace.equals(v)) {
+                    attribute = name.toString().substring("xmlns:".length()) + ":" + Xml.attribute;
                 }
+                xml.attr(name.toString(), v);
+            }
 
-                /*
-                 * (non-Javadoc)
-                 * @see org.xml.sax.helpers.DefaultHandler#endElement(java.lang.String, java.lang.String, java.lang.String)
-                 */
-                @Override
-                public void endElement(String uri, String localName, String qName) throws SAXException {
-                    Xml self = xml;
-                    xml = xml.parent;
-                    if (self.attributes == null || renders == null) {
-                        return;
-                    }
-                    String attribute = namespace + Xml.attribute;
-                    String render = self.attributes.get(attribute);
-                    if (render != null) {
-                        self.attributes.remove(attribute);
-                        int i = xml.children.indexOf(self);
-                        Xml x = xml.children.get(i);
-                        xml.children.remove(i);
-                        xml.children.add(i, Tool.peek(renders.get(render).apply(x), j -> j.parent = xml));
-                    }
+            @Override
+            public void text(CharSequence tag, CharSequence text) {
+                if (tag != null && nonParseTags.stream().anyMatch(tag.toString()::equals)) {
+                    xml.child(of(null).text(text.toString()));
+                    return;
                 }
+                xml.text(text.toString());
+            }
 
-                /*
-                 * (non-Javadoc)
-                 * @see org.xml.sax.helpers.DefaultHandler#characters(char[], int, int)
-                 */
-                @Override
-                public void characters(char[] ch, int start, int length) throws SAXException {
-                    xml.text(new String(ch, start, length));
+            @Override
+            public void tagEnd(CharSequence tag) {
+                Xml self = xml;
+                xml = xml.parent;
+                if (self.attributes == null || renders == null) {
+                    return;
                 }
+                String render = self.attributes.get(attribute);
+                if (render != null) {
+                    self.attributes.remove(attribute);
+                    int i = xml.children.indexOf(self);
+                    Xml x = xml.children.get(i);
+                    xml.children.remove(i);
+                    xml.children.add(i, Tool.peek(renders.get(render).apply(x), j -> j.parent = xml));
+                }
+            }
+        });
+        return result;
+    }
 
-            });
-            return result;
-        } catch (SAXException | IOException | ParserConfigurationException e) {
+    /**
+     * @param url Url
+     * @return Text
+     */
+    public static Xml get(String url) {
+        try (InputStream in = Tool.peek((HttpURLConnection) new URL(url).openConnection(), Try.c(c -> {
+            c.setRequestMethod("GET");
+            c.setInstanceFollowRedirects(true);
+            c.setRequestProperty("Accept-Language", "ja");
+        })).getInputStream()) {
+            return parse(Tool.loadText(in));
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     /*
      * (non-Javadoc)
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
@@ -522,18 +767,21 @@ public class Xml {
             t.children().get(2).text(i.r.r);
             return t;
         });
-        System.out.println(parse("<body xmlns:j=\"http://vav.jp/java-web\">" + //
-                "<div j:render=\"a\">" + //
-                "<!--abcde-->" + //
-                "</div>" + //
-                "<ul j:render=\"b\">" + //
-                "  <li>a</li>" + //
-                "  <li>b</li>" + //
-                "</ul>" + //
-                "<table>" + //
-                "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
-                "  <tr j:render=\"c\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
-                "</table>" + //
-                "</body>", Tool.map("a", a, "b", b, "c", c)));
+        System.out.println(
+                parse("<?xml version=\"1.0\" encoding=\"utf-8\"?><style type=\"text/css\">\n*{\nfont-size:11pt;\n}\n</style><script type=\"text/javascript\">window.onload=function(){alert('1');}</script><body xmlns:j=\"http://vav.jp/java-web\">"
+                        + //
+                        "<div j:render=\"a\">" + //
+                        "<!--abcde-->" + //
+                        "</div>" + //
+                        "<ul j:render=\"b\">" + //
+                        "  <li>a</li>" + //
+                        "  <li>b</li>" + //
+                        "</ul>" + //
+                        "<table>" + //
+                        "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
+                        "  <tr j:render=\"c\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
+                        "</table>" + //
+                        "</body>", Tool.map("a", a, "b", b, "c", c)));
+        new Sax().dump("view/test.html", System.out);
     }
 }

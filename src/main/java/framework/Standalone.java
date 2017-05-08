@@ -426,6 +426,7 @@ public class Standalone {
          * @see java.lang.Object#equals(java.lang.Object)
          */
         @Override
+        @SuppressFBWarnings("EQ_UNUSUAL")
         public boolean equals(Object obj) {
             return obj != null && hashCode() == obj.hashCode();
         }

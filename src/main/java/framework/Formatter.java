@@ -37,27 +37,12 @@ import framework.annotation.Config;
 /**
  * formatter with el, config, message
  */
-public class Formatter implements AutoCloseable {
+public class Formatter extends AbstractParser implements AutoCloseable {
 
     /**
      * current formatter
      */
     static final ThreadLocal<Formatter> current = new ThreadLocal<>();
-
-    /**
-     * target text
-     */
-    StringBuilder source = new StringBuilder();
-
-    /**
-     * current index
-     */
-    int index;
-
-    /**
-     * last index
-     */
-    int lastIndex;
 
     /**
      * cache enabled
@@ -189,7 +174,7 @@ public class Formatter implements AutoCloseable {
      * @return result
      */
     public static Result excludeForHtml(Formatter formatter) {
-        if (formatter.eat("<!--") && !(formatter.index < formatter.lastIndex && formatter.source.charAt(formatter.index) == '{')) {
+        if (formatter.eat("<!--") && !(formatter.index < formatter.lastIndex && formatter.charAt(formatter.index) == '{')) {
             formatter.index = formatter.indexOf("-->");
             if (formatter.index < 0) {
                 return Result.EXIT;
@@ -209,17 +194,6 @@ public class Formatter implements AutoCloseable {
             }
         }
         return Result.NEXT;
-    }
-
-    /**
-     * HTML escape(&amp;, &quot;, &lt;, &gt;, &#39;)
-     *
-     * @param text target
-     * @return escaped text
-     */
-    public static String htmlEscape(Object text) {
-        return Tool.string(text).map(i -> i.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;"))
-                .orElse(null);
     }
 
     /**
@@ -287,6 +261,12 @@ public class Formatter implements AutoCloseable {
         return result;
     }
 
+    @Override
+    void set(String text) {
+        braces.clear();
+        super.set(text);
+    }
+
     /**
      * @param text target
      * @return formatted text
@@ -295,17 +275,13 @@ public class Formatter implements AutoCloseable {
         if (text == null) {
             return null;
         }
-        source.setLength(0);
-        source.append(text);
-        index = 0;
-        lastIndex = source.length();
-        braces.clear();
+        set(text);
         while (index < lastIndex) {
             skipSpaces();
             if (exclude != null && braces.isEmpty()) {
                 Result b = exclude.apply(this);
                 if (b == Result.EXIT) {
-                    return source.toString();
+                    return toString();
                 }
                 if (b == Result.SKIP) {
                     continue;
@@ -325,7 +301,7 @@ public class Formatter implements AutoCloseable {
             }
             if (eat("}") && !braces.isEmpty()) {
                 int start = braces.pop();
-                int first = source.charAt(start);
+                int first = charAt(start);
                 int prefix = first == '$' || first == '#' ? 2 : 1;
                 int suffix = 1;
                 switch (first) {
@@ -340,7 +316,7 @@ public class Formatter implements AutoCloseable {
                     suffix = "}*/".length();
                     break;
                 default:
-                    if (source.charAt(start + 1) == '/') {
+                    if (charAt(start + 1) == '/') {
                         prefix = "{/*".length();
                         suffix = "*/}".length();
                     }
@@ -348,85 +324,16 @@ public class Formatter implements AutoCloseable {
                 }
                 int end = index;
                 if (start + prefix < end - suffix) {
-                    String before = source.substring(start, end);
+                    String before = subSequence(start, end).toString();
                     String after = Tool.string(eval(before, prefix, suffix)).orElse("");
-                    source.replace(start, end, after);
-                    lastIndex = source.length();
+                    replace(start, end, after);
                     index = end + after.length() - before.length();
                 }
                 continue;
             }
             index++;
         }
-        return source.toString();
-    }
-
-    /**
-     * skip spaces
-     */
-    void skipSpaces() {
-        for (; index < lastIndex; index++) {
-            switch (source.charAt(index)) {
-            case ' ':
-            case '\t':
-            case '\r':
-            case '\n':
-                continue;
-            default:
-                return;
-            }
-        }
-    }
-
-    /**
-     * skip until a letter
-     *
-     * @param letter a letter
-     * @return true:found a letter, false:not found
-     */
-    boolean skipUntil(int letter) {
-        for (; index < lastIndex; index++) {
-            if (letter == source.charAt(index)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * eat a word
-     *
-     * @param word word
-     * @return true:ate a word, false:not ate
-     */
-    boolean eat(String word) {
-        int length = word.length();
-        if (index + length <= lastIndex && source.substring(index, index + length).equals(word)) {
-            index += length;
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * prev word check
-     *
-     * @param word word
-     * @return true:equals prev word, false:not equals
-     */
-    boolean prev(String word) {
-        int length = word.length();
-        return index - length >= 0 && source.substring(index - length, index).equals(word);
-    }
-
-    /**
-     * index of word from current index
-     *
-     * @param word word
-     * @return index of word, -1:not found
-     */
-    int indexOf(String word) {
-        return source.indexOf(word, index);
+        return toString();
     }
 
     /**

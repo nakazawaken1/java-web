@@ -120,7 +120,7 @@ public class Tool {
     public static <T> Predicate<T> not(Predicate<T> predicate) {
         return predicate.negate();
     }
-    
+
     /**
      * @param <T> Value type
      * @param value value
@@ -641,7 +641,7 @@ public class Tool {
         }
         return map;
     }
-    
+
     /**
      * @param <T> Value type
      * @param values Values
@@ -650,6 +650,16 @@ public class Tool {
     @SafeVarargs
     public static <T> Set<T> set(T... values) {
         return new HashSet<T>(Arrays.asList(values));
+    }
+
+    /**
+     * @param <T> Value type
+     * @param values Values
+     * @return List
+     */
+    @SafeVarargs
+    public static <T> List<T> list(T... values) {
+        return new ArrayList<T>(Arrays.asList(values));
     }
 
     /**
@@ -1559,6 +1569,17 @@ public class Tool {
     }
 
     /**
+     * HTML escape(&amp;, &quot;, &lt;, &gt;, &#39;)
+     *
+     * @param text target
+     * @return escaped text
+     */
+    public static String htmlEscape(Object text) {
+        return Tool.string(text).map(i -> i.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;"))
+                .orElse(null);
+    }
+
+    /**
      * @param text text
      * @return Character array
      */
@@ -1761,7 +1782,7 @@ public class Tool {
         InternetAddress from = Tool.of(mail.from).orElseGet(Try.s(() -> new InternetAddress(Sys.Mail.user)));
         try {
             message.setFrom(from);
-            message.setReplyTo(Tool.array(from));
+            message.setReplyTo(mail.replyTo == null ? Tool.array(from) : mail.replyTo);
             mail.users.forEach(Try.biC((type, users) -> message.setRecipients(type, users)));
             message.setSubject(subject, Sys.Mail.charset);
             message.setText(body, Sys.Mail.charset);

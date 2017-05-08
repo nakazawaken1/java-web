@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 
 import app.controller.Main;
 import app.model.Account;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Db.Setup;
 import framework.Message;
 import framework.Tool;
@@ -22,6 +23,7 @@ import framework.annotation.Separator;
 
 /** not use primitive type because not apply property by optimized */
 @SuppressWarnings("javadoc")
+@SuppressFBWarnings("MS_SHOULD_BE_FINAL")
 @Config({ "sys.config", "sys.message" })
 public interface Sys {
 

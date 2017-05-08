@@ -462,7 +462,7 @@ public abstract class Response {
                                                 escape = null;
                                             } else {
                                                 exclude = Formatter::excludeForHtml;
-                                                escape = Formatter::htmlEscape;
+                                                escape = Tool::htmlEscape;
                                             }
                                             try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, response.values)) {
                                                 lines.forEach(line -> writer.println(formatter.format(line)));
@@ -497,7 +497,7 @@ public abstract class Response {
                         response.contentType(Tool.getContentType(template.name), response.charset());
                         try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
                                 Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
-                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Formatter::htmlEscape, response.locale(), null)) {
+                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
                             lines.map(formatter::format).forEach(line -> {
                                 Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                                 writer.println();
