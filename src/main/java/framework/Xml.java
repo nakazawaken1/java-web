@@ -2,13 +2,11 @@ package framework;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -17,7 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -54,26 +52,65 @@ public class Xml {
     public static Set<String> nonParseTags = Tool.set("script", "style");
 
     /**
-     * Namespace
-     */
-    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
-    public static String namespace = "http://vav.jp/java-web";
-
-    /**
      * Render attribute name
      */
     @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
-    public static String attribute = "render";
+    public static String attribute = "data-render";
 
     /**
-     * Tag name (exclude &lt;, &gt;. invisible tag if null or empty)
+     * True if reverse comments
      */
-    protected String tag;
+    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
+    public static boolean isReserveComment = true;
+
+    /**
+     * Tag name(exclude &lt;, &gt;. invisible tag if null or empty) or text
+     */
+    public final String content;
+
+    /**
+     * Node type
+     */
+    enum Type {
+        /**
+         * tag
+         */
+        tag,
+        /**
+         * escaped text
+         */
+        text,
+        /**
+         * unescaped text
+         */
+        html,
+        /**
+         * comment
+         */
+        comment,
+        /**
+         * control
+         */
+        control;
+        /**
+         * @return True if must to escape
+         */
+        public boolean isEscape() {
+            return this == text;
+        }
+
+        /**
+         * @return True if text node
+         */
+        public boolean isText() {
+            return this != tag;
+        }
+    }
 
     /**
      * True if text node
      */
-    protected boolean isText;
+    public final Type type;
 
     /**
      * Parent node
@@ -92,15 +129,13 @@ public class Xml {
 
     /**
      * Hidden
+     * 
+     * @param content Content
+     * @param type Node type
      */
-    protected Xml() {
-    }
-
-    /**
-     * @return True if invisible tag
-     */
-    protected boolean isNull() {
-        return tag == null || tag.isEmpty();
+    public Xml(Object content, Type type) {
+        this.content = content == null ? null : String.valueOf(content);
+        this.type = type;
     }
 
     /**
@@ -108,20 +143,14 @@ public class Xml {
      * @return Node
      */
     public static Xml of(String tag) {
-        return Tool.peek(new Xml(), xml -> xml.tag = tag);
+        return new Xml(tag, Type.tag);
     }
 
     /**
-     * Constructor for text node
-     * 
-     * @param text Text
-     * @return Text node
+     * @return True if invisible tag
      */
-    public static Xml textOf(String text) {
-        return Tool.peek(new Xml(), xml -> {
-            xml.tag = text;
-            xml.isText = true;
-        });
+    protected boolean isNull() {
+        return content == null || content.isEmpty();
     }
 
     /**
@@ -134,34 +163,56 @@ public class Xml {
          */
         interface Handler {
             /**
+             * logger
+             */
+            static final Logger logger = Logger.getLogger(Handler.class.getCanonicalName());
+
+            /**
              * @param tag Tag name
              */
-            void tagStart(CharSequence tag);
+            default void tagStart(CharSequence tag) {
+                logger.info("tagStart: " + tag);
+            }
 
             /**
              * @param tag Tag name
              * @param name Attribute name
              * @param value Attribute value
              */
-            void attribute(CharSequence tag, CharSequence name, CharSequence value);
+            default void attribute(CharSequence tag, CharSequence name, CharSequence value) {
+                logger.info("attribute: " + name + " = " + value + " @ " + tag);
+            }
+
+            /**
+             * @param tag Tag name
+             * @param control Control
+             */
+            default void control(CharSequence tag, CharSequence control) {
+                logger.info("control: " + control + " @ " + tag);
+            }
 
             /**
              * @param tag Tag name
              * @param comment Comment
              */
             default void comment(CharSequence tag, CharSequence comment) {
+                logger.info("comment: " + comment + " @ " + tag);
             }
 
             /**
              * @param tag Tag name
              * @param text Text
              */
-            void text(CharSequence tag, CharSequence text);
+            default void text(CharSequence tag, CharSequence text) {
+                logger.info("text: " + text + " @ " + tag);
+            }
 
             /**
              * @param tag Tag name
              */
-            void tagEnd(CharSequence tag);
+            default void tagEnd(CharSequence tag) {
+                logger.info("tagEnd: " + tag);
+            }
         }
 
         /**
@@ -171,7 +222,9 @@ public class Xml {
                 Tool.set("address", "article", "aside", "blockquote", "details", "div", "dl", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2",
                         "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main", "menu", "nav", "ol", "p", "pre", "section", "table", "ul"),
                 "rp", Tool.set("rp", "rt"), "rt", Tool.set("rp", "rt"), "optgroup", Tool.set("optgroup"), "option", Tool.set("optgroup", "option"), "thead",
-                Tool.set("tbody", "tfoot"), "tbody", Tool.set("thead", "tfoot"), "tr", Tool.set("tr"), "td", Tool.set("td", "th"), "th", Tool.set("td", "th"));
+                Tool.set("tbody", "tfoot"), "tbody", Tool.set("thead", "tfoot"), "tr", Tool.set("tr"), "td", Tool.set("td", "th", "tr"), "th",
+                Tool.set("td", "th", "tr"), "colgroup", Tool.set("thead", "tbody", "tfoot", "colgroup", "tr"), "caption",
+                Tool.set("thead", "tbody", "tfoot", "colgroup", "tr"));
 
         /**
          * Tag stack
@@ -229,12 +282,12 @@ public class Xml {
                             index = end + "-->".length();
                             continue;
                         }
-                        /* doctype */
+                        /* Document type definition or XML Declaration */
                         int start = index - "<!".length();
                         skipUntil('>');
                         eat(">");
                         int end = index;
-                        handler.text(peek(), subSequence(start, trimRight(end)));
+                        handler.control(peek(), subSequence(start, trimRight(end)));
                         continue;
                     }
                     int start = index;
@@ -242,10 +295,12 @@ public class Xml {
                         int end = index;
                         String name = subSequence(start, end).toString().toLowerCase();
                         /* optional tag check */
-                        if (!stack.isEmpty()) {
+                        while (!stack.isEmpty()) {
                             Set<String> set = optionalTags.get(stack.peek());
                             if (set != null && set.contains(name)) {
                                 handler.tagEnd(stack.pop());
+                            } else {
+                                break;
                             }
                         }
                         handler.tagStart(name);
@@ -289,7 +344,7 @@ public class Xml {
                             stack.pop();
                             continue;
                         }
-                        if (nonParseTags.contains(name)) {
+                        if (nonParseTags.contains(name)) { /* non-parse tag */
                             start = index;
                             String tag = '/' + name + '>';
                             do {
@@ -297,7 +352,7 @@ public class Xml {
                                 eat("<");
                             } while (index < lastIndex && !tag.equals(subSequence(index, index + tag.length())));
                             end = index - 1;
-                            handler.text(name, subSequence(start, trimRight(end)));
+                            handler.text(name, subSequence(start, end));
                             handler.tagEnd(name);
                             stack.pop();
                             index += tag.length();
@@ -314,52 +369,18 @@ public class Xml {
                 }
             }
         }
-
-        /**
-         * @param path Relative url
-         * @param out Output
-         */
-        public void dump(String path, PrintStream out) {
-            try (InputStream in = Tool.toURL(path).get().openStream()) {
-                parse(Tool.loadText(in), new Handler() {
-
-                    @Override
-                    public void tagStart(CharSequence tag) {
-                        out.println("tagStart: " + tag);
-                    }
-
-                    @Override
-                    public void attribute(CharSequence tag, CharSequence name, CharSequence value) {
-                        out.println("attribute: " + name + " = " + value + " @ " + tag);
-                    }
-
-                    @Override
-                    public void comment(CharSequence tag, CharSequence comment) {
-                        out.println("comment: " + comment + " @ " + tag);
-                    }
-
-                    @Override
-                    public void text(CharSequence tag, CharSequence text) {
-                        out.println("text: " + text + " @ " + tag);
-                    }
-
-                    @Override
-                    public void tagEnd(CharSequence tag) {
-                        out.println("tagEnd: " + tag);
-                    }
-                });
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     /**
      * @param source Source
+     * @param renders Renders
      * @return Xml
      */
-    public static Xml parse(String source) {
-        return parse(source, null);
+    @SafeVarargs
+    public static Xml parse(String source, Function<Xml, Xml>... renders) {
+        Map<String, Function<Xml, Xml>> s = renders.length <= 0 ? null
+                : Stream.of(renders).collect(LinkedHashMap::new, (m, r) -> m.put(String.valueOf(m.size()), r), (a, b) -> a.putAll(b));
+        return parseMap(source, s);
     }
 
     /**
@@ -367,35 +388,38 @@ public class Xml {
      * @param renders Renders(name: render)
      * @return Xml
      */
-    public static Xml parse(String source, Map<String, Function<Xml, Xml>> renders) {
+    public static Xml parseMap(String source, Map<String, Function<Xml, Xml>> renders) {
         Xml result = of(null);
         new Sax().parse(source, new Sax.Handler() {
 
             Xml xml = result;
 
-            String attribute = Xml.attribute;
-
             @Override
             public void tagStart(CharSequence tag) {
-                xml = xml.child(tag.toString());
+                xml = xml.append(tag.toString());
             }
 
             @Override
             public void attribute(CharSequence tag, CharSequence name, CharSequence value) {
                 String v = value.toString();
-                if (namespace.equals(v)) {
-                    attribute = name.toString().substring("xmlns:".length()) + ":" + Xml.attribute;
-                }
                 xml.attr(name.toString(), v);
             }
 
             @Override
-            public void text(CharSequence tag, CharSequence text) {
-                if (tag != null && nonParseTags.stream().anyMatch(tag.toString()::equals)) {
-                    xml.child(of(null).text(text.toString()));
-                    return;
+            public void comment(CharSequence tag, CharSequence comment) {
+                if (isReserveComment) {
+                    xml.append(new Xml("<!--" + comment + "-->", Type.comment));
                 }
-                xml.text(text.toString());
+            }
+
+            @Override
+            public void control(CharSequence tag, CharSequence control) {
+                xml.append(new Xml(control, Type.control));
+            }
+
+            @Override
+            public void text(CharSequence tag, CharSequence text) {
+                xml.append(new Xml(text, Type.html));
             }
 
             @Override
@@ -441,7 +465,7 @@ public class Xml {
      */
     @Override
     public String toString() {
-        return root().toString("", xml -> Tool.string(xml.tag).map(singles::contains).orElse(false));
+        return root().toString("", xml -> Tool.string(xml.content).map(singles::contains).orElse(false)).trim();
     }
 
     /**
@@ -450,43 +474,40 @@ public class Xml {
      * @return String
      */
     public String toString(String indent, Function<Xml, Boolean> isSingle) {
-        boolean noChild = children == null || children.isEmpty();
         StringBuilder s = new StringBuilder();
-        boolean isBeforeText = before().map(i -> i.isText).orElse(false);
+        if (type.isText()) {
+            if (parent != null && parent.isNull()) {
+                s.append(newline).append(indent);
+            }
+            return s.append(type.isEscape() ? Tool.htmlEscape(content) : content).toString();
+        }
         boolean isNull = isNull();
-        if (!(parent == null || isText || isNull || parent.isNull() && parent.parent == null || isBeforeText)) {
-            s.append(newline);
-        }
-        if (isText) {
-            if (parent != null && parent.isNull() && parent.parent != null && parent.parent.children.size() > 1) {
-                s.append(newline).append(indent).append(indent);
-            }
-            return s.append(tag).toString();
-        }
         if (!isNull) {
-            if (!isBeforeText) {
-                s.append(indent);
-            }
-            s.append('<').append(tag);
-            if (attributes != null) {
+            s.append(newline).append(indent).append('<').append(content);
+            if (attributes != null && !attributes.isEmpty()) {
                 attributes.entrySet().forEach(i -> s.append(' ').append(i.getKey()).append("=\"").append(i.getValue()).append('"'));
             }
+        }
+        boolean noChild = children == null || children.isEmpty();
+        if (!isNull) {
             if (noChild && isSingle.apply(this)) {
                 return s.append(" />").toString();
             }
             s.append('>');
         }
+        boolean isNewline = false;
         if (!noChild) {
-            boolean[] isText = { isNull };
-            children.forEach(i -> {
-                s.append(i.toString(isNull ? indent : indent + Xml.indent, isSingle));
-                isText[0] = isText[0] || i.isText;
-            });
-            if (!isText[0]) {
-                s.append(newline).append(indent);
+            for (Xml child : children) {
+                s.append(child.toString(isNull ? indent : indent + Xml.indent, isSingle));
+                if (!child.type.isText()) {
+                    isNewline = true;
+                }
             }
         }
-        return isNull ? s.toString() : s.append("</").append(tag).append('>').toString();
+        if (isNewline && !isNull) {
+            s.append(newline).append(indent);
+        }
+        return isNull ? s.toString() : s.append("</").append(content).append('>').toString();
     }
 
     /**
@@ -508,6 +529,33 @@ public class Xml {
     }
 
     /**
+     * @return Before node
+     */
+    public Optional<Xml> prev() {
+        if (parent != null) {
+            int i = parent.children.indexOf(this);
+            if (i > 0) {
+                return Optional.of(parent.children.get(i - 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * @return After node
+     */
+    public Optional<Xml> next() {
+        if (parent != null) {
+            int i = parent.children.indexOf(this);
+            int size = parent.children.size();
+            if (i >= 0 && i < size - 1) {
+                return Optional.of(parent.children.get(i + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * @return Non-null Children
      */
     public List<Xml> children() {
@@ -522,57 +570,14 @@ public class Xml {
     }
 
     /**
-     * @return Before node
-     */
-    public Optional<Xml> before() {
-        if (parent != null) {
-            int i = parent.children.indexOf(this);
-            if (i > 0) {
-                return Optional.of(parent.children.get(i - 1));
-            }
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * @return After node
-     */
-    public Optional<Xml> after() {
-        if (parent != null) {
-            int i = parent.children.indexOf(this);
-            int size = parent.children.size();
-            if (i >= 0 && i < size - 1) {
-                return Optional.of(parent.children.get(i + 1));
-            }
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Add child
-     * 
-     * @param tag Tag
-     * @return Added child
-     */
-    public Xml child(String tag) {
-        if (children == null) {
-            children = new ArrayList<>();
-        }
-        Xml c = of(tag);
-        c.parent = this;
-        children.add(c);
-        return c;
-    }
-
-    /**
      * Add children
      * 
      * @param tag Tag
      * @param texts Texts
      * @return Self
      */
-    public Xml child(String tag, Stream<Object> texts) {
-        texts.forEach(text -> child(tag).text(text));
+    public Xml append(String tag, Stream<Object> texts) {
+        texts.forEach(text -> append(tag).text(text));
         return this;
     }
 
@@ -582,7 +587,7 @@ public class Xml {
      * @param children Children
      * @return Self
      */
-    public Xml child(Stream<Xml> children) {
+    public Xml append(Stream<Xml> children) {
         Stream<Xml> flat = children.flatMap(i -> i.isNull() ? i.children.stream() : Stream.of(i));
         if (this.children == null) {
             this.children = flat.peek(i -> i.parent = this).collect(Collectors.toList());
@@ -594,9 +599,9 @@ public class Xml {
 
     /**
      * @param child Child
-     * @return Added child
+     * @return Added
      */
-    public Xml child(Xml child) {
+    public Xml append(Xml child) {
         child.parent = this;
         if (this.children == null) {
             this.children = Tool.peek(new ArrayList<>(), a -> a.add(child));
@@ -607,11 +612,33 @@ public class Xml {
     }
 
     /**
-     * @param tag Tag
-     * @return Added sibling
+     * @param tag Tag name
+     * @return Added
      */
-    public Xml sibling(String tag) {
-        return parent.child(tag);
+    public Xml append(String tag) {
+        return append(of(tag));
+    }
+
+    /**
+     * @param child Child
+     * @return Added
+     */
+    public Xml prepend(Xml child) {
+        child.parent = this;
+        if (this.children == null) {
+            this.children = Tool.peek(new ArrayList<>(), a -> a.add(child));
+        } else {
+            this.children.add(0, child);
+        }
+        return child;
+    }
+
+    /**
+     * @param tag Tag name
+     * @return Added
+     */
+    public Xml prepend(String tag) {
+        return prepend(of(tag));
     }
 
     /**
@@ -619,18 +646,48 @@ public class Xml {
      * @param texts Texts
      * @return Self
      */
-    public Xml sibling(String tag, Stream<Object> texts) {
-        parent.child(tag, texts);
-        return this;
+    public Xml after(String tag, Stream<Object> texts) {
+        return parent.append(tag, texts);
     }
 
     /**
      * @param sibling Sibling
      * @return Self
      */
-    public Xml sibling(Stream<Xml> sibling) {
-        parent.child(sibling);
-        return this;
+    public Xml after(Stream<Xml> sibling) {
+        return parent.append(sibling);
+    }
+
+    /**
+     * @param xml Xml
+     * @return Added
+     */
+    public Xml after(Xml xml) {
+        return parent.append(xml);
+    }
+
+    /**
+     * @param tag Tag name
+     * @return Added
+     */
+    public Xml after(String tag) {
+        return after(of(tag));
+    }
+
+    /**
+     * @param xml Xml
+     * @return Added
+     */
+    public Xml before(Xml xml) {
+        return parent.prepend(xml);
+    }
+
+    /**
+     * @param tag Tag name
+     * @return Added
+     */
+    public Xml before(String tag) {
+        return before(of(tag));
     }
 
     /**
@@ -640,7 +697,20 @@ public class Xml {
      * @return Self
      */
     public Xml text(Object text) {
-        Tool.string(text).map(String::trim).filter(Tool.notEmpty).ifPresent(i -> clear().child(i).isText = true);
+        clear();
+        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> append(new Xml(text, Type.text)));
+        return this;
+    }
+
+    /**
+     * Set text(clear existing children)
+     * 
+     * @param text Text
+     * @return Self
+     */
+    public Xml html(Object text) {
+        clear();
+        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> append(new Xml(text, Type.html)));
         return this;
     }
 
@@ -651,11 +721,11 @@ public class Xml {
      * @param value Value
      * @return Self
      */
-    public Xml attr(String name, String value) {
+    public Xml attr(String name, Object value) {
         if (attributes == null) {
             attributes = new LinkedHashMap<>();
         }
-        attributes.put(name, value);
+        attributes.put(name, value == null ? "" : String.valueOf(value));
         return this;
     }
 
@@ -665,8 +735,8 @@ public class Xml {
      * @param stream Name-value pairs
      * @return Self
      */
-    public Xml attr(Stream<Tuple<String, String>> stream) {
-        stream.forEach(i -> attr(i.l, i.r));
+    public Xml attr(Stream<Map.Entry<String, Object>> stream) {
+        stream.forEach(i -> attr(i.getKey(), i.getValue()));
         return this;
     }
 
@@ -684,47 +754,11 @@ public class Xml {
     }
 
     /**
-     * Remove match children
-     * 
-     * @param filter return true if remove
-     * @return Self
-     */
-    public Xml remove(Predicate<Xml> filter) {
-        if (children != null) {
-            for (Iterator<Xml> i = children.iterator(); i.hasNext();) {
-                Xml xml = i.next();
-                if (filter.test(xml)) {
-                    i.remove();
-                    xml.parent = null;
-                }
-            }
-        }
-        return this;
-    }
-
-    /**
-     * Remove children
-     * 
-     * @param child Child for remove
-     * @return Self
-     */
-    public Xml remove(Stream<Xml> child) {
-        if (children != null) {
-            for (Xml c : child.toArray(Xml[]::new)) {
-                children.remove(c);
-                c.parent = null;
-            }
-        }
-        return this;
-    }
-
-    /**
      * @param parent Inner use only
      * @return Copied xml
      */
     public Xml copy(Xml... parent) {
-        Xml to = of(tag);
-        to.isText = isText;
+        Xml to = new Xml(content, type);
         if (parent.length > 0) {
             to.parent = parent[0];
         }
@@ -740,7 +774,7 @@ public class Xml {
      * @return Xml
      */
     public <T> Xml repeat(Stream<T> source, BiFunction<Xml, T, Xml> editor) {
-        return of(null).child(source.map(j -> editor.apply(copy(), j)));
+        return of(null).append(source.map(j -> editor.apply(copy(), j)));
     }
 
     /**
@@ -750,38 +784,43 @@ public class Xml {
      */
     public static void main(String[] args) {
         Xml xml = Xml.of("b");
-        System.out.println(xml.child("i").text("test"));
-        System.out.println(xml.copy().clear().child("a").text("test2"));
+        System.out.println(xml.append("i").text("test"));
+        System.out.println(xml.copy().clear().append("a").text("test2"));
         System.out.println(Xml.of("br").attr(Stream.of(Tuple.of("style", "clear:both"), Tuple.of("id", "test"))));
         System.out.println(Xml.of("span").text("abc"));
-        System.out.println(Xml.of("ol").child("li").text("1").sibling("li").text("2"));
-        System.out.println(Xml.of("ol").child("li", Stream.of("1", "2")));
-        System.out.println(Xml.of("ol").child(IntStream.rangeClosed(1, 2).mapToObj(i -> Xml.of("li").text(i))));
-        System.out.println(Xml.of("table").child("thead").child("tr").child("th", Stream.of("a", "b")).root().child("tbody").child("tr")
-                .child("th", Stream.of(1, 2)).sibling("tr").child("th", Stream.of(3, 4)));
-        Function<Xml, Xml> a = div -> Xml.of(null).text("あいうえお");
-        Function<Xml, Xml> b = ul -> ul.clear().child("li", Stream.of("aa", "bb", "cc"));
-        Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 23), Tuple.of(2, "Sam", 41), Tuple.of(3, "Andy", 33)), (t, i) -> {
+        System.out.println(Xml.of("ol").append("li").text("1").after("li").text("2"));
+        System.out.println(Xml.of("ol").append("li", Stream.of(1, 2)));
+        System.out.println(Xml.of("ol").append(IntStream.rangeClosed(1, 2).mapToObj(i -> Xml.of("li").text(i))));
+        System.out.println(Xml.of("table").append("thead").append("tr").append("th", Stream.of("a", "b")).root().append("tbody").append("tr")
+                .append("th", Stream.of(1, 2)).after("tr").append("th", Stream.of(3, 4)));
+        Function<Xml, Xml> a = div -> Xml.of(null).text("あい<a>うえお");
+        Function<Xml, Xml> b = ul -> ul.clear().append("li", Stream.of("aa", "bb", "cc"));
+        Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 23), Tuple.of(2, "S<a>m", 41), Tuple.of(3, "Andy", 33)), (t, i) -> {
             t.children().get(0).text(i.l);
             t.children().get(1).text(i.r.l);
             t.children().get(2).text(i.r.r);
             return t;
         });
-        System.out.println(
-                parse("<?xml version=\"1.0\" encoding=\"utf-8\"?><style type=\"text/css\">\n*{\nfont-size:11pt;\n}\n</style><script type=\"text/javascript\">window.onload=function(){alert('1');}</script><body xmlns:j=\"http://vav.jp/java-web\">"
-                        + //
-                        "<div j:render=\"a\">" + //
-                        "<!--abcde-->" + //
-                        "</div>" + //
-                        "<ul j:render=\"b\">" + //
-                        "  <li>a</li>" + //
-                        "  <li>b</li>" + //
-                        "</ul>" + //
-                        "<table>" + //
-                        "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
-                        "  <tr j:render=\"c\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
-                        "</table>" + //
-                        "</body>", Tool.map("a", a, "b", b, "c", c)));
-        new Sax().dump("view/test.html", System.out);
+        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + //
+                "<!DOCTYPE html>\n" + //
+                "<style type=\"text/css\">\nbody > div{\n  font-size:11pt;\n}\n</style>" + //
+                "<script type=\"text/javascript\">\nwindow.onload=function(){\n  if(Math.random() < 0.5) alert('1');\n}\n</script>" + //
+                "<!--abcde-->" + //
+                "<body>" + //
+                "<div data-render=\"0\">" + //
+                "<!--abcde-->" + //
+                "</div>" + //
+                "<ul data-render=\"1\">" + //
+                "  <li>a</li>" + //
+                "  <li>b</li>" + //
+                "</ul>" + //
+                "<table>" + //
+                "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
+                "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
+                "</table>" + //
+                "</body>", a, b, c));
+        System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
+        Tool.using(Tool.toURL("view/test.html").get()::openStream, in -> new Sax().parse(Tool.loadText(in), new Sax.Handler() {
+        }));
     }
 }

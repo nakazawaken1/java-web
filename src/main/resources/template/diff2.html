@@ -1,7 +1,7 @@
 <script type="text/javascript">
-    window.onload = function() {
-        document.getElementById('spacer').style.height = document.getElementById('menu').clientHeight;
-    }
+window.onload = function() {
+  document.getElementById('spacer').style.height = document.getElementById('menu').clientHeight; 
+}
 </script>
 
 <style type="text/css">
@@ -24,7 +24,6 @@ table.full {
 textarea {
   width: 100%;
 }
-
 #menu {
   padding: 5px;
   background-color: #ffffee;
@@ -35,11 +34,9 @@ textarea {
 .left {
   float: left;
 }
-
 .legend {
   margin: 0 10px 0 auto;
 }
-
 .legend td {
   padding: 3px;
   border: 1px solid #999;
@@ -97,8 +94,8 @@ b {
   color: #009900;
 }
 
-.header th:not (.index ) {
-  width: 48%;
+.header th:not(.index) {
+width: 48%;
 }
 
 .header th.index {
@@ -106,9 +103,10 @@ b {
 }
 </style>
 
+<div xmlns:j="http://vav.jp/java-web">
 <div id="menu">
   <form method="post" class="left">
-    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? sys.item.compact : sys.item.full}" /> <a href="${A.contextPath}">{sys.item.back}</a>
+    <input type="submit" j:render="0" name="full" value="{sys.item.full}" /> <a href="${R.uri}">{sys.item.back}</a>
   </form>
 
   <table class="legend">
@@ -119,7 +117,8 @@ b {
     </tr>
   </table>
 </div>
-<div id="spacer"></div>
+<div id="spacer">
+</div>
 <table class="full">
   <tr class="header">
     <th class="index">{sys.item.index}</th>
@@ -127,7 +126,12 @@ b {
     <th class="index">{sys.item.index}</th>
     <th>${empty after ? sys.item.after : after}</th>
   </tr>
-  <!--{F:includeFor('parts/diff.html', diffs)}-->
+  <tr class="change" j:render="1">
+    <th>1</th>
+    <td>before</td>
+    <th class="to">1</th>
+    <td class="to">after</td>
+  </tr>
   <tr>
     <th>raw</th>
     <td><textarea rows="10">${S.before}</textarea></td>
@@ -135,3 +139,4 @@ b {
     <td><textarea rows="10">${S.after}</textarea></td>
   </tr>
 </table>
+</div>

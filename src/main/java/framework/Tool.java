@@ -100,6 +100,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 import app.config.Sys;
+import framework.Try.TryConsumer;
+import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
 
 /**
@@ -1790,6 +1792,19 @@ public class Tool {
             Transport.send(message);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * @param <T> Resource type
+     * @param supplier Resource supplier
+     * @param consumer Resource consumer
+     */
+    public static <T extends AutoCloseable> void using(TrySupplier<T> supplier, TryConsumer<T> consumer) {
+        try(T resource = supplier.get()) {
+            consumer.accept(resource);
+        } catch (Exception e) {
+            Log.warning(e, () -> "resource error");
         }
     }
 }

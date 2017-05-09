@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -116,7 +117,7 @@ public abstract class Response {
      * encoding
      */
     Optional<Charset> charset = Optional.empty();
-    
+
     /**
      * locale
      */
@@ -396,10 +397,52 @@ public abstract class Response {
         /**
          * @param name name
          * @param replacer replacer
+         * @return Template
          */
-        public Template(String name, TryTriConsumer<PrintWriter, String, String> replacer) {
-            this.name = name;
-            this.replacer = replacer;
+        public static Template of(String name, TryTriConsumer<PrintWriter, String, String> replacer) {
+            Template t = new Template();
+            t.name = name;
+            t.replacer = replacer;
+            return t;
+        }
+    }
+
+    /**
+     * Render
+     */
+    public static class Render {
+        /**
+         * File
+         */
+        String file;
+        /**
+         * Renders
+         */
+        Map<String, Function<Xml, Xml>> renders;
+
+        /**
+         * @param file File
+         * @param renders Function(Xml, Xml)
+         * @return Render
+         */
+        @SafeVarargs
+        public static Render of(String file, Function<Xml, Xml>... renders) {
+            Render r = new Render();
+            r.file = file;
+            r.renders = Stream.of(renders).collect(LinkedHashMap::new, (map, render) -> map.put(String.valueOf(map.size()), render), (a, b) -> a.putAll(b));
+            return r;
+        }
+
+        /**
+         * @param file File
+         * @param renders (name: Function(Xml, Xml))
+         * @return Render
+         */
+        public static Render ofMap(String file, Map<String, Function<Xml, Xml>> renders) {
+            Render r = new Render();
+            r.file = file;
+            r.renders = renders;
+            return r;
         }
     }
 
@@ -428,106 +471,118 @@ public abstract class Response {
     /**
      * body writer
      */
-    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays
-            .asList(Tuple.of(String.class, (response, out, cancel) -> {
+    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays.asList(//
+            Tuple.of(String.class, (response, out, cancel) -> {
                 response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
                 out.get().write(((String) response.content).getBytes(response.charset()));
-            }), Tuple.of(Writer.class, (response, out, cancel) -> {
+            }), //
+            Tuple.of(Writer.class, (response, out, cancel) -> {
                 response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
                     ((Writer) response.content).write(writer);
                 }
-            }), Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())),
-                    Tuple.of(Path.class, (response, out, cancel) -> {
-                        String file = ((Path) response.content).toString().replace('\\', '/');
-                        Optional<URL> url = Tool.toURL(file);
-                        if (url.isPresent()) {
-                            URL u = url.get();
-                            try (InputStream in = u.openStream()) {
-                                if (!("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
-                                        && Try.s(() -> in.available() >= 0, e -> false).get()) {
-                                    Log.config("[static load] " + u);
-                                    response.contentType(Tool.getContentType(file),
-                                            response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                                    if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
-                                        try (Stream<String> lines = Tool.lines(in);
-                                                PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                                            Function<Formatter, Formatter.Result> exclude;
-                                            Function<Object, String> escape;
-                                            if (file.endsWith(".js")) {
-                                                exclude = Formatter::excludeForScript;
-                                                escape = Formatter::scriptEscape;
-                                            } else if (file.endsWith(".css")) {
-                                                exclude = Formatter::excludeForStyle;
-                                                escape = null;
-                                            } else {
-                                                exclude = Formatter::excludeForHtml;
-                                                escape = Tool::htmlEscape;
-                                            }
-                                            try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, response.values)) {
-                                                lines.forEach(line -> writer.println(formatter.format(line)));
-                                            }
-                                        }
+            }), //
+            Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())), //
+            Tuple.of(Path.class, (response, out, cancel) -> {
+                String file = ((Path) response.content).toString().replace('\\', '/');
+                Optional<URL> url = Tool.toURL(file);
+                if (url.isPresent()) {
+                    URL u = url.get();
+                    try (InputStream in = u.openStream()) {
+                        if (!("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
+                                && Try.s(() -> in.available() >= 0, e -> false).get()) {
+                            Log.config("[static load] " + u);
+                            response.contentType(Tool.getContentType(file),
+                                    response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                            if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
+                                try (Stream<String> lines = Tool.lines(in);
+                                        PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                                    Function<Formatter, Formatter.Result> exclude;
+                                    Function<Object, String> escape;
+                                    if (file.endsWith(".js")) {
+                                        exclude = Formatter::excludeForScript;
+                                        escape = Formatter::scriptEscape;
+                                    } else if (file.endsWith(".css")) {
+                                        exclude = Formatter::excludeForStyle;
+                                        escape = null;
                                     } else {
-                                        Tool.copy(in, out.get(), new byte[1024]);
+                                        exclude = Formatter::excludeForHtml;
+                                        escape = Tool::htmlEscape;
                                     }
-                                } else {
-                                    String prefix = Paths.get(Sys.document_root_folder).toString().replace('\\', '/');
-                                    String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
-                                    Log.info(file + " : " + path);
-                                    response.setHeader("Location",
-                                            Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
-                                            .status(Status.Moved_Permamently);
-                                    out.get();
+                                    try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, response.values)) {
+                                        lines.forEach(line -> writer.println(formatter.format(line)));
+                                    }
                                 }
+                            } else {
+                                Tool.copy(in, out.get(), new byte[1024]);
                             }
-                            return;
-                        }
-
-                        /* no content */
-                        if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
-                            response.status(Status.No_Content);
                         } else {
-                            Log.info("not found: " + Tool.trim("/", file, null));
-                            response.status(Status.Not_Found);
+                            String prefix = Paths.get(Sys.document_root_folder).toString().replace('\\', '/');
+                            String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
+                            Log.info(file + " : " + path);
+                            response.setHeader("Location",
+                                    Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
+                                    .status(Status.Moved_Permamently);
+                            out.get();
                         }
-                        out.get();
-                    }), Tuple.of(Template.class, (response, out, cancel) -> {
-                        Template template = (Template) response.content;
-                        response.contentType(Tool.getContentType(template.name), response.charset());
-                        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
-                                Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
-                                Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
-                            lines.map(formatter::format).forEach(line -> {
-                                Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
-                                writer.println();
-                            });
+                    }
+                    return;
+                }
+
+                /* no content */
+                if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
+                    response.status(Status.No_Content);
+                } else {
+                    Log.info("not found: " + Tool.trim("/", file, null));
+                    response.status(Status.Not_Found);
+                }
+                out.get();
+            }), //
+            Tuple.of(Template.class, (response, out, cancel) -> {
+                Template template = (Template) response.content;
+                response.contentType(Tool.getContentType(template.name), response.charset());
+                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
+                        Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
+                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
+                    lines.map(formatter::format).forEach(line -> {
+                        Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
+                        writer.println();
+                    });
+                }
+            }), //
+            Tuple.of(Render.class, (response, out, cancel) -> {
+                Render render = (Render) response.content;
+                response.contentType(Tool.getContentType(render.file), response.charset());
+                try (InputStream in = Tool.toURL(Sys.template_folder, render.file).get().openStream();
+                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
+                    out.get().write(Xml.parseMap(formatter.format(Tool.loadText(in)), render.renders).toString().getBytes(response.charset()));
+                }
+            }), //
+            Tuple.of(Object.class, (response, out, cancel) -> {
+                Runnable other = Try.r(() -> {
+                    response.contentType(Content.TEXT, response.charset());
+                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                        if (response.content instanceof Stream) {
+                            ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
+                        } else if (response.content instanceof Optional) {
+                            ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
+                        } else {
+                            writer.print(Tool.dump(response.content));
                         }
-                    }), Tuple.of(Object.class, (response, out, cancel) -> {
-                        Runnable other = Try.r(() -> {
-                            response.contentType(Content.TEXT, response.charset());
-                            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                                if (response.content instanceof Stream) {
-                                    ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
-                                } else if (response.content instanceof Optional) {
-                                    ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
-                                } else {
-                                    writer.print(Tool.dump(response.content));
-                                }
-                            }
-                        });
-                        Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
-                            switch (Tool.splitAt(contentType, "\\s*;", 0)) {
-                            case Content.JSON:
-                                Tool.json(response.content, out.get());
-                                break;
-                            case Content.XML:
-                                Tool.xml(response.content, out.get());
-                                break;
-                            default:
-                                other.run();
-                                break;
-                            }
-                        }), other);
-                    }));
+                    }
+                });
+                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
+                    switch (Tool.splitAt(contentType, "\\s*;", 0)) {
+                    case Content.JSON:
+                        Tool.json(response.content, out.get());
+                        break;
+                    case Content.XML:
+                        Tool.xml(response.content, out.get());
+                        break;
+                    default:
+                        other.run();
+                        break;
+                    }
+                }), other);
+            }));
 }

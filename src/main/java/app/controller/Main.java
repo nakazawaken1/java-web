@@ -2,6 +2,7 @@ package app.controller;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -11,6 +12,7 @@ import framework.Db;
 import framework.Diff;
 import framework.Request;
 import framework.Response;
+import framework.Response.Render;
 import framework.Response.Status;
 import framework.Session;
 import framework.Try;
@@ -51,7 +53,7 @@ public class Main {
     @Route
     @Only(Administrator.class)
     Object sql(Db db, Optional<String> sql) throws SQLException {
-        return new Response.Template("table.html", (out, name, prefix) -> {
+        return Response.Template.of("table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
             }
@@ -60,9 +62,9 @@ public class Main {
                 if (columns.compareAndSet(-1, 0)) {
                     ResultSetMetaData meta = rs.getMetaData();
                     columns.set(meta.getColumnCount());
-                    out.println(Xml.of("tr").child("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
+                    out.println(Xml.of("tr").append("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
                 }
-                out.println(Xml.of("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
+                out.println(Xml.of("tr").append("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
             })).count();
             out.printf("<caption>%d rows %d columns</caption>", rows, columns.get());
         });
@@ -171,5 +173,38 @@ public class Main {
                     Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
                             Sys.Item.reader.toString()));
         })).orElseGet(() -> Response.file("diff.html"));
+    }
+
+    /**
+     * @param session session
+     * @param request request
+     * @param before before
+     * @param after after
+     * @return response
+     */
+    @Route(extensions = ".html")
+    Object diff2(Session session, Request request, Optional<String> before, Optional<String> after) {
+        boolean isFull = request.getParameters().containsKey("full");
+        if (isFull || request.getParameters().containsKey("compact")) {
+            before = session.getAttr("before");
+            after = session.getAttr("after");
+        }
+        Optional<String> after2 = after;
+        return before.flatMap(b -> after2.<Object>map(a -> {
+            session.put("before", b);
+            session.put("after", a);
+            List<Diff<String>> list = Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))),
+                    isFull ? 0 : 3, Sys.Item.reader.toString());
+            return Render.of("diff2.html",
+                    xml -> xml.attr("name", isFull ? "compact" : "full").attr("value", isFull ? Sys.Item.compact.toString() : Sys.Item.full.toString()),
+                    xml -> xml.repeat(list.stream(), (x, d) -> {
+                        x.attr("class", d.type.toString());
+                        x.children().get(0).text(d.getBeforeIndexText());
+                        x.children().get(1).text(d.getBeforeText());
+                        x.children().get(2).text(d.getAfterIndexText());
+                        x.children().get(3).text(d.getAfterText());
+                        return x;
+                    }));
+        })).orElseGet(() -> Response.file("diff2.html"));
     }
 }
