@@ -17,7 +17,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -44,12 +43,6 @@ public class Xml {
      */
     @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
     public static Set<String> singles = Tool.set("area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source");
-
-    /**
-     * Non-parse tags
-     */
-    @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
-    public static Set<String> nonParseTags = Tool.set("script", "style");
 
     /**
      * Render attribute name
@@ -218,13 +211,20 @@ public class Xml {
         /**
          * Tags that can omit the close tag(optional tag: next tags)
          */
-        Map<String, Set<String>> optionalTags = Tool.map("li", Tool.set("li"), "dd", Tool.set("dt", "dd"), "dt", Tool.set("dt", "dd"), "p",
+        @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
+        public static Map<String, Set<String>> optionalTags = Tool.map("li", Tool.set("li"), "dd", Tool.set("dt", "dd"), "dt", Tool.set("dt", "dd"), "p",
                 Tool.set("address", "article", "aside", "blockquote", "details", "div", "dl", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2",
                         "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main", "menu", "nav", "ol", "p", "pre", "section", "table", "ul"),
                 "rp", Tool.set("rp", "rt"), "rt", Tool.set("rp", "rt"), "optgroup", Tool.set("optgroup"), "option", Tool.set("optgroup", "option"), "thead",
                 Tool.set("tbody", "tfoot"), "tbody", Tool.set("thead", "tfoot"), "tr", Tool.set("tr"), "td", Tool.set("td", "th", "tr"), "th",
                 Tool.set("td", "th", "tr"), "colgroup", Tool.set("thead", "tbody", "tfoot", "colgroup", "tr"), "caption",
                 Tool.set("thead", "tbody", "tfoot", "colgroup", "tr"));
+
+        /**
+         * Non-parse tags
+         */
+        @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
+        public static Set<String> nonParseTags = Tool.set("script", "style");
 
         /**
          * Tag stack
@@ -338,7 +338,7 @@ public class Xml {
                         }
                         if (singles.contains(name)) {
                             skipSpaces();
-                            eat("/");
+                            eat("/");/*optional*/
                             eat(">");
                             handler.tagEnd(name);
                             stack.pop();
@@ -396,7 +396,7 @@ public class Xml {
 
             @Override
             public void tagStart(CharSequence tag) {
-                xml = xml.append(tag.toString());
+                xml = xml.child(tag.toString());
             }
 
             @Override
@@ -408,18 +408,18 @@ public class Xml {
             @Override
             public void comment(CharSequence tag, CharSequence comment) {
                 if (isReserveComment) {
-                    xml.append(new Xml("<!--" + comment + "-->", Type.comment));
+                    xml.child(new Xml(comment, Type.comment));
                 }
             }
 
             @Override
             public void control(CharSequence tag, CharSequence control) {
-                xml.append(new Xml(control, Type.control));
+                xml.child(new Xml(control, Type.control));
             }
 
             @Override
             public void text(CharSequence tag, CharSequence text) {
-                xml.append(new Xml(text, Type.html));
+                xml.child(new Xml(text, Type.html));
             }
 
             @Override
@@ -478,6 +478,9 @@ public class Xml {
         if (type.isText()) {
             if (parent != null && parent.isNull()) {
                 s.append(newline).append(indent);
+            }
+            if (type == Type.comment) {
+                return s.append("<!--").append(content).append("-->").toString();
             }
             return s.append(type.isEscape() ? Tool.htmlEscape(content) : content).toString();
         }
@@ -576,8 +579,8 @@ public class Xml {
      * @param texts Texts
      * @return Self
      */
-    public Xml append(String tag, Stream<Object> texts) {
-        texts.forEach(text -> append(tag).text(text));
+    public Xml child(String tag, Stream<Object> texts) {
+        texts.forEach(text -> child(tag).text(text));
         return this;
     }
 
@@ -587,7 +590,7 @@ public class Xml {
      * @param children Children
      * @return Self
      */
-    public Xml append(Stream<Xml> children) {
+    public Xml child(Stream<Xml> children) {
         Stream<Xml> flat = children.flatMap(i -> i.isNull() ? i.children.stream() : Stream.of(i));
         if (this.children == null) {
             this.children = flat.peek(i -> i.parent = this).collect(Collectors.toList());
@@ -599,63 +602,35 @@ public class Xml {
 
     /**
      * @param child Child
+     * @param index index(0: first, -1: last)
      * @return Added
      */
-    public Xml append(Xml child) {
+    public Xml child(Xml child, int index) {
         child.parent = this;
-        if (this.children == null) {
-            this.children = Tool.peek(new ArrayList<>(), a -> a.add(child));
+        if (children == null) {
+            children = Tool.peek(new ArrayList<>(), a -> a.add(child));
+        } else if (index == -1) {
+            children.add(child);
         } else {
-            this.children.add(child);
+            children.add(index < 0 ? children.size() + index : index, child);
         }
         return child;
-    }
-
-    /**
-     * @param tag Tag name
-     * @return Added
-     */
-    public Xml append(String tag) {
-        return append(of(tag));
     }
 
     /**
      * @param child Child
      * @return Added
      */
-    public Xml prepend(Xml child) {
-        child.parent = this;
-        if (this.children == null) {
-            this.children = Tool.peek(new ArrayList<>(), a -> a.add(child));
-        } else {
-            this.children.add(0, child);
-        }
-        return child;
+    public Xml child(Xml child) {
+        return child(child, -1);
     }
 
     /**
      * @param tag Tag name
      * @return Added
      */
-    public Xml prepend(String tag) {
-        return prepend(of(tag));
-    }
-
-    /**
-     * @param tag Tag
-     * @param texts Texts
-     * @return Self
-     */
-    public Xml after(String tag, Stream<Object> texts) {
-        return parent.append(tag, texts);
-    }
-
-    /**
-     * @param sibling Sibling
-     * @return Self
-     */
-    public Xml after(Stream<Xml> sibling) {
-        return parent.append(sibling);
+    public Xml child(String tag) {
+        return child(of(tag));
     }
 
     /**
@@ -663,7 +638,10 @@ public class Xml {
      * @return Added
      */
     public Xml after(Xml xml) {
-        return parent.append(xml);
+        if (parent == null) {
+            return of(null).child(this).parent.child(xml);
+        }
+        return parent.child(xml, parent.children.indexOf(this) + 1);
     }
 
     /**
@@ -679,7 +657,10 @@ public class Xml {
      * @return Added
      */
     public Xml before(Xml xml) {
-        return parent.prepend(xml);
+        if (parent == null) {
+            return of(null).child(this).parent.child(xml, 0);
+        }
+        return parent.child(xml, parent.children.indexOf(this));
     }
 
     /**
@@ -698,7 +679,7 @@ public class Xml {
      */
     public Xml text(Object text) {
         clear();
-        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> append(new Xml(text, Type.text)));
+        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> child(new Xml(text, Type.text)));
         return this;
     }
 
@@ -708,10 +689,32 @@ public class Xml {
      * @param text Text
      * @return Self
      */
-    public Xml html(Object text) {
+    public Xml innerHtml(Object text) {
         clear();
-        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> append(new Xml(text, Type.html)));
+        Tool.string(text).filter(Tool.notEmpty).ifPresent(i -> child(new Xml(text, Type.html)));
         return this;
+    }
+
+    /**
+     * @return Inner HTML
+     */
+    public String innerHtml() {
+        return children().stream().map(child -> child.toString("", xml -> Tool.string(xml.content).map(singles::contains).orElse(false)).trim())
+                .collect(Collectors.joining(newline));
+    }
+
+    /**
+     * @return Outer HTML
+     */
+    public String outerHtml() {
+        return toString("", xml -> Tool.string(xml.content).map(singles::contains).orElse(false)).trim();
+    }
+
+    /**
+     * @return Inner text
+     */
+    public String text() {
+        return stream().filter(xml -> xml.type == Type.text).map(xml -> xml.content).collect(Collectors.joining(" "));
     }
 
     /**
@@ -730,13 +733,37 @@ public class Xml {
     }
 
     /**
-     * Set attributes
+     * Add attribute
      * 
-     * @param stream Name-value pairs
+     * @param name Name
+     * @param value Value
+     * @param separator Value separator(" " if class)
      * @return Self
      */
-    public Xml attr(Stream<Map.Entry<String, Object>> stream) {
-        stream.forEach(i -> attr(i.getKey(), i.getValue()));
+    public Xml attr(String name, Object value, String separator) {
+        Object v;
+        if (attributes == null) {
+            attributes = new LinkedHashMap<>();
+            v = null;
+        } else {
+            v = attributes.get(name);
+        }
+        if (v == null) {
+            attributes.put(name, value == null ? "" : String.valueOf(value));
+        } else {
+            attributes.put(name, v + separator + (value == null ? "" : value));
+        }
+        return this;
+    }
+
+    /**
+     * Set attributes
+     * 
+     * @param map Name-value pairs
+     * @return Self
+     */
+    public Xml attr(Map<String, Object> map) {
+        map.forEach(this::attr);
         return this;
     }
 
@@ -754,13 +781,13 @@ public class Xml {
     }
 
     /**
-     * @param parent Inner use only
+     * @param notUse Inner use only
      * @return Copied xml
      */
-    public Xml copy(Xml... parent) {
+    public Xml copy(Xml... notUse) {
         Xml to = new Xml(content, type);
-        if (parent.length > 0) {
-            to.parent = parent[0];
+        if (notUse.length > 0) {
+            to.parent = notUse[0];
         }
         to.children = children == null ? null : children.stream().map(i -> i.copy(to)).collect(Collectors.toList());
         to.attributes = attributes == null ? null : new LinkedHashMap<>(attributes);
@@ -774,7 +801,26 @@ public class Xml {
      * @return Xml
      */
     public <T> Xml repeat(Stream<T> source, BiFunction<Xml, T, Xml> editor) {
-        return of(null).append(source.map(j -> editor.apply(copy(), j)));
+        return of(null).child(source.map(j -> editor.apply(copy(), j)));
+    }
+
+    /**
+     * @return Traversal stream
+     */
+    public Stream<Xml> stream() {
+        Stream.Builder<Xml> builder = Stream.builder();
+        streamInner(builder);
+        return builder.build();
+    }
+
+    /**
+     * @param builder builder
+     */
+    private void streamInner(Stream.Builder<Xml> builder) {
+        builder.add(this);
+        for (Xml child : children()) {
+            child.streamInner(builder);
+        }
     }
 
     /**
@@ -783,19 +829,19 @@ public class Xml {
      * @param args No use
      */
     public static void main(String[] args) {
-        Xml xml = Xml.of("b");
-        System.out.println(xml.append("i").text("test"));
-        System.out.println(xml.copy().clear().append("a").text("test2"));
-        System.out.println(Xml.of("br").attr(Stream.of(Tuple.of("style", "clear:both"), Tuple.of("id", "test"))));
-        System.out.println(Xml.of("span").text("abc"));
-        System.out.println(Xml.of("ol").append("li").text("1").after("li").text("2"));
-        System.out.println(Xml.of("ol").append("li", Stream.of(1, 2)));
-        System.out.println(Xml.of("ol").append(IntStream.rangeClosed(1, 2).mapToObj(i -> Xml.of("li").text(i))));
-        System.out.println(Xml.of("table").append("thead").append("tr").append("th", Stream.of("a", "b")).root().append("tbody").append("tr")
-                .append("th", Stream.of(1, 2)).after("tr").append("th", Stream.of(3, 4)));
+        // Xml xml = Xml.of("b");
+        // System.out.println(xml.child("i").text("test"));
+        // System.out.println(xml.copy().clear().child("a").text("test2"));
+        // System.out.println(Xml.of("br").attr(Tool.map("style", "clear:both", "id", "test")));
+        // System.out.println(Xml.of("span").text("abc"));
+        // System.out.println(Xml.of("ol").child("li").text("1").after("li").text("2"));
+        // System.out.println(Xml.of("ol").child("li", Stream.of(1, 2)));
+        // System.out.println(Xml.of("ol").child(IntStream.rangeClosed(1, 2).mapToObj(i -> Xml.of("li").text(i))));
+        // System.out.println(Xml.of("table").child("thead").child("tr").child("th", Stream.of("a", "b")).root().child("tbody").child("tr")
+        // .child("th", Stream.of(1, 2)).after("tr").child("th", Stream.of(3, 4)));
         Function<Xml, Xml> a = div -> Xml.of(null).text("あい<a>うえお");
-        Function<Xml, Xml> b = ul -> ul.clear().append("li", Stream.of("aa", "bb", "cc"));
-        Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 23), Tuple.of(2, "S<a>m", 41), Tuple.of(3, "Andy", 33)), (t, i) -> {
+        Function<Xml, Xml> b = ul -> ul.clear().child("li", Stream.of("aa", "bb", "cc"));
+        Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 44), Tuple.of(2, "S<a>m", 55), Tuple.of(3, "Andy", 66)), (t, i) -> {
             t.children().get(0).text(i.l);
             t.children().get(1).text(i.r.l);
             t.children().get(2).text(i.r.r);
@@ -818,9 +864,10 @@ public class Xml {
                 "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
                 "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
                 "</table>" + //
-                "</body>", a, b, c));
-        System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
-        Tool.using(Tool.toURL("view/test.html").get()::openStream, in -> new Sax().parse(Tool.loadText(in), new Sax.Handler() {
-        }));
+                "</body>", a, b, c)/*.stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text)
+                        .collect(Collectors.joining(System.lineSeparator()))*/);
+        // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
+        // Tool.using(Tool.toURL("view/test.html").get()::openStream, in -> new Sax().parse(Tool.loadText(in), new Sax.Handler() {
+        // }));
     }
 }

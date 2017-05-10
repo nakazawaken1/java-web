@@ -62,9 +62,9 @@ public class Main {
                 if (columns.compareAndSet(-1, 0)) {
                     ResultSetMetaData meta = rs.getMetaData();
                     columns.set(meta.getColumnCount());
-                    out.println(Xml.of("tr").append("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
+                    out.println(Xml.of("tr").child("th", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(meta::getColumnName))));
                 }
-                out.println(Xml.of("tr").append("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
+                out.println(Xml.of("tr").child("td", IntStream.rangeClosed(1, columns.get()).mapToObj(Try.intF(rs::getString))));
             })).count();
             out.printf("<caption>%d rows %d columns</caption>", rows, columns.get());
         });

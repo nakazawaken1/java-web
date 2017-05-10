@@ -1577,8 +1577,37 @@ public class Tool {
      * @return escaped text
      */
     public static String htmlEscape(Object text) {
-        return Tool.string(text).map(i -> i.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;"))
-                .orElse(null);
+        if (text == null) {
+            return null;
+        }
+        String string = text.toString();
+        if (string == null || string.isEmpty()) {
+            return null;
+        }
+        StringBuilder s = new StringBuilder();
+        string.chars().forEach(c -> {
+            switch (c) {
+            case '&':
+                s.append("&amp;");
+                break;
+            case '"':
+                s.append("&quot;");
+                break;
+            case '<':
+                s.append("&lt;");
+                break;
+            case '>':
+                s.append("&gt;");
+                break;
+            case '\'':
+                s.append("&#39;");
+                break;
+            default:
+                s.append((char) c);
+                break;
+            }
+        });
+        return s.toString();
     }
 
     /**
@@ -1801,7 +1830,7 @@ public class Tool {
      * @param consumer Resource consumer
      */
     public static <T extends AutoCloseable> void using(TrySupplier<T> supplier, TryConsumer<T> consumer) {
-        try(T resource = supplier.get()) {
+        try (T resource = supplier.get()) {
             consumer.accept(resource);
         } catch (Exception e) {
             Log.warning(e, () -> "resource error");
