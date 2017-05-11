@@ -3,14 +3,12 @@ package framework;
 import java.beans.FeatureDescriptor;
 import java.beans.IntrospectionException;
 import java.beans.PropertyDescriptor;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.text.MessageFormat;
+import java.time.chrono.JapaneseDate;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
@@ -43,6 +41,11 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * current formatter
      */
     static final ThreadLocal<Formatter> current = new ThreadLocal<>();
+
+    /**
+     * elClass entries
+     */
+    static Map<String, Class<?>> elClassMap = Tool.map("Tool", Tool.class);
 
     /**
      * cache enabled
@@ -261,6 +264,11 @@ public class Formatter extends AbstractParser implements AutoCloseable {
         return result;
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see framework.AbstractParser#set(java.lang.String)
+     */
     @Override
     void set(String text) {
         braces.clear();
@@ -356,49 +364,66 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @param values {0}, {1}... replace to value
      * @return result text
      */
-    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map, Object... values) {
+    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map,
+            Object... values) {
         try (Formatter formatter = new Formatter(exclude, escape, locale, map, values)) {
             return formatter.format(text);
         }
     }
 
     /**
-     * @param path include file path
-     * @return content
+     * @param path Include file path
+     * @return Content
      */
     public static String include(String path) {
-        try {
+        return Tool.toURL(path).map(url -> {
             Formatter formatter = current.get().copy();
             boolean backup = formatter.isCache;
             formatter.isCache = false;
-            return Tool.peek(formatter.format(Tool.loadText(Tool.toURL(path).orElseThrow(FileNotFoundException::new).openStream())),
-                    s -> formatter.isCache = backup);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+            String result = formatter.format(Tool.usingGet(url::openStream, Tool::loadText));
+            formatter.isCache = backup;
+            return result;
+        }).orElse("((not found: " + path + "))");
     }
 
     /**
-     * @param path include file path
-     * @param list list
-     * @return content
+     * @param path Include file path
+     * @param list List
+     * @return Content
      */
     public static String includeFor(String path, Iterable<?> list) {
-        try {
-            String text = Tool.loadText(Tool.toURL(path).orElseThrow(FileNotFoundException::new).openStream());
+        return Tool.toURL(path).map(url -> {
+            String text = Tool.usingGet(url::openStream, Tool::loadText);
             Formatter formatter = current.get().copy();
-            StringBuilder s = new StringBuilder();
             boolean backup = formatter.isCache;
             formatter.isCache = false;
+            StringBuilder s = new StringBuilder();
             list.forEach(i -> {
                 formatter.el.setValue("I", i);
                 s.append(formatter.format(text));
             });
             formatter.isCache = backup;
             return s.toString();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        }).orElse("((not found: " + path + "))");
+    }
+
+    /**
+     * @param path Include file path
+     * @param condition Include if true
+     * @return Content
+     */
+    public static String includeIf(String path, boolean condition) {
+        return Tool.toURL(path).map(url -> {
+            if (condition) {
+                Formatter formatter = current.get().copy();
+                boolean backup = formatter.isCache;
+                formatter.isCache = false;
+                String result = formatter.format(Tool.usingGet(url::openStream, Tool::loadText));
+                formatter.isCache = backup;
+                return result;
+            }
+            return "";
+        }).orElse("((not found: " + path + "))");
     }
 
     /**
@@ -503,7 +528,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                                 try {
                                     if (base instanceof ELClass && property instanceof String) {
                                         Class<?> clazz = ((ELClass) base).getKlass();
-                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().equals(property))
                                                 .peek(c -> context.setPropertyResolved(true)).findFirst().map(ELClass::new).orElse(null);
                                     }
                                 } catch (SecurityException | IllegalArgumentException e) {
@@ -517,7 +542,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                                 try {
                                     if (base instanceof ELClass && property instanceof String) {
                                         Class<?> clazz = ((ELClass) base).getKlass();
-                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().toLowerCase().equals(property))
+                                        return Stream.of(clazz.getClasses()).filter(c -> c.getSimpleName().equals(property))
                                                 .peek(c -> context.setPropertyResolved(true)).findFirst().orElse(null);
                                     }
                                 } catch (SecurityException | IllegalArgumentException e) {
@@ -654,11 +679,13 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                         el.defineBean("A", Application.current().orElse(null));
                         el.defineFunction("F", "include", getClass().getMethod("include", String.class));
                         el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
+                        el.defineFunction("F", "includeIf", getClass().getMethod("includeIf", String.class, boolean.class));
+                        el.defineBean("JapaneseDate", new ELClass(JapaneseDate.class));
                         el.defineBean("R", Request.current().orElse(null));
                         el.defineBean("S", Session.current().orElse(null));
-                        el.defineBean("sys", new ELClass(Sys.class));
-                        el.defineBean("Tool", new ELClass(Tool.class));
+                        el.defineBean("Sys", new ELClass(Sys.class));
                         el.defineBean("V", values == null ? new Object[] {} : values);
+                        elClassMap.forEach((k, v) -> el.defineBean(k, new ELClass(v)));
                         if (map != null) {
                             map.forEach(el::defineBean);
                         }

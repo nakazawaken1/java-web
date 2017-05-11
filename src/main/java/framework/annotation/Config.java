@@ -71,7 +71,7 @@ public @interface Config {
 
             /* load config files form Config or classname.config */
             String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value)
-                    .orElse(new String[] { clazz.getSimpleName().toLowerCase() + ".config" });
+                    .orElse(new String[] { clazz.getSimpleName().toLowerCase(Locale.ENGLISH) + ".config" });
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
             }
@@ -79,13 +79,13 @@ public @interface Config {
             /* add system properties */
             System.getProperties().forEach((k, v) -> {
                 String key = (String) k;
-                if (key.startsWith("sys.")) {
+                if (key.startsWith("Sys.")) {
                     sourceProperties.setProperty(key, (String) v);
                 }
             });
 
-            /* select db setting from sys.db.suffix */
-            Optional<String> suffix = Tool.string(sourceProperties.getProperty("sys.db.suffix"));
+            /* select db setting from Sys.Db.suffix */
+            Optional<String> suffix = Tool.string(sourceProperties.getProperty("Sys.Db.suffix"));
             suffix.ifPresent(s -> {
                 Reflector.fields(Sys.Db.class).forEach((name, field) -> {
                     if ("suffix".equals(name)) {
@@ -219,10 +219,6 @@ public @interface Config {
         }
 
         /**
-         * modifiers of Filed
-         */
-        static final Field modifiersField;
-        /**
          * default value of Separator.prefix
          */
         static final String prefixDefault;
@@ -265,12 +261,6 @@ public @interface Config {
         static final Map<String, Field> fieldCache = new ConcurrentHashMap<>();
 
         static {
-            try {
-                modifiersField = Field.class.getDeclaredField("modifiers");
-                modifiersField.setAccessible(true);
-            } catch (NoSuchFieldException | SecurityException e) {
-                throw new InternalError(e);
-            }
             prefixDefault = Reflector.getDefaultValue(Separator.class, "prefix");
             valueDefault = Reflector.getDefaultValue(Separator.class, "value");
             suffixDefault = Reflector.getDefaultValue(Separator.class, "suffix");
@@ -288,7 +278,7 @@ public @interface Config {
         static Properties inject(Class<?> clazz, Properties properties, String prefix) {
             Properties realProperties = new Properties();
             realProperties.putAll(properties);
-            String newPrefix = prefix + clazz.getSimpleName().toLowerCase() + '.';
+            String newPrefix = prefix + clazz.getSimpleName() + '.';
             classCache.put(newPrefix.substring(0, newPrefix.length() - 1), clazz);
             if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
                 if (Message.class.isAssignableFrom(clazz)) {
@@ -297,14 +287,6 @@ public @interface Config {
                     Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
                         String key = newPrefix + f.getName();
                         String raw = properties.getProperty(key);
-                        int modifiers = f.getModifiers();
-                        if ((modifiers & Modifier.FINAL) == Modifier.FINAL) {
-                            try {
-                                modifiersField.setInt(f, modifiers & ~Modifier.FINAL); // must to be before Field.get
-                            } catch (IllegalArgumentException | IllegalAccessException e) {
-                                throw new InternalError(e);
-                            }
-                        }
                         f.setAccessible(true);
                         Object value;
                         try {
@@ -364,7 +346,7 @@ public @interface Config {
          * @return lines
          */
         static List<String> dump(Class<?> clazz, String prefix, boolean sort) {
-            String newPrefix = prefix + clazz.getSimpleName().replace('$', '.').toLowerCase() + '.';
+            String newPrefix = prefix + clazz.getSimpleName().replace('$', '.') + '.';
             List<String> lines = new ArrayList<>();
             if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
                 if (Message.class.isAssignableFrom(clazz)) {

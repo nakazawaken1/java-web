@@ -3,6 +3,7 @@ package framework;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -31,7 +32,7 @@ public class Diff<T> {
         SKIP;
         @Override
         public String toString() {
-            return name().toLowerCase();
+            return name().toLowerCase(Locale.ENGLISH);
         }
     }
 
@@ -102,7 +103,7 @@ public class Diff<T> {
     /**
      * HTML escape editor
      */
-    public static Consumer<Diff<String>> ESCAPE = d -> {
+    public static final Consumer<Diff<String>> ESCAPE = d -> {
         d.before = d.before.map(Tool::htmlEscape);
         d.after = d.after.map(Tool::htmlEscape);
     };

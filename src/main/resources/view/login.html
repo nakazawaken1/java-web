@@ -1,6 +1,6 @@
 #{F:include('parts/simple_header.html')}
 <h1>
-    <img src="images/logo.png" alt=""/> {sys.item.title}
+    <img src="images/logo.png" alt=""/> {Sys.Item.title}
 </h1>
 <div class="middle">
 <form method="post" action="login">
@@ -8,7 +8,7 @@
         <strong>Please Login</strong>
         <img src="images/loginlogo.png" alt=""/>
     </div>
-    <h2>{sys.prompt.login}</h2>
+    <h2>{Sys.Prompt.login}</h2>
     <div class="margin error" data-load="alert"></div>
     <div class="margin">
         <table>
@@ -20,6 +20,6 @@
 </form>
 </div>
 <div class="footer">
-    <div>{sys.item.copyright}</div>
+    <div>{Sys.Item.copyright}</div>
 </div>
 #{F:include('parts/footer.html')}

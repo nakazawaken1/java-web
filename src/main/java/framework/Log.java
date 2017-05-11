@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -155,7 +156,7 @@ public class Log extends Handler {
                 realFile = file;
             } else {
                 level = record.getLevel();
-                realFile = file.replace("ll", level.getName().toLowerCase());
+                realFile = file.replace("ll", level.getName().toLowerCase(Locale.ENGLISH));
             }
             String message = getFormatter().format(record);
             Charset encoding = Tool.of(getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset());

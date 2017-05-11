@@ -1,45 +1,45 @@
-sys.alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください。
+Sys.Alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください。
 
-sys.alert.login_failed = ログインIDまたはパスワードが違います。
+Sys.Alert.login_failed = ログインIDまたはパスワードが違います。
 
-sys.item.after = 変更後
+Sys.Item.after = 変更後
 
-sys.item.back = 戻る
+Sys.Item.back = 戻る
 
-sys.item.before = 変更前
+Sys.Item.before = 変更前
 
-sys.item.clear = クリア
+Sys.Item.clear = クリア
 
-sys.item.compact = 省略表示
+Sys.Item.compact = 省略表示
 
-sys.item.delete = 削除
+Sys.Item.delete = 削除
 
-sys.item.diff = 差分表示
+Sys.Item.diff = 差分表示
 
-sys.item.error = 何か間違っていませんか？
+Sys.Item.error = 何か間違っていませんか？
 
-sys.item.full = 全行表示
+Sys.Item.full = 全行表示
 
-sys.item.index = 行
+Sys.Item.index = 行
 
-sys.item.insert = 追加
+Sys.Item.insert = 追加
 
-sys.item.login = ログイン
+Sys.Item.login = ログイン
 
-sys.item.loginId = ログインID
+Sys.Item.loginId = ログインID
 
-sys.item.logout = ログアウト
+Sys.Item.logout = ログアウト
 
-sys.item.password = パスワード
+Sys.Item.password = パスワード
 
-sys.item.quit = 終了
+Sys.Item.quit = 終了
 
-sys.item.reader = &#xFE19;
+Sys.Item.reader = &#xFE19;
 
-sys.item.run = 実行
+Sys.Item.run = 実行
 
-sys.item.title = タイトル
+Sys.Item.title = タイトル
 
-sys.item.update = 変更
+Sys.Item.update = 変更
 
-sys.prompt.login = ログインID・ パスワードを入力して、 ログインボタンを押して下さい。
+Sys.Prompt.login = ログインID・ パスワードを入力して、 ログインボタンを押して下さい。

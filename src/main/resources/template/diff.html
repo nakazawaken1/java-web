@@ -108,24 +108,24 @@ b {
 
 <div id="menu">
   <form method="post" class="left">
-    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? sys.item.compact : sys.item.full}" /> <a href="${A.contextPath}">{sys.item.back}</a>
+    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? Sys.Item.compact : Sys.Item.full}" /> <a href="${A.contextPath}">{Sys.Item.back}</a>
   </form>
 
   <table class="legend">
     <tr>
-      <td class="g">{sys.item.update}</td>
-      <td class="b">{sys.item.insert}</td>
-      <td class="r">{sys.item.delete}</td>
+      <td class="g">{Sys.Item.update}</td>
+      <td class="b">{Sys.Item.insert}</td>
+      <td class="r">{Sys.Item.delete}</td>
     </tr>
   </table>
 </div>
 <div id="spacer"></div>
 <table class="full">
   <tr class="header">
-    <th class="index">{sys.item.index}</th>
-    <th>${empty before ? sys.item.before : before}</th>
-    <th class="index">{sys.item.index}</th>
-    <th>${empty after ? sys.item.after : after}</th>
+    <th class="index">{Sys.Item.index}</th>
+    <th>${empty before ? Sys.Item.before : before}</th>
+    <th class="index">{Sys.Item.index}</th>
+    <th>${empty after ? Sys.Item.after : after}</th>
   </tr>
   <!--{F:includeFor('parts/diff.html', diffs)}-->
   <tr>

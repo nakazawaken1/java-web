@@ -10,6 +10,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -263,7 +264,7 @@ public class Xml {
                         if (skipUntil('>')) {
                             int end = index;
                             eat(">");
-                            String name = subSequence(start, end).toString().toLowerCase();
+                            String name = subSequence(start, end).toString().toLowerCase(Locale.ENGLISH);
                             for (;;) {
                                 String s = stack.pop();
                                 handler.tagEnd(s);
@@ -293,7 +294,7 @@ public class Xml {
                     int start = index;
                     if (skipUntil(' ', '/', '>')) { /* start tag */
                         int end = index;
-                        String name = subSequence(start, end).toString().toLowerCase();
+                        String name = subSequence(start, end).toString().toLowerCase(Locale.ENGLISH);
                         /* optional tag check */
                         while (!stack.isEmpty()) {
                             Set<String> set = optionalTags.get(stack.peek());
@@ -867,7 +868,5 @@ public class Xml {
                 "</body>", a, b, c)/*.stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text)
                         .collect(Collectors.joining(System.lineSeparator()))*/);
         // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
-        // Tool.using(Tool.toURL("view/test.html").get()::openStream, in -> new Sax().parse(Tool.loadText(in), new Sax.Handler() {
-        // }));
     }
 }

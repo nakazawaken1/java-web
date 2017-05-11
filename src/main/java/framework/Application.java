@@ -41,7 +41,7 @@ public abstract class Application implements Attributes<Object> {
     /**
      * routing table{path: {class: method}}
      */
-    static SortedMap<String, Tuple<Class<?>, Method>> table;
+    static SortedMap<String, Tuple<Class<?>, Method>> routing;
 
     /**
      * @return singleton
@@ -80,7 +80,7 @@ public abstract class Application implements Attributes<Object> {
 
         /* load config */
         try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage().getName())) {
-            cs.filter(c -> c.getAnnotation(Config.class) != null).forEach(Config.Injector::inject);
+            cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject).forEach(c -> Formatter.elClassMap.put(c.getSimpleName(), c));
         }
         Log.startup();
         Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
@@ -93,11 +93,11 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* setup routing */
-        if (table == null) {
-            table = new TreeMap<>();
+        if (routing == null) {
+            routing = new TreeMap<>();
             try (Stream<Class<?>> cs = Tool.getClasses(Main.class.getPackage().getName())) {
                 cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
-                        .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> table, (map, trio) -> {
+                        .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> routing, (map, trio) -> {
                             Class<?> c = trio.l;
                             Method m = trio.r.l;
                             String left = Tool.of(c.getAnnotation(Route.class)).map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/'))
@@ -109,7 +109,7 @@ public abstract class Application implements Attributes<Object> {
             }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
-                table.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
+                routing.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
             }));
         }
 
@@ -170,7 +170,7 @@ public abstract class Application implements Attributes<Object> {
             action = path;
             extension = "";
         }
-        final Tuple<Class<?>, Method> pair = table.get(action);
+        final Tuple<Class<?>, Method> pair = routing.get(action);
         if (pair != null && Tool.val(pair.r.getAnnotation(Route.class).extensions(),
                 extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension)))) {
             do {

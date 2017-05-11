@@ -116,7 +116,7 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String toString() {
-            return super.toString().toLowerCase();
+            return super.toString().toLowerCase(Locale.ENGLISH);
         }
 
         /**
@@ -124,7 +124,7 @@ public class Db implements AutoCloseable {
          * @return type
          */
         public static Type fromUrl(String url) {
-            return Enum.valueOf(Type.class, url.split(":")[1].toUpperCase());
+            return Enum.valueOf(Type.class, url.split(":")[1].toUpperCase(Locale.ENGLISH));
         }
     }
 
@@ -250,7 +250,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Locale.getDefault()).getProperty("sys.db" + suffix));
+            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Locale.getDefault()).getProperty("Sys.db" + suffix));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -380,8 +380,6 @@ public class Db implements AutoCloseable {
             schema = "dbo";
             break;
         case H2:
-            builder = new Builder();
-            break;
         case MYSQL:
             builder = new Builder();
             break;
@@ -397,9 +395,9 @@ public class Db implements AutoCloseable {
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
             Properties p = Config.Injector.getSource(Sys.class, Locale.getDefault());
-            String url = p.getProperty("sys.db" + key);
+            String url = p.getProperty("Sys.db" + key);
             Type type = Type.fromUrl(url);
-            String name = Tool.string(p.getProperty("sys.db.datasource_class" + key)).orElse(type.dataSource);
+            String name = Tool.string(p.getProperty("Sys.Db.datasource_class" + key)).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
             if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
@@ -1076,6 +1074,7 @@ public class Db implements AutoCloseable {
          * @param value value
          * @return escaped value
          */
+        @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(Object value) {
             if (value == null) {
                 return "NULL";
@@ -1166,7 +1165,7 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String fn(String function, String... args) {
-            switch (function.toUpperCase()) {
+            switch (function.toUpperCase(Locale.ENGLISH)) {
             case "YEAR":
             case "MONTH":
             case "DAY":
@@ -1233,6 +1232,7 @@ public class Db implements AutoCloseable {
          * @see framework.Db.Builder#escape(java.lang.Object)
          */
         @Override
+        @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(Object value) {
             if (value != null && value instanceof Date) {
                 return "'" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value) + "'";
@@ -1278,7 +1278,7 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String fn(String function, String... args) {
-            switch (function.toUpperCase()) {
+            switch (function.toUpperCase(Locale.ENGLISH)) {
             case "NOW":
                 return "SYSDATE";
             case "YEAR":

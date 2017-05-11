@@ -106,14 +106,14 @@ width: 48%;
 <div xmlns:j="http://vav.jp/java-web">
 <div id="menu">
   <form method="post" class="left">
-    <input type="submit" j:render="0" name="full" value="{sys.item.full}" /> <a href="${R.uri}">{sys.item.back}</a>
+    <input type="submit" data-render="0" name="full" value="{Sys.Item.full}" /> <a href="${R.uri}">{Sys.Item.back}</a>
   </form>
 
   <table class="legend">
     <tr>
-      <td class="g">{sys.item.update}</td>
-      <td class="b">{sys.item.insert}</td>
-      <td class="r">{sys.item.delete}</td>
+      <td class="g">{Sys.Item.update}</td>
+      <td class="b">{Sys.Item.insert}</td>
+      <td class="r">{Sys.Item.delete}</td>
     </tr>
   </table>
 </div>
@@ -121,12 +121,12 @@ width: 48%;
 </div>
 <table class="full">
   <tr class="header">
-    <th class="index">{sys.item.index}</th>
-    <th>${empty before ? sys.item.before : before}</th>
-    <th class="index">{sys.item.index}</th>
-    <th>${empty after ? sys.item.after : after}</th>
+    <th class="index">{Sys.Item.index}</th>
+    <th>${empty before ? Sys.Item.before : before}</th>
+    <th class="index">{Sys.Item.index}</th>
+    <th>${empty after ? Sys.Item.after : after}</th>
   </tr>
-  <tr class="change" j:render="1">
+  <tr class="change" data-render="1">
     <th>1</th>
     <td>before</td>
     <th class="to">1</th>

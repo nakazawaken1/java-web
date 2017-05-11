@@ -7,6 +7,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -175,7 +176,7 @@ public class Reflector {
                 }
             }
         }
-        return start.getSimpleName().toLowerCase();
+        return start.getSimpleName().toLowerCase(Locale.ENGLISH);
     }
 
     /**

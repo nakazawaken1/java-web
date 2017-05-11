@@ -1,5 +1,6 @@
 package framework;
 
+import java.text.MessageFormat;
 import java.util.Locale;
 
 import framework.annotation.Config;
@@ -33,6 +34,15 @@ public interface Message {
             clazz = clazz.getDeclaringClass();
             name = clazz.getSimpleName() + "." + name;
         } while (clazz.getAnnotation(Config.class) == null);
-        return Config.Injector.getSource(clazz, locale).getProperty(name.toLowerCase() + "." + ((Enum<?>) this).name());
+        return Config.Injector.getSource(clazz, locale).getProperty(name + "." + ((Enum<?>) this).name());
+    }
+
+    /**
+     * @param locale Locale
+     * @param values Values
+     * @return Message
+     */
+    default String format(Locale locale, Object... values) {
+        return MessageFormat.format(message(locale), values);
     }
 }

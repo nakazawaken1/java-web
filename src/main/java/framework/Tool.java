@@ -101,6 +101,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 import app.config.Sys;
 import framework.Try.TryConsumer;
+import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
 
@@ -415,7 +416,7 @@ public class Tool {
      * @return true if text contents file
      */
     public static boolean isTextContent(String file) {
-        String lower = file.toLowerCase();
+        String lower = file.toLowerCase(Locale.ENGLISH);
         return Sys.text_extensions.stream().anyMatch(lower::endsWith);
     }
 
@@ -847,7 +848,7 @@ public class Tool {
         if (Objects.requireNonNull(text).length() <= 0) {
             return 0;
         }
-        String value = text.trim().toUpperCase();
+        String value = text.trim().toUpperCase(Locale.ENGLISH);
         if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
             Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
             return interval.toMillis();
@@ -1311,7 +1312,7 @@ public class Tool {
         // try (Stream<Class<?>> list = getClasses("test")) {
         // list.forEach(c -> Log.info(c.getCanonicalName()));
         // }
-        String text = "target text!";
+        //String text = "target text!";
         // String password = "abcd123";
         // Log.info("source: " + text);
         // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -1324,10 +1325,11 @@ public class Tool {
         // Log.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
         // Log.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
         // password));
-        Log.info("base128encoded: " + base128Decode(text));
-        Log.info("base128decoded: " + base128Decode(base128Encode(text)));
-        Log.info(Locale.getDefault().toString());
-        Log.info(camelToSnake("LoginURL"));
+//        Log.info("base128encoded: " + base128Decode(text));
+//        Log.info("base128decoded: " + base128Decode(base128Encode(text)));
+//        Log.info(Locale.getDefault().toString());
+//        Log.info(camelToSnake("LoginURL"));
+        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
     }
 
     /**
@@ -1624,11 +1626,12 @@ public class Tool {
     public static final Map<String, String> formatCache = new ConcurrentHashMap<>();
 
     /**
-     * @param pattern pattern
+     * @param pattern Pattern
+     * @param locale Locale
      * @return DateTimeFormatter
      */
-    public static DateTimeFormatter getFormat(String pattern) {
-        return peek(DateTimeFormatter.ofPattern(pattern), format -> formatCache.computeIfAbsent(format.toString(), key -> pattern));
+    public static DateTimeFormatter getFormat(String pattern, Locale locale) {
+        return peek(DateTimeFormatter.ofPattern(pattern, locale), format -> formatCache.computeIfAbsent(format.toString(), key -> pattern));
     }
 
     /**
@@ -1834,6 +1837,22 @@ public class Tool {
             consumer.accept(resource);
         } catch (Exception e) {
             Log.warning(e, () -> "resource error");
+        }
+    }
+
+    /**
+     * @param <T> Resource type
+     * @param <U> Return type
+     * @param supplier Resource supplier
+     * @param function Resource function
+     * @return Value
+     */
+    public static <T extends AutoCloseable, U> U usingGet(TrySupplier<T> supplier, TryFunction<T, U> function) {
+        try (T resource = supplier.get()) {
+            return function.apply(resource);
+        } catch (Exception e) {
+            Log.warning(e, () -> "resource error");
+            return null;
         }
     }
 }

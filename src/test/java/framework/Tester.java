@@ -2,6 +2,8 @@ package framework;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -328,10 +330,12 @@ public class Tester {
             tester.test = notifier -> {
                 PrintStream backup = System.out;
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                try (PrintStream out = new PrintStream(buffer)) {
+                try (PrintStream out = new PrintStream(buffer, false, StandardCharsets.UTF_8.name())) {
                     System.setOut(out);
                     tester.get();
-                    Assert.assertEquals(String.join(System.lineSeparator(), expected), buffer.toString().trim());
+                    Assert.assertEquals(String.join(System.lineSeparator(), expected), buffer.toString(StandardCharsets.UTF_8.name()).trim());
+                } catch (UnsupportedEncodingException e) {
+                    throw new InternalError(e);
                 }
                 System.setOut(backup);
             };
@@ -346,10 +350,12 @@ public class Tester {
             tester.test = notifier -> {
                 PrintStream backup = System.err;
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                try (PrintStream out = new PrintStream(buffer)) {
+                try (PrintStream out = new PrintStream(buffer, false, StandardCharsets.UTF_8.name())) {
                     System.setErr(out);
                     tester.get();
-                    Assert.assertEquals(String.join(System.lineSeparator(), expected), buffer.toString().trim());
+                    Assert.assertEquals(String.join(System.lineSeparator(), expected), buffer.toString(StandardCharsets.UTF_8.name()).trim());
+                } catch (UnsupportedEncodingException e) {
+                    throw new InternalError(e);
                 }
                 System.setErr(backup);
             };
