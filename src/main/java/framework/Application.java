@@ -10,6 +10,7 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -83,7 +84,7 @@ public abstract class Application implements Attributes<Object> {
             cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject).forEach(c -> Formatter.elClassMap.put(c.getSimpleName(), c));
         }
         Log.startup();
-        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
+        Log.info(() -> "---- setting ----" + Letters.CRLF + "locale: " + Locale.getDefault() + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
 
         Log.info(Application.current().get()::toString);
 

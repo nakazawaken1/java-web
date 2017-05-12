@@ -380,7 +380,7 @@ public class Xml {
     @SafeVarargs
     public static Xml parse(String source, Function<Xml, Xml>... renders) {
         Map<String, Function<Xml, Xml>> s = renders.length <= 0 ? null
-                : Stream.of(renders).collect(LinkedHashMap::new, (m, r) -> m.put(String.valueOf(m.size()), r), (a, b) -> a.putAll(b));
+                : Stream.of(renders).collect(LinkedHashMap::new, (m, r) -> m.put(String.valueOf(m.size()), r), Map::putAll);
         return parseMap(source, s);
     }
 

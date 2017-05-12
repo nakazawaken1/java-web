@@ -63,6 +63,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -183,6 +184,17 @@ public class Tool {
             value = i.get();
         }
         return Tool.of(value);
+    }
+
+    /**
+     * get optional
+     * 
+     * @param <T> type
+     *
+     * @return optional
+     */
+    public static <T> Optional<T> of() {
+        return Optional.empty();
     }
 
     /**
@@ -467,6 +479,14 @@ public class Tool {
      * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
+        if (!Tool.string(location).isPresent()) {
+            Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString().endsWith("!/app"));
+            return Tool.toURLs("app").collect(collector).entrySet().stream()
+                    .flatMap(e -> e.getValue().stream()
+                            .flatMap(url -> (e.getKey()
+                                    ? getResourcesFromJar(location, Try.s(() -> ((JarURLConnection) url.openConnection()).getJarFile()).get())
+                                    : getResourcesFromFolder(new File(url.getFile())))));
+        }
         return Tool.toURLs(location).flatMap(Try.f(i -> {
             boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
             if ("jar".equals(i.getProtocol())) {
@@ -673,7 +693,7 @@ public class Tool {
      */
     public static Map<String, String> parseMap(String text, String separator, String pairSeparator) {
         return string(text).map(s -> Stream.of(s.split(separator)).collect(() -> (Map<String, String>) new LinkedHashMap<String, String>(),
-                (map, ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), (a, b) -> a.putAll(b))).orElseGet(Collections::emptyMap);
+                (map, ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), Map::putAll)).orElseGet(Collections::emptyMap);
     }
 
     /**
@@ -1312,7 +1332,7 @@ public class Tool {
         // try (Stream<Class<?>> list = getClasses("test")) {
         // list.forEach(c -> Log.info(c.getCanonicalName()));
         // }
-        //String text = "target text!";
+        // String text = "target text!";
         // String password = "abcd123";
         // Log.info("source: " + text);
         // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -1325,10 +1345,10 @@ public class Tool {
         // Log.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
         // Log.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
         // password));
-//        Log.info("base128encoded: " + base128Decode(text));
-//        Log.info("base128decoded: " + base128Decode(base128Encode(text)));
-//        Log.info(Locale.getDefault().toString());
-//        Log.info(camelToSnake("LoginURL"));
+        // Log.info("base128encoded: " + base128Decode(text));
+        // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
+        // Log.info(Locale.getDefault().toString());
+        // Log.info(camelToSnake("LoginURL"));
         System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
     }
 

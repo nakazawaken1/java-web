@@ -96,7 +96,7 @@ public abstract class Response {
             // _ -> space, AbcDef -> Abc-Def
             IntFunction<IntStream> m = c -> (Letters.ALPHABET_UPPERS.indexOf(c) >= 0 ? IntStream.of('-', c) : IntStream.of(c));
             Function<String, StringBuilder> mapper = i -> IntStream.concat(IntStream.of(i.charAt(0)), i.chars().skip(1).flatMap(m)).collect(StringBuilder::new,
-                    (s, c) -> s.append((char) c), (a, b) -> a.append(b));
+                    (s, c) -> s.append((char) c), StringBuilder::append);
             return code + " " + Stream.of(name().split("_")).map(mapper).collect(Collectors.joining(" "));
         }
 
@@ -429,7 +429,7 @@ public abstract class Response {
         public static Render of(String file, Function<Xml, Xml>... renders) {
             Render r = new Render();
             r.file = file;
-            r.renders = Stream.of(renders).collect(LinkedHashMap::new, (map, render) -> map.put(String.valueOf(map.size()), render), (a, b) -> a.putAll(b));
+            r.renders = Stream.of(renders).collect(LinkedHashMap::new, (map, render) -> map.put(String.valueOf(map.size()), render), Map::putAll);
             return r;
         }
 
@@ -525,6 +525,8 @@ public abstract class Response {
                                     .status(Status.Moved_Permamently);
                             out.get();
                         }
+                    } catch(NullPointerException e) {
+                        /*noop*/
                     }
                     return;
                 }

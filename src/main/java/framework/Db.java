@@ -229,7 +229,7 @@ public class Db implements AutoCloseable {
     public static final Function<ResultSet, Map<String, Object>> toMap = Try.f(rs -> {
         ResultSetMetaData meta = rs.getMetaData();
         return IntStream.rangeClosed(1, meta.getColumnCount()).collect(LinkedHashMap::new,
-                Try.intC((map, i) -> map.put(meta.getColumnName(i), rs.getObject(i))), LinkedHashMap::putAll);
+                Try.intC((map, i) -> map.put(meta.getColumnName(i), rs.getObject(i))), Map::putAll);
     });
 
     /**

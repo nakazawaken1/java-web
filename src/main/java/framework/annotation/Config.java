@@ -42,6 +42,7 @@ import framework.Message;
 import framework.Reflector;
 import framework.Tool;
 import framework.Tuple;
+import framework.Tuple.Tuple3;
 
 /**
  * config file mapping
@@ -71,7 +72,7 @@ public @interface Config {
 
             /* load config files form Config or classname.config */
             String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value)
-                    .orElse(new String[] { clazz.getSimpleName().toLowerCase(Locale.ENGLISH) + ".config" });
+                    .orElse(Tool.array(clazz.getSimpleName().toLowerCase(Locale.ENGLISH) + ".config"));
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
             }
@@ -113,13 +114,24 @@ public @interface Config {
 
             defaultMap.put(clazz, String.join(Letters.CRLF, dump(clazz, true)));
             Map<String, Properties> propertiesMap = Tool.map("", sourceProperties);
-            Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).forEach(trio -> {
-                try (Stream<String> list = Tool.getResources(trio.l)) {
-                    list.filter(i -> i.startsWith(trio.r.l) && i.endsWith(trio.r.r))
-                            .forEach(i -> propertiesMap.compute(i.substring(trio.r.l.length() + 1, i.length() - trio.r.r.length()),
-                                    (k, v) -> v == null ? getProperties(i) : Tool.peek(v, vv -> vv.putAll(getProperties(i)))));
-                }
-            });
+            Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).collect(Collectors.groupingBy(t -> t.l)).entrySet()
+                    .forEach(entry -> {
+                        String folder = entry.getKey();
+                        List<Tuple3<String, String, String>> trios = entry.getValue();
+                        System.err.println("search config:" + folder);
+                        Stream<String> list = Tool.getResources(folder);
+                        list.filter(
+                                i -> trios.stream()
+                                        .anyMatch(
+                                                trio -> i.startsWith(trio.r.l)
+                                                        && i.endsWith(trio.r.r)))
+                                .peek(i -> System.err.println("found: " + i)).forEach(
+                                        i -> propertiesMap.compute(
+                                                i.substring(folder.length() + 1,
+                                                        i.length() - trios.stream().filter(trio -> i.endsWith(trio.r.r)).findFirst()
+                                                                .map(trio -> trio.r.r.length()).orElse(0)),
+                                                (k, v) -> v == null ? getProperties(i) : Tool.peek(v, vv -> vv.putAll(getProperties(i)))));
+                    });
             sourceMap.put(clazz, propertiesMap);
 
             inject(clazz, getSource(clazz, Locale.getDefault()), "");
@@ -312,14 +324,14 @@ public @interface Config {
                                         .collect(Collectors.toList());
                             } else if (type == Set.class) {
                                 value = split(raw, f.getAnnotation(Separator.class)).map(i -> getValue(f, Reflector.getGenericParameter(f, 0), i))
-                                        .collect(LinkedHashSet::new, (set, v) -> set.add(v), (a, b) -> a.addAll(b));
+                                        .collect(LinkedHashSet::new, (set, v) -> set.add(v), Set::addAll);
                             } else if (type == Map.class) {
                                 value = split(raw, f.getAnnotation(Separator.class)).map(i -> {
                                     String[] pair = i.split(Tool.val(f.getAnnotation(Separator.class),
                                             s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
                                     return Tuple.of(getValue(f, Reflector.getGenericParameter(f, 0), pair[0]),
                                             getValue(f, Reflector.getGenericParameter(f, 1), pair[1]));
-                                }).collect(LinkedHashMap::new, (map, tuple) -> map.put(tuple.l, tuple.r), (a, b) -> a.putAll(b));
+                                }).collect(LinkedHashMap::new, (map, tuple) -> map.put(tuple.l, tuple.r), Map::putAll);
                             } else {
                                 value = getValue(f, type, raw);
                             }
@@ -350,7 +362,8 @@ public @interface Config {
             List<String> lines = new ArrayList<>();
             if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
                 if (Message.class.isAssignableFrom(clazz)) {
-                    Stream.of(clazz.getEnumConstants()).forEach(i -> lines.add('\b' + newPrefix + ((Enum<?>) i).name() + " = " + ((Message) i).defaultMessage()));
+                    Stream.of(clazz.getEnumConstants())
+                            .forEach(i -> lines.add('\b' + newPrefix + ((Enum<?>) i).name() + " = " + ((Message) i).defaultMessage()));
                 } else {
                     Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
                         try {

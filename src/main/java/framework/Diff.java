@@ -92,7 +92,7 @@ public class Diff<T> {
      * @return equalizer
      */
     public static <T> Equalizer<T> DEFAULT() {
-        return (a, b) -> a.equals(b);
+        return Object::equals;
     }
 
     /**

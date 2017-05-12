@@ -2,8 +2,6 @@ package app.config;
 
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,7 +41,7 @@ public class Sys {
 
         @Help("classes of suppress log")
         @Separator(',')
-        public static List<String> ignore_prefixes = Collections.unmodifiableList(Arrays.asList("com.sun."));
+        public static List<String> ignore_prefixes = Tool.list("com.sun.");
 
         @Help("shared lock if true else exclusive lock")
         public static boolean is_shared = true;
@@ -62,12 +60,12 @@ public class Sys {
         @Help("ISO-2022-JP or UTF-8 in Japan")
         public static String charset = StandardCharsets.UTF_8.name();
         public static String encoding = "base64";
-        public static Integer port = 587;
-        public static Boolean auth = true;
-        public static Boolean startTls = true;
-        public static Integer connectionTimeout = 10 * 1000;
-        public static Integer readTimeout = 10 * 1000;
-        public static Boolean debug = true;
+        public static int port = 587;
+        public static boolean auth = true;
+        public static boolean startTls = true;
+        public static int connectionTimeout = 10 * 1000;
+        public static int readTimeout = 10 * 1000;
+        public static boolean debug = true;
     }
 
     @Help("database connection string(inclucde id and password)")
@@ -124,30 +122,30 @@ public class Sys {
 
     @Help("accounts data(loginId:password:name:roles,...)")
     @Separator(value = ';')
-    public static List<String> accounts = Collections.unmodifiableList(Arrays.asList("admin:Adm1n:Administrator:Administrator"));
+    public static List<String> accounts = Tool.list("admin:Adm1n:Administrator:Administrator");
 
     @Help("file extension of text type contents")
     @Separator('|')
-    public static List<String> text_extensions = Collections.unmodifiableList(Arrays.asList(".txt", ".htm", ".html", ".js", ".json", ".css", ".csv", ".tsv",
-            ".xml", ".ini", ".yml", ".properties", ".php", ".java", ".jsp", ".xhtml"));
+    public static List<String> text_extensions = Tool.list(".txt", ".htm", ".html", ".js", ".json", ".css", ".csv", ".tsv", ".xml", ".ini", ".yml",
+            ".properties", ".php", ".java", ".jsp", ".xhtml");
 
     @Help("http port(disabled if empty)")
-    public static Optional<Integer> http_port = Optional.of(80);
+    public static Optional<Integer> http_port = Tool.of(80);
 
     @Help("https port(disabled if empty, standard value is 443)")
-    public static Optional<Integer> https_port = Optional.empty();
+    public static Optional<Integer> https_port = Tool.of();
 
     @Help("https private key(etc. host.key)")
-    public static Optional<String> https_key_file = Optional.empty();
+    public static Optional<String> https_key_file = Tool.of();
 
     @Help("https cert(etc. host.crt)")
-    public static List<String> https_cert_files = Collections.emptyList();
+    public static List<String> https_cert_files = Tool.list();
 
     @Help("context path")
     public static String context_path = "/";
 
     @Help("h2 web console port(disabled if empty)")
-    public static Optional<Integer> h2_port = Optional.empty();
+    public static Optional<Integer> h2_port = Tool.of();
 
     @Help("h2 web console access allowed remote client")
     public static boolean h2_allow_remote = false;
@@ -159,7 +157,7 @@ public class Sys {
     public static String cluster_suffix = "";
 
     @Help("job packages")
-    public static List<String> job_packages = Collections.unmodifiableList(Arrays.asList(Main.class.getPackage().getName()));
+    public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
 
     public enum Item implements Message {
         title,

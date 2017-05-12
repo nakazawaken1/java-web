@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * restrict viewer
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Only {
     /**

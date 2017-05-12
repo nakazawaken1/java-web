@@ -143,7 +143,7 @@ public class Standalone {
                 lines.add("webSSL=" + Sys.h2_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
                 Tool.val(Config.Injector.getSource(Sys.class, Locale.getDefault()), properties -> properties.stringPropertyNames().stream()
-                        .sorted((a, b) -> b.compareTo(a)).map(p -> Tuple.of(p, properties.getProperty(p)))
+                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
                         .filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
                         .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);

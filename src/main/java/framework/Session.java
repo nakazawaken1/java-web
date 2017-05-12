@@ -2,6 +2,7 @@ package framework;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Optional;
 
 import app.config.Sys;
@@ -11,6 +12,25 @@ import app.model.Account;
  * session scoped object
  */
 public abstract class Session implements Attributes<Serializable> {
+
+    /**
+     * Locale
+     */
+    protected Locale locale = Locale.getDefault();
+
+    /**
+     * @return Locale
+     */
+    public Locale getLocale() {
+        return locale;
+    }
+
+    /**
+     * @return Locale
+     */
+    public static Locale currentLocale() {
+        return current().map(Session::getLocale).orElse(Locale.getDefault());
+    }
 
     /**
      * current session
@@ -49,11 +69,10 @@ public abstract class Session implements Attributes<Serializable> {
      * @return true if success, else failure
      */
     public boolean login(String loginId, String password) {
-        Optional<Account> a = Try
-                .s(() -> Tool.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
-                    Log.warning(() -> Tool.print(e::printStackTrace));
-                    return Optional.<Account>empty();
-                }).get();
+        Optional<Account> a = Try.s(() -> Tool.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
+            Log.warning(() -> Tool.print(e::printStackTrace));
+            return Optional.<Account>empty();
+        }).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
             Log.info("logged in : " + loginId + Arrays.toString(i.roles));

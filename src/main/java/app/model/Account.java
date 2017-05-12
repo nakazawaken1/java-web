@@ -89,7 +89,8 @@ public class Account implements Serializable {
      * @param roles roles
      * @return true if has role
      */
-    public boolean hasAnyRole(@SuppressWarnings("unchecked") Class<? extends User>... roles) {
+    @SafeVarargs
+    public final boolean hasAnyRole(Class<? extends User>... roles) {
         if (this.roles != null) {
             for (Class<? extends User> i : this.roles) {
                 for (Class<? extends User> j : roles) {
