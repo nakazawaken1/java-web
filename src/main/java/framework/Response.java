@@ -334,7 +334,7 @@ public abstract class Response {
      * @return locale
      */
     public Locale locale() {
-        return locale.orElse(Locale.getDefault());
+        return locale.orElseGet(Session::currentLocale);
     }
 
     /**

@@ -54,17 +54,27 @@ public class Sys {
     }
 
     public static class Mail {
+        @Help("SMTP Auth user")
         public static String user = "";
+        @Help("SMTP Auth password")
         public static String password = "";
+        @Help("SMTP host")
         public static String host = "smtp.gmail.com";
         @Help("ISO-2022-JP or UTF-8 in Japan")
         public static String charset = StandardCharsets.UTF_8.name();
+        @Help("Mail encoding")
         public static String encoding = "base64";
+        @Help("SMTP port")
         public static int port = 587;
+        @Help("SMTP Auth enabled")
         public static boolean auth = true;
+        @Help("SMTP Auth with tls")
         public static boolean startTls = true;
+        @Help("Connection timeout")
         public static int connectionTimeout = 10 * 1000;
+        @Help("Read timeout")
         public static int readTimeout = 10 * 1000;
+        @Help("Debug output")
         public static boolean debug = true;
     }
 
@@ -122,7 +132,7 @@ public class Sys {
 
     @Help("accounts data(loginId:password:name:roles,...)")
     @Separator(value = ';')
-    public static List<String> accounts = Tool.list("admin:Adm1n:Administrator:Administrator");
+    public static List<String> accounts = Tool.list("admin:Adm1n:Administrator:Administrator", "user:U5er:User:User");
 
     @Help("file extension of text type contents")
     @Separator('|')
@@ -158,6 +168,8 @@ public class Sys {
 
     @Help("job packages")
     public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
+    
+    public static Optional<String> redirect_if_not_login = Tool.of("login.html");
 
     public enum Item implements Message {
         title,

@@ -3,6 +3,7 @@ package framework;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import app.config.Sys;
@@ -16,7 +17,7 @@ public abstract class Session implements Attributes<Serializable> {
     /**
      * Locale
      */
-    protected Locale locale = Locale.getDefault();
+    protected Locale locale = null;
 
     /**
      * @return Locale
@@ -29,7 +30,7 @@ public abstract class Session implements Attributes<Serializable> {
      * @return Locale
      */
     public static Locale currentLocale() {
-        return current().map(Session::getLocale).orElse(Locale.getDefault());
+        return current().map(Session::getLocale).filter(Objects::nonNull).orElse(Locale.getDefault());
     }
 
     /**

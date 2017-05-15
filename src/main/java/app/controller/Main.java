@@ -15,7 +15,7 @@ import framework.annotation.Route.Method;
 public class Main {
 
     /**
-     * top page
+     * welcome page
      * 
      * @param session session
      * @param request request
@@ -23,23 +23,10 @@ public class Main {
      */
     @Route(extensions = ".html")
     Object index(Session session, Request request) {
-        if (!session.isLoggedIn()) {
-            return Response.redirect("login.html");
+        if (Sys.redirect_if_not_login.isPresent() && !session.isLoggedIn()) {
+            return Response.redirect(Sys.redirect_if_not_login.get());
         }
         return Response.file(request.getPath());
-    }
-
-    /**
-     * @param session session
-     * @return response
-     */
-    @Route
-    Object info(Session session) {
-        if (session.isLoggedIn()) {
-            return Response.template("logged_in.html");
-        } else {
-            return "";
-        }
     }
 
     /**

@@ -10,7 +10,6 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -84,7 +83,8 @@ public abstract class Application implements Attributes<Object> {
             cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject).forEach(c -> Formatter.elClassMap.put(c.getSimpleName(), c));
         }
         Log.startup();
-        Log.info(() -> "---- setting ----" + Letters.CRLF + "locale: " + Locale.getDefault() + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
+        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
+        Log.info(() -> "---- message ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.messageDump()));
 
         Log.info(Application.current().get()::toString);
 
@@ -180,7 +180,7 @@ public abstract class Application implements Attributes<Object> {
                 if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
                     break;
                 }
-                Only only = method.getAnnotation(Only.class);
+                Only only = Tool.or(method.getAnnotation(Only.class), () -> method.getDeclaringClass().getAnnotation(Only.class)).orElse(null);
                 boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
                     forbidden = !session.getAccount().hasAnyRole(only.value());

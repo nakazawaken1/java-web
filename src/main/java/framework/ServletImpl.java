@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -35,6 +36,11 @@ import framework.annotation.Route;
 @WebServlet("/")
 public class ServletImpl implements javax.servlet.Servlet {
 
+    /**
+     * first access
+     */
+    AtomicBoolean first = new AtomicBoolean(true);
+
     /*
      * (non-Javadoc)
      * 
@@ -42,6 +48,7 @@ public class ServletImpl implements javax.servlet.Servlet {
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
+        System.setProperty("Sys.context_path", Tool.suffix(config.getServletContext().getContextPath(), "/"));
         new ApplicationImpl(config.getServletContext()).setup(ResponseImpl::new);
     }
 
@@ -80,7 +87,11 @@ public class ServletImpl implements javax.servlet.Servlet {
      * 
      * @see javax.servlet.Servlet#service(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
      */
+    @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
     public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException {
+        if (first.compareAndSet(true, false)) {
+            Sys.http_port = Tool.of(req.getServerPort());
+        }
         try (Defer<RequestImpl> request = new Defer<>(Tool.peek(new RequestImpl((HttpServletRequest) req, (HttpServletResponse) res), Request.CURRENT::set),
                 r -> Request.CURRENT.remove());
                 Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(((HttpServletRequest) req).getSession()), Session.CURRENT::set),
@@ -180,7 +191,9 @@ public class ServletImpl implements javax.servlet.Servlet {
             session.setMaxInactiveInterval(Sys.session_timeout_minutes * 60);
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see java.lang.Object#hashCode()
          */
         @Override
@@ -188,7 +201,9 @@ public class ServletImpl implements javax.servlet.Servlet {
             return session.getId().hashCode();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see java.lang.Object#equals(java.lang.Object)
          */
         @Override
@@ -197,7 +212,9 @@ public class ServletImpl implements javax.servlet.Servlet {
             return obj != null && hashCode() == obj.hashCode();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see java.lang.Object#toString()
          */
         @Override

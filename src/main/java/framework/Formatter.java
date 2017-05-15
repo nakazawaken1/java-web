@@ -681,6 +681,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                         el.defineFunction("F", "includeFor", getClass().getMethod("includeFor", String.class, Iterable.class));
                         el.defineFunction("F", "includeIf", getClass().getMethod("includeIf", String.class, boolean.class));
                         el.defineBean("JapaneseDate", new ELClass(JapaneseDate.class));
+                        el.defineBean("P", Sys.context_path);
                         el.defineBean("R", Request.current().orElse(null));
                         el.defineBean("S", Session.current().orElse(null));
                         el.defineBean("Sys", new ELClass(Sys.class));

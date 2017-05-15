@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +24,7 @@ import framework.Db;
 import framework.Lazy;
 import framework.Log;
 import framework.Reflector;
+import framework.Session;
 import framework.Tool;
 import framework.Tuple;
 
@@ -72,8 +72,9 @@ public @interface Job {
                         .forEach(pair -> {
                             Method method = pair.l;
                             Stream.of(pair.r.value().split("\\s*,\\s*")).filter(Tool.notEmpty)
-                                    .<String>map(j -> j.startsWith("job.") ? Config.Injector.getSource(Sys.class, Locale.getDefault()).getProperty(j, "") : j).filter(Tool.notEmpty)
-                                    .forEach(text -> {
+                                    .<String>map(
+                                            j -> j.startsWith("job.") ? Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty(j, "") : j)
+                                    .filter(Tool.notEmpty).forEach(text -> {
                                         if (scheduler.get() == null) {
                                             int n = Sys.job_threads;
                                             scheduler.set(Executors.newScheduledThreadPool(n));

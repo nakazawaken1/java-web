@@ -20,7 +20,7 @@ public interface Message {
      * @return message
      */
     default String message() {
-        return message(Locale.getDefault());
+        return message(Session.currentLocale());
     }
 
     /**

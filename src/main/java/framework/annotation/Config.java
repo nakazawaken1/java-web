@@ -40,9 +40,9 @@ import app.config.Sys;
 import framework.Log;
 import framework.Message;
 import framework.Reflector;
+import framework.Session;
 import framework.Tool;
 import framework.Tuple;
-import framework.Tuple.Tuple3;
 
 /**
  * config file mapping
@@ -117,24 +117,17 @@ public @interface Config {
             Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).collect(Collectors.groupingBy(t -> t.l)).entrySet()
                     .forEach(entry -> {
                         String folder = entry.getKey();
-                        List<Tuple3<String, String, String>> trios = entry.getValue();
-                        System.err.println("search config:" + folder);
-                        Stream<String> list = Tool.getResources(folder);
-                        list.filter(
-                                i -> trios.stream()
-                                        .anyMatch(
-                                                trio -> i.startsWith(trio.r.l)
-                                                        && i.endsWith(trio.r.r)))
-                                .peek(i -> System.err.println("found: " + i)).forEach(
-                                        i -> propertiesMap.compute(
-                                                i.substring(folder.length() + 1,
-                                                        i.length() - trios.stream().filter(trio -> i.endsWith(trio.r.r)).findFirst()
-                                                                .map(trio -> trio.r.r.length()).orElse(0)),
-                                                (k, v) -> v == null ? getProperties(i) : Tool.peek(v, vv -> vv.putAll(getProperties(i)))));
+                        List<Tuple<String, String>> nameExtension = entry.getValue().stream().map(t -> Tuple.of(t.r.l, t.r.r)).collect(Collectors.toList());
+                        try (Stream<String> list = Tool.getResources(folder)) {
+                            list.map(i -> Tuple.of(i, nameExtension.stream().filter(ne -> i.startsWith(ne.l) && i.endsWith(ne.r)).findFirst().orElse(null)))
+                                    .filter(t -> t.r != null)
+                                    .forEach(t -> propertiesMap.compute(t.l.substring(folder.length() + t.r.l.length() + 1, t.l.length() - t.r.r.length()),
+                                            (k, v) -> v == null ? getProperties(t.l) : Tool.peek(v, vv -> vv.putAll(getProperties(t.l)))));
+                        }
                     });
             sourceMap.put(clazz, propertiesMap);
 
-            inject(clazz, getSource(clazz, Locale.getDefault()), "");
+            inject(clazz, getSource(clazz, Session.currentLocale()), "");
         }
 
         /**
@@ -228,6 +221,15 @@ public @interface Config {
                         .map(Map.Entry::getValue).forEach(p::putAll);
                 return p;
             });
+        }
+
+        /**
+         * @return message dump
+         */
+        public static String[] messageDump() {
+            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag).collect(Collectors.toSet());
+            Set<Class<?>> classes = sourceMap.keySet();
+            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"), classes.stream().flatMap(clazz -> dump(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
         }
 
         /**
@@ -360,25 +362,20 @@ public @interface Config {
         static List<String> dump(Class<?> clazz, String prefix, boolean sort) {
             String newPrefix = prefix + clazz.getSimpleName().replace('$', '.') + '.';
             List<String> lines = new ArrayList<>();
-            if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
-                if (Message.class.isAssignableFrom(clazz)) {
-                    Stream.of(clazz.getEnumConstants())
-                            .forEach(i -> lines.add('\b' + newPrefix + ((Enum<?>) i).name() + " = " + ((Message) i).defaultMessage()));
-                } else {
-                    Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
-                        try {
-                            String key = newPrefix + f.getName();
-                            Object value = f.get(null);
-                            List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
-                            if (comments != null) {
-                                Collections.reverse(comments);
-                            }
-                            lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
-                        } catch (IllegalArgumentException | IllegalAccessException e) {
-                            throw new InternalError(e);
+            if (!Enum.class.isAssignableFrom(clazz)) {
+                Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
+                    try {
+                        String key = newPrefix + f.getName();
+                        Object value = f.get(null);
+                        List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
+                        if (comments != null) {
+                            Collections.reverse(comments);
                         }
-                    });
-                }
+                        lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
+                    } catch (IllegalArgumentException | IllegalAccessException e) {
+                        throw new InternalError(e);
+                    }
+                });
             }
             Stream.of(clazz.getClasses()).forEach(c -> lines.addAll(dump(c, newPrefix, false)));
             if (sort) {

@@ -213,11 +213,6 @@ public class Db implements AutoCloseable {
     private String schema;
 
     /**
-     * locale
-     */
-    private Locale locale = Locale.getDefault();
-
-    /**
      * ResultSet to array
      */
     public static final Function<ResultSet, Object[]> toArray = Try
@@ -250,7 +245,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Locale.getDefault()).getProperty("Sys.db" + suffix));
+            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty("Sys.db" + suffix));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -394,7 +389,7 @@ public class Db implements AutoCloseable {
      */
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
-            Properties p = Config.Injector.getSource(Sys.class, Locale.getDefault());
+            Properties p = Config.Injector.getSource(Sys.class, Session.currentLocale());
             String url = p.getProperty("Sys.db" + key);
             Type type = Type.fromUrl(url);
             String name = Tool.string(p.getProperty("Sys.Db.datasource_class" + key)).orElse(type.dataSource);
@@ -501,7 +496,7 @@ public class Db implements AutoCloseable {
      * @return raw sql
      */
     public String sql(String sql, Map<String, Object> map, Object... values) {
-        return Formatter.format(sql, Formatter::excludeForSql, builder::escape, locale, map, values);
+        return Formatter.format(sql, Formatter::excludeForSql, builder::escape, Session.currentLocale(), map, values);
     }
 
     /**

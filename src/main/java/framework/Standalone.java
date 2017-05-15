@@ -42,7 +42,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -142,7 +141,7 @@ public class Standalone {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Tool.val(Config.Injector.getSource(Sys.class, Locale.getDefault()), properties -> properties.stringPropertyNames().stream()
+                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
                         .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
                         .filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
                         .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))

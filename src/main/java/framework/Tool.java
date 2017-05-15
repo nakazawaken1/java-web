@@ -485,7 +485,7 @@ public class Tool {
                     .flatMap(e -> e.getValue().stream()
                             .flatMap(url -> (e.getKey()
                                     ? getResourcesFromJar(location, Try.s(() -> ((JarURLConnection) url.openConnection()).getJarFile()).get())
-                                    : getResourcesFromFolder(new File(url.getFile())))));
+                                    : getResourcesFromFolder(new File(url.getFile()).getParentFile()))));
         }
         return Tool.toURLs(location).flatMap(Try.f(i -> {
             boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
@@ -507,7 +507,7 @@ public class Tool {
      * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
-        return jar.stream().onClose(Try.r(jar::close)).map(JarEntry::getName).filter(i -> i.startsWith(location))
+        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(location))
                 .map(i -> trim("/", i.substring(location.length()), null));
     }
 
@@ -1347,7 +1347,7 @@ public class Tool {
         // password));
         // Log.info("base128encoded: " + base128Decode(text));
         // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
-        // Log.info(Locale.getDefault().toString());
+        // Log.info(Session.currentLocale().toString());
         // Log.info(camelToSnake("LoginURL"));
         System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
     }
