@@ -480,7 +480,7 @@ public class Tool {
      */
     public static Stream<String> getResources(String location) {
         if (!Tool.string(location).isPresent()) {
-            Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString().endsWith("!/app"));
+            Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString().contains(".jar!"));
             return Tool.toURLs("app").collect(collector).entrySet().stream()
                     .flatMap(e -> e.getValue().stream()
                             .flatMap(url -> (e.getKey()
@@ -507,8 +507,7 @@ public class Tool {
      * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
-        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(location))
-                .map(i -> trim("/", i.substring(location.length()), null));
+        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(location)).map(i -> trim("/", i.substring(location.length()), null));
     }
 
     /**

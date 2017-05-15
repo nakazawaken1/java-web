@@ -143,7 +143,7 @@ public class Standalone {
                 AtomicInteger index = new AtomicInteger(-1);
                 Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
                         .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
-                        .filter(t -> t.l.startsWith("db") && t.r.startsWith("jdbc:"))
+                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
                         .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);

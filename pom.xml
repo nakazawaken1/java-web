@@ -38,8 +38,6 @@
               <mainClass>framework.Standalone</mainClass>
             </manifest>
           </archive>
-          <finalName>${project.build.finalName}-standalone</finalName>
-          <appendAssemblyId>false</appendAssemblyId>
         </configuration>
         <executions>
           <execution>

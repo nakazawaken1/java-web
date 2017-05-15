@@ -120,9 +120,10 @@ public @interface Config {
                         List<Tuple<String, String>> nameExtension = entry.getValue().stream().map(t -> Tuple.of(t.r.l, t.r.r)).collect(Collectors.toList());
                         try (Stream<String> list = Tool.getResources(folder)) {
                             list.map(i -> Tuple.of(i, nameExtension.stream().filter(ne -> i.startsWith(ne.l) && i.endsWith(ne.r)).findFirst().orElse(null)))
-                                    .filter(t -> t.r != null)
-                                    .forEach(t -> propertiesMap.compute(t.l.substring(folder.length() + t.r.l.length() + 1, t.l.length() - t.r.r.length()),
-                                            (k, v) -> v == null ? getProperties(t.l) : Tool.peek(v, vv -> vv.putAll(getProperties(t.l)))));
+                                    .filter(t -> t.r != null).map(t -> Tuple.of(t.l, folder.length() + t.r.l.length() + 1, t.l.length() - t.r.r.length()))
+                                    .filter(t -> t.r.l < t.r.r)
+                                    .forEach(t -> propertiesMap.compute(t.l.substring(t.r.l, t.r.r), (k, v) -> v == null ? getProperties(t.l)
+                                            : Tool.peek(v, vv -> vv.putAll(getProperties(t.l)))));
                         }
                     });
             sourceMap.put(clazz, propertiesMap);
@@ -227,9 +228,11 @@ public @interface Config {
          * @return message dump
          */
         public static String[] messageDump() {
-            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag).collect(Collectors.toSet());
+            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag)
+                    .collect(Collectors.toSet());
             Set<Class<?>> classes = sourceMap.keySet();
-            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"), classes.stream().flatMap(clazz -> dump(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
+            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"),
+                    classes.stream().flatMap(clazz -> dump(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
         }
 
         /**
