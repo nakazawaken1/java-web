@@ -90,6 +90,7 @@ import javax.mail.internet.MimeMessage;
 import javax.xml.bind.DatatypeConverter;
 
 import app.config.Sys;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
@@ -320,6 +321,11 @@ public class Tool {
          * @param clazz Class
          */
         void end(Class<?> clazz);
+
+        /**
+         * @return If true, the Optional.empty field is not output
+         */
+        boolean isCompact();
     }
 
     /**
@@ -328,6 +334,7 @@ public class Tool {
      * @param hashes Inner use only
      * @return Value
      */
+    @SuppressWarnings("unchecked")
     @SafeVarargs
     public static String traverse(Object o, Traverser traverser, Set<Object>... hashes) {
         final boolean first = hashes.length <= 0;
@@ -386,14 +393,13 @@ public class Tool {
                     field.setAccessible(true);
                     Object value = field.get(o);
                     boolean isOptional = value instanceof Optional;
-                    if (isOptional && value == Optional.empty()) {
+                    if (isOptional && value == Optional.empty() && traverser.isCompact()) {
                         return;
                     }
                     traverser.key(field.getName());
                     if (value != null) {
                         Stringer stringer = field.getAnnotation(Stringer.class);
                         if (stringer != null) {
-                            @SuppressWarnings("unchecked")
                             Stringer.FromTo<Object> ft = (FromTo<Object>) Reflector.instance(stringer.value());
                             ft.toString(value, traverser);
                         } else if (!isOptional
@@ -402,7 +408,7 @@ public class Tool {
                             return;
                         } else {
                             if (isOptional) {
-                                value = ((Optional<?>) value).get();
+                                value = ((Optional<Object>) value).orElse("");
                             }
                             traverse(value, traverser, cache);
                             cache.add(value);
@@ -480,6 +486,10 @@ public class Tool {
          * Object end character
          */
         char endObject = '}';
+        /**
+         * If true, the Optional.empty field is not output
+         */
+        boolean isCompact = true;
 
         /**
          * Buffer
@@ -647,6 +657,16 @@ public class Tool {
             }
             return buffer.toString();
         }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#isCompact()
+         */
+        @Override
+        public boolean isCompact() {
+            return isCompact;
+        }
     }
 
     /**
@@ -706,6 +726,10 @@ public class Tool {
          * Class to tag name
          */
         Function<Class<?>, String> classToTag = Class::getSimpleName;
+        /**
+         * If true, the Optional.empty field is not output
+         */
+        boolean isCompact = true;
 
         /**
          * Buffer
@@ -826,6 +850,259 @@ public class Tool {
                 return null;
             }
             return buffer.toString();
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#isCompact()
+         */
+        @Override
+        public boolean isCompact() {
+            return isCompact;
+        }
+    }
+
+    /**
+     * @param o object
+     * @return text
+     */
+    public static String csv(Object o) {
+        return traverse(o, new CsvTraverser(null, null));
+    }
+
+    /**
+     * @param o Object
+     * @param out Output
+     * @param charset Charset
+     */
+    public static void csv(Object o, OutputStream out, Charset charset) {
+        traverse(o, new CsvTraverser(out, charset));
+    }
+
+    /**
+     * @param o object
+     * @return text
+     */
+    public static String tsv(Object o) {
+        return traverse(o, Tool.peek(new CsvTraverser(null, null), t -> {
+            t.separator = '\t';
+            t.clouser = '\0';/* none */
+            t.innerSeparator = ",";
+        }));
+    }
+
+    /**
+     * @param o Object
+     * @param out Output
+     * @param charset Charset
+     */
+    public static void tsv(Object o, OutputStream out, Charset charset) {
+        traverse(o, Tool.peek(new CsvTraverser(out, charset), t -> {
+            t.separator = '\t';
+            t.clouser = '\0';/* none */
+            t.innerSeparator = ",";
+        }));
+    }
+
+    /**
+     * Tsv traverser
+     */
+    static class CsvTraverser implements Traverser {
+        /**
+         * Newline
+         */
+        String newline = Xml.newline;
+        /**
+         * Separator
+         */
+        char separator = ',';
+        /**
+         * Array start character
+         */
+        char clouser = '"';
+        /**
+         * Buffer size
+         */
+        int bufferSize = 1024 * 1024;
+        /**
+         * Header output if true
+         */
+        boolean hasHeader = true;
+        /**
+         * Nested value seprator
+         */
+        String innerSeparator = ";";
+
+        /**
+         * Buffer
+         */
+        private StringBuilder buffer = new StringBuilder();
+        /**
+         * First line values
+         */
+        private List<String> values = new ArrayList<>();
+        /**
+         * Nested values
+         */
+        private List<String> nested = new ArrayList<>();
+        /**
+         * true if first column
+         */
+        private boolean firstColumn;
+        /**
+         * Nesting level
+         */
+        private int level = 0;
+
+        /**
+         * Output(return string if null)
+         */
+        private OutputStream out;
+        /**
+         * Charset(required if output is not null)
+         */
+        private Charset charset;
+
+        /**
+         * @param out Output(return string if null)
+         * @param charset Charset(required if output is not null)
+         */
+        CsvTraverser(OutputStream out, Charset charset) {
+            this.out = out;
+            this.charset = charset;
+        }
+
+        /**
+         * Flush buffer
+         */
+        void flush() {
+            try {
+                out.write(buffer.toString().getBytes(charset));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#start(java.lang.Class)
+         */
+        @Override
+        public void start(Class<?> clazz) {
+            level++;
+            if (level == 2) {
+                firstColumn = true;
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#key(java.lang.String)
+         */
+        @Override
+        public void key(String key) {
+            if (level != 2 || values == null || !hasHeader) {
+                return;
+            }
+            if (!firstColumn) {
+                buffer.append(separator);
+            }
+            if (clouser != '\0') {
+                buffer.append(clouser).append(key).append(clouser);
+            } else {
+                buffer.append(key);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#value(java.lang.String, java.lang.Class, boolean)
+         */
+        @Override
+        public void value(String value, Class<?> clazz, boolean isString) {
+            if (level != 2) {
+                nested.add(value);
+                return;
+            }
+            if (values != null) {
+                firstColumn = false;
+                values.add(value);
+            } else {
+                if (firstColumn) {
+                    firstColumn = false;
+                } else {
+                    buffer.append(separator);
+                }
+                if (clouser != '\0') {
+                    buffer.append(clouser).append(value).append(clouser);
+                } else {
+                    buffer.append(value);
+                }
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#end(java.lang.Class)
+         */
+        @Override
+        public void end(Class<?> clazz) {
+            if (level == 2) {
+                buffer.append(newline);
+                if (values != null) {
+                    String c = String.valueOf(clouser);
+                    Collector<CharSequence, ?, String> collector = clouser != '\0' ? Collectors.joining(c + separator + c, c, c)
+                            : Collectors.joining(String.valueOf(separator));
+                    buffer.append(values.stream().collect(collector)).append(newline);
+                    values = null;
+                }
+                if (out != null && buffer.length() > bufferSize) {
+                    flush();
+                    buffer.setLength(0);
+                }
+            } else if (level > 2) {
+                String line = nested.stream().collect(Collectors.joining(innerSeparator));
+                if (values != null) {
+                    values.add(line);
+                } else {
+                    if (!firstColumn) {
+                        buffer.append(separator);
+                    }
+                    buffer.append(line);
+                }
+                nested.clear();
+                firstColumn = false;
+            }
+            level--;
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.util.function.Supplier#get()
+         */
+        @Override
+        public String get() {
+            if (out != null) {
+                flush();
+                return null;
+            }
+            return buffer.toString();
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#isCompact()
+         */
+        @Override
+        public boolean isCompact() {
+            return false;
         }
     }
 
@@ -2083,6 +2360,12 @@ public class Tool {
      * DateTimeFormatter toString cache
      */
     public static final Map<String, String> formatCache = new ConcurrentHashMap<>();
+
+    /**
+     * UTF-8 byte order mark
+     */
+    @SuppressFBWarnings("MS_PKGPROTECT")
+    public static final byte[] BOM = { (byte) 0xef, (byte) 0xbb, (byte) 0xbf };
 
     /**
      * @param pattern Pattern

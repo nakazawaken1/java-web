@@ -452,7 +452,9 @@ public class ServletImpl implements javax.servlet.Servlet {
         @Override
         public String toString() {
             return Request.current().map(i -> (RequestImpl) i)
-                    .map(i -> "-> " + i.request.getProtocol() + " " + i.response.getStatus() + " " + Tool.string(i.response.getContentType()).orElse(""))
+                    .map(i -> "-> " + i.request.getProtocol() + " "
+                            + Status.of(i.response.getStatus()).map(Object::toString).orElseGet(() -> String.valueOf(i.response.getStatus()))
+                            + Tool.string(i.response.getContentType()).map(type -> " (" + type + ")").orElse(""))
                     .orElse("");
         }
     }

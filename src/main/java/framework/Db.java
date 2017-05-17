@@ -2137,7 +2137,7 @@ public class Db implements AutoCloseable {
             if (Modifier.isTransient(field.getModifiers())) {
                 return;
             }
-            if (Join.FIELD.apply(field).flatMap(join -> Tool.string(join.table())).isPresent()) {
+            if (Tool.of(field.getAnnotation(Join.class)).flatMap(join -> Tool.string(join.table())).isPresent()) {
                 return;
             }
             Column c = new Column(name);
@@ -2146,9 +2146,9 @@ public class Db implements AutoCloseable {
                 c.type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
                 c.nullable();
             }
-            Help.FIELD.apply(field).ifPresent(help -> c.display(String.join(" ", help.value())));
-            Size.FIELD.apply(field).ifPresent(size -> c.length(size.value()));
-            Id.FIELD.apply(field).map(id -> primary).orElse(columns).add(c);
+            Tool.of(field.getAnnotation(Help.class)).ifPresent(help -> c.display(String.join(" ", help.value())));
+            Tool.of(field.getAnnotation(Size.class)).ifPresent(size -> c.length(size.value()));
+            Tool.of(field.getAnnotation(Id.class)).map(id -> primary).orElse(columns).add(c);
         });
         return createSql(Reflector.mappingClassName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream()).toArray(Column[]::new));
     }

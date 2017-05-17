@@ -158,7 +158,7 @@ public class Reflector {
      * @return name
      */
     public static String mappingFieldName(Field field) {
-        return Mapping.FIELD.apply(field).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
+        return Tool.of(field.getAnnotation(Mapping.class)).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
     }
 
     /**
@@ -186,13 +186,14 @@ public class Reflector {
      * @return method
      */
     public static Optional<Method> method(Class<?> clazz, String name, Class<?>... args) {
-        return Tool.of(methods.computeIfAbsent(Tuple.of(clazz, Objects.hash(name, Arrays.hashCode(args))), Try.f(pair -> pair.l.getMethod(name, args), (e, pair) -> {
-            Method result = Try.s(() -> pair.l.getDeclaredMethod(name, args), ee -> null).get();
-            if (result != null) {
-                result.setAccessible(true);
-            }
-            return result;
-        })));
+        return Tool.of(
+                methods.computeIfAbsent(Tuple.of(clazz, Objects.hash(name, Arrays.hashCode(args))), Try.f(pair -> pair.l.getMethod(name, args), (e, pair) -> {
+                    Method result = Try.s(() -> pair.l.getDeclaredMethod(name, args), ee -> null).get();
+                    if (result != null) {
+                        result.setAccessible(true);
+                    }
+                    return result;
+                })));
     }
 
     /**

@@ -4,11 +4,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.reflect.Field;
-import java.util.Optional;
-import java.util.function.Function;
-
-import framework.Reflector;
 
 /**
  * length limitation
@@ -32,12 +27,7 @@ public @interface Size {
     int value();
 
     /**
-     * @return length is character count if empty, else byte count
+     * @return If empty, check character count else byte count
      */
     String charset() default "";
-
-    /**
-     * field annotation getter
-     */
-    Function<Field, Optional<Size>> FIELD = Reflector.annotation(Size.class);
 }

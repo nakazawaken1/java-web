@@ -17,6 +17,7 @@ import framework.Response;
 import framework.Response.Render;
 import framework.Response.Status;
 import framework.Session;
+import framework.Tool;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Accept;
@@ -25,9 +26,9 @@ import framework.annotation.Content;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
-import framework.annotation.Valid.Read;
 import framework.annotation.Route;
 import framework.annotation.Valid;
+import framework.annotation.Valid.Read;
 
 /**
  * main controller
@@ -83,7 +84,6 @@ public class Admin {
     Object db() {
         return Sys.h2_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
     }
-
 
     /**
      * default config file
@@ -160,7 +160,7 @@ public class Admin {
      */
     @Route
     @Accept(Accept.FORM)
-    @Content({Content.JSON, Content.HTML, Content.TEXT, Content.XML})
+    @Content({ Content.JSON, Content.HTML, Content.TEXT, Content.XML, Content.CSV, Content.TSV })
     Object accounts(Db db, @Valid(Read.class) Optional<Account> account) {
         return db.find(Account.class);
     }
@@ -169,10 +169,8 @@ public class Admin {
      * @param db db
      * @return response
      */
-    @Route
-    @Accept(Accept.FORM)
-    @Content({Content.JSON, Content.HTML, Content.TEXT, Content.XML})
+    @Route(extensions = {})
     Object persons(Db db) {
-        return db.find(Person.class);
+        return db.find(Person.class).map(p -> Tool.map("id", p.id, "name", p.name, "age", p.getAge().map(Object::toString).orElse("不明")));
     }
 }

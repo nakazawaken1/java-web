@@ -377,12 +377,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      */
     public static String include(String path) {
         return Tool.toURL(path).map(url -> {
-            Formatter formatter = current.get().copy();
-            boolean backup = formatter.isCache;
-            formatter.isCache = false;
-            String result = formatter.format(Tool.usingGet(url::openStream, Tool::loadText));
-            formatter.isCache = backup;
-            return result;
+            return current.get().copy().format(Tool.usingGet(url::openStream, Tool::loadText));
         }).orElse("((not found: " + path + "))");
     }
 

@@ -64,7 +64,7 @@ public abstract class Response {
         Not_Acceptable(406),
         Proxy_Authentication_Required(407),
         Request_Timeout(408),
-        conflict(409),
+        Conflict(409),
         Gone(410),
         Length_Required(411),
         Precondition_Failed(412),
@@ -97,13 +97,28 @@ public abstract class Response {
             IntFunction<IntStream> m = c -> (Letters.ALPHABET_UPPERS.indexOf(c) >= 0 ? IntStream.of('-', c) : IntStream.of(c));
             Function<String, StringBuilder> mapper = i -> IntStream.concat(IntStream.of(i.charAt(0)), i.chars().skip(1).flatMap(m)).collect(StringBuilder::new,
                     (s, c) -> s.append((char) c), StringBuilder::append);
-            return code + " " + Stream.of(name().split("_")).map(mapper).collect(Collectors.joining(" "));
+            String name = name();
+            int max = name.length();
+            int skip = 0;
+            while(skip < max && Character.isUpperCase(name.charAt(skip))) {
+                skip++;
+            }
+            skip--;
+            return code + " " + name.substring(0, skip) + Stream.of(name.substring(skip).split("_")).map(mapper).collect(Collectors.joining(" "));
+        }
+
+        /**
+         * @param code Status code
+         * @return Status
+         */
+        public static Optional<Status> of(int code) {
+            return Stream.of(values()).filter(i -> i.code == code).findAny();
         }
 
         /**
          * @param code Status code
          */
-        Status(int code) {
+        private Status(int code) {
             this.code = code;
         }
     }
@@ -543,8 +558,9 @@ public abstract class Response {
             Tuple.of(Template.class, (response, out, cancel) -> {
                 Template template = (Template) response.content;
                 response.contentType(Tool.getContentType(template.name), response.charset());
+                URL url = (template.name.startsWith("/") ? Tool.toURL(template.name) : Tool.toURL(Sys.template_folder, template.name)).get();
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
-                        Stream<String> lines = Tool.lines(Tool.toURL(Sys.template_folder, template.name).get().openStream());
+                        Stream<String> lines = Tool.lines(url.openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
                     lines.map(formatter::format).forEach(line -> {
                         Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
@@ -555,7 +571,8 @@ public abstract class Response {
             Tuple.of(Render.class, (response, out, cancel) -> {
                 Render render = (Render) response.content;
                 response.contentType(Tool.getContentType(render.file), response.charset());
-                try (InputStream in = Tool.toURL(Sys.template_folder, render.file).get().openStream();
+                URL url = (render.file.startsWith("/") ? Tool.toURL(render.file) : Tool.toURL(Sys.template_folder, render.file)).get();
+                try (InputStream in = url.openStream();
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
                     out.get().write(Xml.parseMap(formatter.format(Tool.loadText(in)), render.renders).toString().getBytes(response.charset()));
                 }
@@ -563,7 +580,7 @@ public abstract class Response {
             Tuple.of(Object.class, (response, out, cancel) -> {
                 Runnable other = Try.r(() -> {
                     response.contentType(Content.TEXT, response.charset());
-                    Tool.json(response.content, out.get(), response.charset());
+                    Tool.csv(response.content, out.get(), response.charset());
                 });
                 Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
                     switch (Tool.splitAt(contentType, "\\s*;", 0)) {
@@ -574,10 +591,25 @@ public abstract class Response {
                     case Content.XML:
                         Tool.xml(response.content, out.get(), response.charset());
                         break;
+                    case Content.CSV:
+                        OutputStream o = out.get();
+                        o.write(Tool.BOM);
+                        Tool.csv(response.content, o, response.charset());
+                        break;
+                    case Content.TSV:
+                        Tool.tsv(response.content, out.get(), response.charset());
+                        break;
                     default:
                         other.run();
                         break;
                     }
                 }), other);
             }));
+    
+    /**
+     * @param args Not use
+     */
+    public static void main(String[] args) {
+        Stream.of(Status.values()).forEach(System.out::println);
+    }
 }

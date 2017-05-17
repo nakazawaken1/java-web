@@ -421,7 +421,9 @@ public class Standalone {
             return result.toString();
         }
 
-        /* (non-Javadoc)
+        /*
+         * (non-Javadoc)
+         * 
          * @see java.lang.Object#equals(java.lang.Object)
          */
         @Override
@@ -432,6 +434,7 @@ public class Standalone {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.lang.Object#hashCode()
          */
         @Override
@@ -958,8 +961,10 @@ public class Standalone {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> ((RequestImpl) i).exchange).map(
-                    r -> "-> " + r.getProtocol() + " " + r.getResponseCode() + " " + Tool.string(r.getResponseHeaders().getFirst("Content-Type")).orElse(""))
+            return Request.current().map(i -> ((RequestImpl) i).exchange)
+                    .map(request -> "-> " + request.getProtocol() + " "
+                            + Status.of(request.getResponseCode()).map(Object::toString).orElseGet(() -> String.valueOf(request.getResponseCode()))
+                            + Tool.string(request.getResponseHeaders().getFirst("Content-Type")).map(type -> " (" + type + ")").orElse(""))
                     .orElse("");
         }
     }

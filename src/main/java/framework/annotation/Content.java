@@ -63,6 +63,11 @@ public @interface Content {
     String CSV = "text/csv";
 
     /**
+     * text/tab-separated-values
+     */
+    String TSV = "text/tab-separated-values";
+
+    /**
      * application/pdf
      */
     String PDF = "application/pdf";

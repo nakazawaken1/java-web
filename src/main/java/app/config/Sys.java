@@ -102,7 +102,7 @@ public class Sys {
     public static String upload_folder = "/temp/";
 
     @Help("sql folder")
-    public static String sql_folder = "sql/";
+    public static String sql_folder = "/sql/";
 
     @Help({ "add http response headers", "X-UA-Compatible: IE=edge #IE version", "X-Content-Type-Options: nosniff #IE auto detect disabled",
             "X-Download-Options: noopen #IE direct open disabled",
@@ -113,10 +113,10 @@ public class Sys {
             "no-cache", "Expires", "-1");
 
     @Help("htdocs folder")
-    public static String document_root_folder = "view/";
+    public static String document_root_folder = "/view/";
 
     @Help("template folder")
-    public static String template_folder = "template/";
+    public static String template_folder = "/template/";
 
     @Help("include file pattern to apply format")
     public static Pattern format_include_regex = Pattern.compile(".*\\.(html?|js|css)");
@@ -140,6 +140,7 @@ public class Sys {
             ".properties", ".php", ".java", ".jsp", ".xhtml");
 
     @Help("http port(disabled if empty)")
+    @SuppressFBWarnings("MS_CANNOT_BE_FINAL")
     public static Optional<Integer> http_port = Tool.of(80);
 
     @Help("https port(disabled if empty, standard value is 443)")

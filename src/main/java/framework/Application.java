@@ -106,7 +106,12 @@ public abstract class Application implements Attributes<Object> {
                                     .orElse("");
                             String right = Tool.string(trio.r.r.path()).orElse(m.getName());
                             m.setAccessible(true);
-                            map.put(left + right, Tuple.of(c, m));
+                            map.compute(left + right, (k, v) -> {
+                                if(v != null) {
+                                    Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
+                                }
+                                return Tuple.of(c, m);
+                            });
                         }, Map::putAll);
             }
             Log.info(() -> Tool.print(writer -> {

@@ -127,7 +127,7 @@ b {
     <th class="index">{Sys.Item.index}</th>
     <th>${empty after ? Sys.Item.after : after}</th>
   </tr>
-  <!--{F:includeFor('parts/diff.html', diffs)}-->
+  <!--{F:includeFor('template/diff_tr.html', diffs)}-->
   <tr>
     <th>raw</th>
     <td><textarea rows="10">${S.before}</textarea></td>
