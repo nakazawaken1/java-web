@@ -169,7 +169,20 @@ public class Sys {
     @Help("job packages")
     public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
     
+    @Help("redirect url if not loggged in(not recirect if empty)")
     public static Optional<String> redirect_if_not_login = Tool.of("login.html");
+
+    @Help("separator of array to text")
+    public static String array_separator = "\n,\n";
+
+    @Help("prefix of array to text")
+    public static String array_prefix = "[\n";
+
+    @Help("suffix of array to text")
+    public static String array_suffix = "\n]";
+
+    @Help("Initial vector for Tool.enctypt and decrypt")
+    public static String IV = "CYKJRWWIYWJHSLEU";
 
     public enum Item implements Message {
         title,

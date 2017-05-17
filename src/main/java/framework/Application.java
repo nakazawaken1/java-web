@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -172,8 +173,15 @@ public abstract class Application implements Attributes<Object> {
             extension = "";
         }
         final Tuple<Class<?>, Method> pair = routing.get(action);
-        if (pair != null && Tool.val(pair.r.getAnnotation(Route.class).extensions(),
-                extensions -> extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension)))) {
+        final String mimeText = mime.orElse("");
+        Predicate<Method> test = method -> {
+            String[] extensions = method.getAnnotation(Route.class).extensions();
+            boolean result = extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension));
+            Optional<String[]> values = Tool.of(method.getAnnotation(Content.class)).map(Content::value);
+            result = result || values.map(i -> Tool.list(i).contains(mimeText)).orElse(false);
+            return result;
+        };
+        if (pair != null && test.test(pair.r)) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);

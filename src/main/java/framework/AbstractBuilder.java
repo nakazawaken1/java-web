@@ -1,5 +1,6 @@
 package framework;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
@@ -104,7 +105,8 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
             }
         }
         try {
-            return (VALUE) Reflector.constructor(clazz, Stream.of(fields).map(Field::getType).toArray(Class[]::new)).orElseThrow(IllegalArgumentException::new)
+            Optional<Constructor<VALUE>> constructor = Reflector.constructor(clazz, Stream.of(fields).map(Field::getType).toArray(Class[]::new));
+            return (VALUE) constructor.orElseThrow(IllegalArgumentException::new)
                     .newInstance(values);
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
             throw new InternalError(e);

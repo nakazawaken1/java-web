@@ -13,11 +13,17 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
@@ -33,23 +39,21 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
@@ -65,9 +69,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -87,24 +89,13 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import javax.xml.bind.DatatypeConverter;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-
 import app.config.Sys;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
+import framework.annotation.Stringer;
+import framework.annotation.Stringer.FromTo;
 
 /**
  * utility
@@ -275,40 +266,567 @@ public class Tool {
 
     /**
      * @param o object
-     * @param hashes avoid loop
-     * @return text
+     * @return is primitive
+     */
+    public static boolean isString(Object o) {
+        if (o instanceof Optional) {
+            o = ((Optional<?>) o).orElse(null);
+        }
+        if (o == null) {
+            return false;
+        }
+        Class<?> c = o.getClass();
+        return !((c.isPrimitive() && c != char.class) || o instanceof BigDecimal || o instanceof BigInteger || o instanceof Boolean || o instanceof Byte
+                || o instanceof Double || o instanceof Float || o instanceof Integer || o instanceof Long || o instanceof Short);
+    }
+
+    /**
+     * @param c Class
+     * @return True if array like class
+     */
+    public static boolean isArray(Class<?> c) {
+        return c != null && (c.isArray() || Stream.class.isAssignableFrom(c) || Iterable.class.isAssignableFrom(c));
+    }
+
+    /**
+     * Handler for traverse
+     */
+    public interface Traverser extends Supplier<String> {
+
+        /**
+         * Call before traverse
+         */
+        default void prepare() {
+        }
+
+        /**
+         * @param clazz Class
+         */
+        void start(Class<?> clazz);
+
+        /**
+         * @param key Key
+         */
+        void key(String key);
+
+        /**
+         * @param value Value
+         * @param clazz Class
+         * @param isString True if quoted
+         */
+        void value(String value, Class<?> clazz, boolean isString);
+
+        /**
+         * @param clazz Class
+         */
+        void end(Class<?> clazz);
+    }
+
+    /**
+     * @param o Object
+     * @param traverser Callback Handler
+     * @param hashes Inner use only
+     * @return Value
      */
     @SafeVarargs
-    public static String dump(Object o, Set<Object>... hashes) {
-        final Set<Object> cache = hashes.length > 0 ? hashes[0] : new HashSet<>();
-        if (o instanceof Iterable) {
-            StringBuilder s = new StringBuilder();
-            String separator = "\n,\n";
-            for (Object i : (Iterable<?>) o) {
-                s.append(separator).append(dump(i));
-            }
-            return "[\n" + s.substring(separator.length()) + "\n]";
+    public static String traverse(Object o, Traverser traverser, Set<Object>... hashes) {
+        final boolean first = hashes.length <= 0;
+        if (first) {
+            traverser.prepare();
         }
-        return Stream.of(o.getClass().getDeclaredFields()).map(field -> {
-            String value = "null";
-            try {
-                field.setAccessible(true);
-                Object object = field.get(o);
-                if (object != null) {
-                    if (object.getClass().getMethod("toString").getDeclaringClass() != Object.class) {
-                        value = object.toString();
-                    } else if (cache.contains(object)) {
-                        value = "(loop)";
-                    } else {
-                        cache.add(object);
-                        value = dump(object, cache);
-                    }
-                }
-            } catch (IllegalArgumentException | IllegalAccessException | NoSuchMethodException | SecurityException e) {
-                throw new InternalError(e);
+        do {
+            if (o == null || o == Optional.empty()) {
+                traverser.value(null, null, false);
+                break;
             }
-            return field.getName() + ": " + value;
-        }).collect(Collectors.joining("\n"));
+            final Set<Object> cache = first ? new HashSet<>() : hashes[0];
+            Class<?> c = o.getClass();
+            if (o instanceof Iterable) {
+                traverser.start(c);
+                for (Object i : (Iterable<?>) o) {
+                    traverse(i, traverser, cache);
+                }
+                traverser.end(c);
+                break;
+            }
+            if (o instanceof Stream) {
+                traverser.start(c);
+                ((Stream<?>) o).forEach(i -> traverse(i, traverser, cache));
+                traverser.end(c);
+                break;
+            }
+            if (o instanceof Map) {
+                traverser.start(c);
+                ((Map<?, ?>) o).forEach((k, v) -> {
+                    traverser.key(String.valueOf(k));
+                    traverse(v, traverser, cache);
+                });
+                traverser.end(c);
+                break;
+            }
+            if (c.isArray()) {
+                traverser.start(c);
+                for (int i = 0, i2 = Array.getLength(o); i < i2; i++) {
+                    traverse(Array.get(o, i), traverser, cache);
+                }
+                traverser.end(c);
+                break;
+            }
+            if (Reflector.method(c, "toString").map(Method::getDeclaringClass).filter(i -> i != Object.class).isPresent()) {
+                traverser.value(o.toString(), c, isString(o));
+                break;
+            }
+            if (cache.contains(o)) {
+                traverser.value("(loop)", c, true);
+                break;
+            }
+            traverser.start(c);
+            Stream.of(c.getDeclaredFields()).filter(f -> Tool.val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m))).forEach(field -> {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(o);
+                    boolean isOptional = value instanceof Optional;
+                    if (isOptional && value == Optional.empty()) {
+                        return;
+                    }
+                    traverser.key(field.getName());
+                    if (value != null) {
+                        Stringer stringer = field.getAnnotation(Stringer.class);
+                        if (stringer != null) {
+                            @SuppressWarnings("unchecked")
+                            Stringer.FromTo<Object> ft = (FromTo<Object>) Reflector.instance(stringer.value());
+                            ft.toString(value, traverser);
+                        } else if (!isOptional
+                                && Reflector.method(value.getClass(), "toString").map(Method::getDeclaringClass).filter(i -> i != Object.class).isPresent()) {
+                            traverser.value(value.toString(), c, isString(value));
+                            return;
+                        } else {
+                            if (isOptional) {
+                                value = ((Optional<?>) value).get();
+                            }
+                            traverse(value, traverser, cache);
+                            cache.add(value);
+                        }
+                    } else {
+                        traverser.value(null, c, false);
+                    }
+                } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
+                    throw new InternalError(e);
+                }
+            });
+            traverser.end(c);
+        } while (false);
+        return first ? traverser.get() : null;
+    }
+
+    /**
+     * @param o object
+     * @return text
+     */
+    public static String json(Object o) {
+        return traverse(o, new JsonTraverser(null, null));
+    }
+
+    /**
+     * @param o Object
+     * @param out Output
+     * @param charset Charset
+     */
+    public static void json(Object o, OutputStream out, Charset charset) {
+        traverse(o, new JsonTraverser(out, charset));
+    }
+
+    /**
+     * Json traverser
+     */
+    static class JsonTraverser implements Traverser {
+        /**
+         * Key-value separator
+         */
+        String separator = ": ";
+        /**
+         * Suffix
+         */
+        String suffix = ",";
+        /**
+         * Newline
+         */
+        String newline = Xml.newline;
+        /**
+         * Indent
+         */
+        String indent = Xml.indent;
+        /**
+         * Buffer size
+         */
+        int bufferSize = 1024 * 1024;
+        /**
+         * String closure
+         */
+        char closure = '"';
+        /**
+         * Array start character
+         */
+        char startArray = '[';
+        /**
+         * Array end character
+         */
+        char endArray = ']';
+        /**
+         * Object start character
+         */
+        char startObject = '{';
+        /**
+         * Object end character
+         */
+        char endObject = '}';
+
+        /**
+         * Buffer
+         */
+        private StringBuilder buffer = new StringBuilder();
+        /**
+         * Current indent
+         */
+        private StringBuilder currentIndent = new StringBuilder();
+        /**
+         * Separator length(cache)
+         */
+        private int separatorLength;
+        /**
+         * Suffix length(cache)
+         */
+        private int suffixLength;
+        /**
+         * True if first output
+         */
+        private boolean done = false;
+        /**
+         * Output(return string if null)
+         */
+        private OutputStream out;
+        /**
+         * Charset(required if output is not null)
+         */
+        private Charset charset;
+
+        /**
+         * @param out Output(return string if null)
+         * @param charset Charset(required if output is not null)
+         */
+        JsonTraverser(OutputStream out, Charset charset) {
+            this.out = out;
+            this.charset = charset;
+        }
+
+        /**
+         * Trim unnecessary suffix
+         */
+        void trim() {
+            int length = buffer.length();
+            if (buffer.subSequence(length - suffixLength, length).toString().equals(suffix)) {
+                buffer.setLength(length - suffixLength);
+            }
+        }
+
+        /**
+         * Output prefix
+         */
+        void prefix() {
+            if (done) {
+                buffer.append(newline).append(currentIndent);
+            } else {
+                done = true;
+            }
+        }
+
+        /**
+         * Oputput prefix if necessary
+         */
+        void smartPrefix() {
+            int length = buffer.length();
+            if (buffer.length() <= separatorLength || !buffer.subSequence(length - separatorLength, length).toString().equals(separator)) {
+                prefix();
+            } else {
+                done = true;
+            }
+        }
+
+        /**
+         * Flush buffer
+         */
+        void flush() {
+            try {
+                out.write(buffer.toString().getBytes(charset));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#prepare()
+         */
+        @Override
+        public void prepare() {
+            suffixLength = suffix.length();
+            separatorLength = separator.length();
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#start(java.lang.Class)
+         */
+        @Override
+        public void start(Class<?> clazz) {
+            smartPrefix();
+            buffer.append(isArray(clazz) ? startArray : startObject);
+            currentIndent.append(indent);
+            if (out != null && buffer.length() > bufferSize) {
+                flush();
+                buffer.setLength(0);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#key(java.lang.String)
+         */
+        @Override
+        public void key(String key) {
+            prefix();
+            buffer.append(closure).append(scriptEscape(key)).append(closure).append(separator);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#value(java.lang.String, java.lang.Class, boolean)
+         */
+        @Override
+        public void value(String value, Class<?> clazz, boolean isString) {
+            if (isArray(clazz)) {
+                smartPrefix();
+            } else {
+                done = true;
+            }
+            if (isString) {
+                buffer.append(closure).append(scriptEscape(value)).append(closure).append(suffix);
+            } else {
+                buffer.append(value).append(suffix);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#end(java.lang.Class)
+         */
+        @Override
+        public void end(Class<?> clazz) {
+            currentIndent.setLength(currentIndent.length() - indent.length());
+            trim();
+            prefix();
+            buffer.append(isArray(clazz) ? endArray : endObject).append(suffix);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.util.function.Supplier#get()
+         */
+        @Override
+        public String get() {
+            trim();
+            if (out != null) {
+                flush();
+                return null;
+            }
+            return buffer.toString();
+        }
+    }
+
+    /**
+     * @param o object
+     * @return text
+     */
+    public static String xml(Object o) {
+        return traverse(o, new XmlTraverser(null, null));
+    }
+
+    /**
+     * @param o Object
+     * @param out Output
+     * @param charset Charset
+     */
+    public static void xml(Object o, OutputStream out, Charset charset) {
+        traverse(o, new XmlTraverser(out, charset));
+    }
+
+    /**
+     * Xml traverser
+     */
+    static class XmlTraverser implements Traverser {
+        /**
+         * Newline
+         */
+        String newline = Xml.newline;
+        /**
+         * Indent
+         */
+        String indent = Xml.indent;
+        /**
+         * Buffer size
+         */
+        int bufferSize = 1024 * 1024;
+        /**
+         * Array start character
+         */
+        char prefix = '<';
+        /**
+         * Array end character
+         */
+        char suffix = '>';
+        /**
+         * Object start character
+         */
+        char endPrefix = '/';
+        /**
+         * Root name
+         */
+        String root = "root";
+        /**
+         * Header output if true
+         */
+        boolean hasHeader = true;
+        /**
+         * Class to tag name
+         */
+        Function<Class<?>, String> classToTag = Class::getSimpleName;
+
+        /**
+         * Buffer
+         */
+        private StringBuilder buffer = new StringBuilder();
+        /**
+         * Current indent
+         */
+        private StringBuilder currentIndent = new StringBuilder();
+        /**
+         * Tag name stack
+         */
+        private Deque<String> tags = new LinkedList<>();
+        /**
+         * Output(return string if null)
+         */
+        private OutputStream out;
+        /**
+         * Charset(required if output is not null)
+         */
+        private Charset charset;
+
+        /**
+         * @param out Output(return string if null)
+         * @param charset Charset(required if output is not null)
+         */
+        XmlTraverser(OutputStream out, Charset charset) {
+            this.out = out;
+            this.charset = charset;
+        }
+
+        /**
+         * Flush buffer
+         */
+        void flush() {
+            try {
+                out.write(buffer.toString().getBytes(charset));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#prepare()
+         */
+        @Override
+        public void prepare() {
+            if (hasHeader) {
+                buffer.append("<?xml version=\"1.0\" encoding=\"").append(charset.name()).append("\"?>").append(newline);
+            }
+            buffer.append(prefix).append(root).append(suffix);
+            currentIndent.append(indent);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#start(java.lang.Class)
+         */
+        @Override
+        public void start(Class<?> clazz) {
+            if (!isArray(clazz)) {
+                buffer.append(newline).append(currentIndent).append(prefix).append(classToTag.apply(clazz)).append(suffix);
+                currentIndent.append(indent);
+            }
+            if (out != null && buffer.length() > bufferSize) {
+                flush();
+                buffer.setLength(0);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#key(java.lang.String)
+         */
+        @Override
+        public void key(String key) {
+            tags.push(key);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#value(java.lang.String, java.lang.Class, boolean)
+         */
+        @Override
+        public void value(String value, Class<?> clazz, boolean isString) {
+            buffer.append(newline).append(currentIndent).append(prefix).append(tags.peek()).append(suffix).append(value).append(prefix).append(endPrefix)
+                    .append(tags.peek()).append(suffix);
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Tool.Traverser#end(java.lang.Class)
+         */
+        @Override
+        public void end(Class<?> clazz) {
+            if (!isArray(clazz)) {
+                currentIndent.setLength(currentIndent.length() - indent.length());
+                buffer.append(newline).append(currentIndent).append(prefix).append(endPrefix).append(classToTag.apply(clazz)).append(suffix);
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.util.function.Supplier#get()
+         */
+        @Override
+        public String get() {
+            buffer.append(newline).append(prefix).append(endPrefix).append(root).append(suffix);
+            if (out != null) {
+                flush();
+                return null;
+            }
+            return buffer.toString();
+        }
     }
 
     /**
@@ -557,7 +1075,7 @@ public class Tool {
      * @param in input
      * @return lines
      */
-    static Stream<String> lines(InputStream in) {
+    public static Stream<String> lines(InputStream in) {
         BufferedReader reader = new BufferedReader(newReader(in));
         return StreamSupport.stream(new Spliterator<String>() {
             @Override
@@ -693,116 +1211,6 @@ public class Tool {
     public static Map<String, String> parseMap(String text, String separator, String pairSeparator) {
         return string(text).map(s -> Stream.of(s.split(separator)).collect(() -> (Map<String, String>) new LinkedHashMap<String, String>(),
                 (map, ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), Map::putAll)).orElseGet(Collections::emptyMap);
-    }
-
-    /**
-     * JSON Mapper
-     */
-    @SuppressWarnings("rawtypes")
-    static ObjectMapper jsonMapper = Tool.peek(new ObjectMapper(), mapper -> {
-        mapper.setVisibility(PropertyAccessor.ALL, Visibility.NONE);
-        mapper.setVisibility(PropertyAccessor.FIELD, Visibility.NON_PRIVATE);
-        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        mapper.setSerializationInclusion(Include.NON_NULL);
-        mapper.enable(SerializationFeature.INDENT_OUTPUT);
-        mapper.registerModule(new SimpleModule().addSerializer(Optional.class, new JsonSerializer<Optional>() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public void serialize(Optional value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeObject(value.orElse(null));
-            }
-        }).addSerializer(OptionalInt.class, new JsonSerializer<OptionalInt>() {
-            @Override
-            public void serialize(OptionalInt value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeObject(value.orElse(0));
-            }
-        }).addSerializer(OptionalLong.class, new JsonSerializer<OptionalLong>() {
-            @Override
-            public void serialize(OptionalLong value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeObject(value.orElse(0));
-            }
-        }).addSerializer(OptionalDouble.class, new JsonSerializer<OptionalDouble>() {
-            @Override
-            public void serialize(OptionalDouble value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeObject(value.orElse(0));
-            }
-        }).addSerializer(Stream.class, new JsonSerializer<Stream>() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public void serialize(Stream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeStartArray();
-                value.forEachOrdered(Try.c(json::writeObject));
-                json.writeEndArray();
-            }
-        }).addSerializer(IntStream.class, new JsonSerializer<IntStream>() {
-            @Override
-            public void serialize(IntStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeStartArray();
-                value.forEachOrdered(Try.intC(json::writeNumber));
-                json.writeEndArray();
-            }
-        }).addSerializer(LongStream.class, new JsonSerializer<LongStream>() {
-            @Override
-            public void serialize(LongStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeStartArray();
-                value.forEachOrdered(Try.longC(json::writeNumber));
-                json.writeEndArray();
-            }
-        }).addSerializer(DoubleStream.class, new JsonSerializer<DoubleStream>() {
-            @Override
-            public void serialize(DoubleStream value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                json.writeStartArray();
-                value.forEachOrdered(Try.doubleC(json::writeNumber));
-                json.writeEndArray();
-            }
-        }).addSerializer(Temporal.class, new JsonSerializer<Temporal>() {
-            @Override
-            public void serialize(Temporal value, JsonGenerator json, SerializerProvider provider) throws IOException, JsonProcessingException {
-                if (value == null) {
-                    json.writeNull();
-                } else {
-                    json.writeString(value.toString());
-                }
-            }
-        }));
-    });
-
-    /**
-     * XML Mapper
-     */
-    static XmlMapper xmlMapper = new XmlMapper();
-
-    /**
-     * @param o object
-     * @return JSON
-     */
-    public static String json(Object o) {
-        return Try.f(jsonMapper::writeValueAsString).apply(o);
-    }
-
-    /**
-     * @param o object
-     * @param out OutputStream
-     */
-    public static void json(Object o, OutputStream out) {
-        Try.<OutputStream, Object>biC(jsonMapper::writeValue).accept(out, o);
-    }
-
-    /**
-     * @param o object
-     * @return XML
-     */
-    public static String xml(Object o) {
-        return Try.f(xmlMapper::writeValueAsString).apply(o);
-    }
-
-    /**
-     * @param o object
-     * @param out OutputStream
-     */
-    public static void xml(Object o, OutputStream out) {
-        Try.<OutputStream, Object>biC(xmlMapper::writeValue).accept(out, o);
     }
 
     /**
@@ -1033,11 +1441,6 @@ public class Tool {
     }
 
     /**
-     * Initial Vector
-     */
-    static final String IV = "CYKJRWWIYWJHSLEU";
-
-    /**
      * encrypt stream
      * 
      * @param out output
@@ -1049,7 +1452,7 @@ public class Tool {
         try {
             Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
-                    new IvParameterSpec((iv.length > 0 ? iv[0] : IV).getBytes(StandardCharsets.UTF_8)));
+                    new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
             return new CipherOutputStream(out, cipher);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             throw new RuntimeException(e);
@@ -1084,7 +1487,7 @@ public class Tool {
         try {
             Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
-                    new IvParameterSpec((iv.length > 0 ? iv[0] : IV).getBytes(StandardCharsets.UTF_8)));
+                    new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
             return new CipherInputStream(in, cipher);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             throw new RuntimeException(e);
@@ -1622,6 +2025,43 @@ public class Tool {
                 break;
             case '\'':
                 s.append("&#39;");
+                break;
+            default:
+                s.append((char) c);
+                break;
+            }
+        });
+        return s.toString();
+    }
+
+    /**
+     * String escape(", \r, \n, \t)
+     *
+     * @param text target
+     * @return escaped text
+     */
+    public static String scriptEscape(Object text) {
+        if (text == null) {
+            return null;
+        }
+        String string = text.toString();
+        if (string == null || string.isEmpty()) {
+            return null;
+        }
+        StringBuilder s = new StringBuilder();
+        string.chars().forEach(c -> {
+            switch (c) {
+            case '"':
+                s.append("\\\"");
+                break;
+            case '\r':
+                s.append("\\r");
+                break;
+            case '\n':
+                s.append("\\n");
+                break;
+            case '\t':
+                s.append("\\t");
                 break;
             default:
                 s.append((char) c);

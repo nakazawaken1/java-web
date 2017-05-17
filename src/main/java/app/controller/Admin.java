@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import app.config.Sys;
+import app.model.Account;
+import app.model.Person;
 import framework.Db;
 import framework.Diff;
 import framework.Request;
@@ -17,11 +19,15 @@ import framework.Response.Status;
 import framework.Session;
 import framework.Try;
 import framework.Xml;
+import framework.annotation.Accept;
 import framework.annotation.Config;
+import framework.annotation.Content;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
+import framework.annotation.Valid.Read;
 import framework.annotation.Route;
+import framework.annotation.Valid;
 
 /**
  * main controller
@@ -145,5 +151,28 @@ public class Admin {
                         return x;
                     }));
         })).orElseGet(() -> Response.file("diff2.html"));
+    }
+
+    /**
+     * @param db db
+     * @param account condition
+     * @return response
+     */
+    @Route
+    @Accept(Accept.FORM)
+    @Content({Content.JSON, Content.HTML, Content.TEXT, Content.XML})
+    Object accounts(Db db, @Valid(Read.class) Optional<Account> account) {
+        return db.find(Account.class);
+    }
+
+    /**
+     * @param db db
+     * @return response
+     */
+    @Route
+    @Accept(Accept.FORM)
+    @Content({Content.JSON, Content.HTML, Content.TEXT, Content.XML})
+    Object persons(Db db) {
+        return db.find(Person.class);
     }
 }

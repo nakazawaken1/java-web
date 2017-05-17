@@ -262,7 +262,7 @@ public class Diff<T> {
      */
     public static void main(String[] args) {
         System.out.print(
-                Tool.dump(Diff.diff(Tool.htmlEscape("  <!-- Prevent memory leaks due to use of particular java/javax APIs-->").chars().mapToObj(i -> (char) i)
+                Tool.json(Diff.diff(Tool.htmlEscape("  <!-- Prevent memory leaks due to use of particular java/javax APIs-->").chars().mapToObj(i -> (char) i)
                         .toArray(Character[]::new), Tool.htmlEscape("   -->").chars().mapToObj(i -> (char) i).toArray(Character[]::new), DEFAULT(), null)));
     }
 

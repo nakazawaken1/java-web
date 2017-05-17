@@ -525,8 +525,8 @@ public abstract class Response {
                                     .status(Status.Moved_Permamently);
                             out.get();
                         }
-                    } catch(NullPointerException e) {
-                        /*noop*/
+                    } catch (NullPointerException e) {
+                        /* noop */
                     }
                     return;
                 }
@@ -563,23 +563,16 @@ public abstract class Response {
             Tuple.of(Object.class, (response, out, cancel) -> {
                 Runnable other = Try.r(() -> {
                     response.contentType(Content.TEXT, response.charset());
-                    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                        if (response.content instanceof Stream) {
-                            ((Stream<?>) response.content).map(Tool::dump).forEach(writer::println);
-                        } else if (response.content instanceof Optional) {
-                            ((Optional<?>) response.content).map(Tool::dump).ifPresent(writer::print);
-                        } else {
-                            writer.print(Tool.dump(response.content));
-                        }
-                    }
+                    Tool.json(response.content, out.get(), response.charset());
                 });
                 Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
                     switch (Tool.splitAt(contentType, "\\s*;", 0)) {
                     case Content.JSON:
-                        Tool.json(response.content, out.get());
+                    case Content.YML:
+                        Tool.json(response.content, out.get(), response.charset());
                         break;
                     case Content.XML:
-                        Tool.xml(response.content, out.get());
+                        Tool.xml(response.content, out.get(), response.charset());
                         break;
                     default:
                         other.run();

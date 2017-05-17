@@ -3,19 +3,24 @@ package app.model;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import app.config.Sys;
-import framework.annotation.Only.User;
 import framework.AbstractBuilder;
 import framework.Db;
 import framework.Tool;
+import framework.Tool.Traverser;
 import framework.Try;
+import framework.annotation.Mapping;
+import framework.annotation.Only.User;
 import framework.annotation.Required;
+import framework.annotation.Stringer;
 
 /**
  * account info
  */
 @SuppressWarnings("serial")
+@Mapping("t_account")
 public class Account implements Serializable {
 
     /**
@@ -27,6 +32,7 @@ public class Account implements Serializable {
      * id
      */
     @Required
+    @Mapping("login_id")
     public final String id;
 
     /**
@@ -36,8 +42,30 @@ public class Account implements Serializable {
     public final String name;
 
     /**
+     * Stringer of roles
+     */
+    static class Roles implements Stringer.FromTo<Class<? extends User>[]> {
+        @SuppressWarnings("unchecked")
+        @Override
+        public Class<? extends User>[] fromString(String text) {
+            return Stream.of(text.split("[^0-9a-zA-Z.]+")).map(User::fromString).toArray(Class[]::new);
+        }
+
+        @Override
+        public void toString(Class<? extends User>[] value, Traverser traverser) {
+            Class<?> clazz = Class[].class;
+            traverser.start(clazz);
+            for (Class<?> i : value) {
+                traverser.value(i.getSimpleName(), clazz, true);
+            }
+            traverser.end(clazz);
+        }
+    }
+
+    /**
      * role
      */
+    @Stringer(Roles.class)
     public final Class<? extends User>[] roles;
 
     /**
@@ -57,7 +85,9 @@ public class Account implements Serializable {
     @SuppressWarnings("javadoc")
     public static class Builder extends AbstractBuilder<Account, Builder> {
         enum F {
-            id, name, roles,
+            id,
+            name,
+            roles,
         }
 
         public Builder() {

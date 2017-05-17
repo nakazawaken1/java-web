@@ -38,6 +38,11 @@ public @interface Content {
     String XML = "application/xml";
 
     /**
+     * application/yml
+     */
+    String YML = "application/yml";
+
+    /**
      * application/json
      */
     String JSON = "application/json";

@@ -59,6 +59,7 @@ import framework.annotation.InitialData;
 import framework.annotation.Join;
 import framework.annotation.Mapping;
 import framework.annotation.Size;
+import framework.annotation.Stringer;
 
 /**
  * database
@@ -112,6 +113,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.lang.Enum#toString()
          */
         @Override
@@ -466,6 +468,7 @@ public class Db implements AutoCloseable {
 
     /*
      * (non-Javadoc)
+     * 
      * @see java.lang.AutoCloseable#close()
      */
     @Override
@@ -940,24 +943,27 @@ public class Db implements AutoCloseable {
             /* get table creation sql */
             List<String> tables = all.stream().filter(file -> file.startsWith(tablePrefix)).collect(Collectors.toList());
 
+            /* table name getter */
+            Function<String, String> tableName = file -> file.substring(tablePrefix.length(), file.length() - suffix.length());
+            List<String> tableNames = tables.stream().map(tableName).collect(Collectors.toList());
+
             List<Tuple<String, Class<?>>> models = new ArrayList<>();
             List<Tuple<String, InitialData>> modelDatas = new ArrayList<>();
             try (Stream<Class<?>> classes = Tool.getClasses(Account.class.getPackage().getName())) {
-                classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c)).peek(
-                        t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l)).ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
+                classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c))
+                        .filter(t -> !tableNames.contains(t.l))
+                        .peek(t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
+                                .ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
                         .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
             }
 
             /* get exists tables */
             Set<String> existTables = db.tables().collect(Collectors.toSet());
 
-            /* table name getter */
-            Function<String, String> tableName = file -> file.substring(tablePrefix.length(), file.length() - suffix.length());
-
             Set<String> reloadTables;
             if (create) {
                 /* drop exists tables */
-                Stream.concat(tables.stream().map(tableName), models.stream().map(t -> t.l)).filter(existTables::contains).forEach(db::drop);
+                Stream.concat(tableNames.stream(), models.stream().map(t -> t.l)).filter(existTables::contains).forEach(db::drop);
                 /* create all tables and entry to load data */
                 reloadTables = Stream.concat(tables.stream().peek(file -> db.executeFile(file, null)).map(tableName),
                         models.stream().peek(t -> db.create(t.r)).map(t -> t.l)).collect(Collectors.toSet());
@@ -966,7 +972,7 @@ public class Db implements AutoCloseable {
                 tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).forEach(file -> db.executeFile(file, null));
                 models.stream().filter(t -> !existTables.contains(t.l)).forEach(t -> db.create(t.r));
                 /* entry all tables to load data */
-                reloadTables = tables.stream().map(tableName).collect(Collectors.toSet());
+                reloadTables = tableNames.stream().collect(Collectors.toSet());
             } else {
                 /* create no-exists table and entry to load data */
                 reloadTables = Stream
@@ -1130,6 +1136,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1156,6 +1163,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
@@ -1177,6 +1185,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1224,6 +1233,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#escape(java.lang.Object)
          */
         @Override
@@ -1243,6 +1253,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#countSql(java.lang.String)
          */
         @Override
@@ -1269,6 +1280,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
@@ -1286,6 +1298,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#sql(framework.Db.Query)
          */
         @Override
@@ -1320,6 +1333,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see framework.Db.Builder#replace(java.lang.String)
          */
         @Override
@@ -1508,6 +1522,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.lang.AutoCloseable#close()
          */
         @Override
@@ -1534,6 +1549,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.util.Spliterator#tryAdvance(java.util.function.Consumer)
          */
         @Override
@@ -1559,6 +1575,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.util.Spliterator#trySplit()
          */
         @Override
@@ -1568,6 +1585,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.util.Spliterator#estimateSize()
          */
         @Override
@@ -1577,6 +1595,7 @@ public class Db implements AutoCloseable {
 
         /*
          * (non-Javadoc)
+         * 
          * @see java.util.Spliterator#characteristics()
          */
         @Override
@@ -1953,30 +1972,28 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * @param <T> criteria model type
-     * @param <S> model type
-     * @param model conditions
+     * @param <T> Model type
+     * @param clazz Model class
      * @param targetColumns fill columns
      * @return found list
      */
-    @SuppressWarnings("unchecked")
-    public <T extends S, S> Stream<S> find(T model, String... targetColumns) {
+    public <T> Stream<T> find(Class<T> clazz, String... targetColumns) {
         List<Field> fields;
-        Class<T> c = (Class<T>) model.getClass();
         if (targetColumns == null || targetColumns.length <= 0) {
             targetColumns = Tool.array("*");
-            fields = Reflector.mappingFields(c).values().stream().filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
+            fields = Reflector.mappingFields(clazz).values().stream().filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
         } else {
-            fields = Stream.of(targetColumns).map(s -> Reflector.mappingField(c, s)).filter(Optional::isPresent).map(Optional::get)
+            fields = Stream.of(targetColumns).map(s -> Reflector.mappingField(clazz, s)).filter(Optional::isPresent).map(Optional::get)
                     .collect(Collectors.toList());
         }
-        if (Reflector.constructor(c).isPresent()) {
-            return select(targetColumns).from(Reflector.mappingClassName(model)).stream().map(rs -> fields.stream().collect(() -> Reflector.instance(c),
-                    Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
+        List<Field> instanceFields = fields.stream().filter(f -> !Modifier.isStatic(f.getModifiers())).collect(Collectors.toList());
+        if (Reflector.constructor(clazz).isPresent()) {
+            return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream().map(rs -> instanceFields.stream()
+                    .collect(() -> Reflector.instance(clazz), Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                     }));
         } else {
-            return select(targetColumns).from(Reflector.mappingClassName(model)).stream()
-                    .map(rs -> fields.stream().<AbstractBuilder<S, ?>>collect(() -> Reflector.instance(c.getName() + "$Builder"),
+            return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream()
+                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?>>collect(() -> Reflector.instance(clazz.getName() + "$Builder"),
                             Try.biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                             }).get());
         }
@@ -1996,6 +2013,10 @@ public class Db implements AutoCloseable {
     public static <T extends Enum<T>> Object resultSetToObject(Field field, ResultSet rs, String name) throws SQLException {
         if (Reflector.hasAnnotation(Join.class).test(field)) {
             return null;
+        }
+        Stringer stringer = field.getAnnotation(Stringer.class);
+        if (stringer != null) {
+            return Reflector.instance(stringer.value()).fromString(rs.getString(name));
         }
         Class<?> baseType = field.getType();
         boolean isOptional = baseType == Optional.class;
