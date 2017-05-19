@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +26,10 @@ import java.util.stream.Stream;
 
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.Tool.CsvTraverser;
+import framework.Tool.JsonTraverser;
+import framework.Tool.Traverser;
+import framework.Tool.XmlTraverser;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
 import framework.annotation.Letters;
@@ -100,7 +103,7 @@ public abstract class Response {
             String name = name();
             int max = name.length();
             int skip = 0;
-            while(skip < max && Character.isUpperCase(name.charAt(skip))) {
+            while (skip < max && Character.isUpperCase(name.charAt(skip))) {
                 skip++;
             }
             skip--;
@@ -484,9 +487,39 @@ public abstract class Response {
     }
 
     /**
+     * Traversers
+     */
+    public Map<Class<? extends Traverser>, Traverser> traverserMap;
+
+    /**
+     * @param <T> Traverser type
+     * @param clazz Traverser class
+     * @param setup Setup
+     * @return Self
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends Traverser> Response traverser(Class<T> clazz, Consumer<T> setup) {
+        if (traverserMap == null) {
+            traverserMap = new HashMap<>();
+        }
+        setup.accept((T) traverserMap.computeIfAbsent(clazz, Try.f(Class::newInstance)));
+        return this;
+    }
+
+    /**
+     * @param <T> Traverser type
+     * @param clazz Traverser class
+     * @return Traverser
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends Traverser> T traverser(Class<T> clazz) {
+        return Tool.of(traverserMap).map(i -> (T) i.get(clazz)).orElseGet(Try.s(clazz::newInstance));
+    }
+
+    /**
      * body writer
      */
-    static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Arrays.asList(//
+    public static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Tool.list(//
             Tuple.of(String.class, (response, out, cancel) -> {
                 response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
                 out.get().write(((String) response.content).getBytes(response.charset()));
@@ -547,7 +580,7 @@ public abstract class Response {
                 }
 
                 /* no content */
-                if (Arrays.asList(".css", ".js").contains(Tool.getExtension(file))) {
+                if (Tool.list(".css", ".js").contains(Tool.getExtension(file))) {
                     response.status(Status.No_Content);
                 } else {
                     Log.info("not found: " + Tool.trim("/", file, null));
@@ -582,22 +615,37 @@ public abstract class Response {
                     response.contentType(Content.TEXT, response.charset());
                     Tool.csv(response.content, out.get(), response.charset());
                 });
-                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Arrays.asList()).stream().findFirst(), Try.c(contentType -> {
+                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Tool.list()).stream().findFirst(), Try.c(contentType -> {
                     switch (Tool.splitAt(contentType, "\\s*;", 0)) {
                     case Content.JSON:
                     case Content.YML:
-                        Tool.json(response.content, out.get(), response.charset());
+                        Tool.traverse(response.content, Tool.peek(response.traverser(JsonTraverser.class), t -> {
+                            t.out = out.get();
+                            t.charset = response.charset();
+                        }));
                         break;
                     case Content.XML:
-                        Tool.xml(response.content, out.get(), response.charset());
+                        Tool.traverse(response.content, Tool.peek(response.traverser(XmlTraverser.class), t -> {
+                            t.out = out.get();
+                            t.charset = response.charset();
+                        }));
                         break;
                     case Content.CSV:
                         OutputStream o = out.get();
                         o.write(Tool.BOM);
-                        Tool.csv(response.content, o, response.charset());
+                        Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                            t.out = o;
+                            t.charset = response.charset();
+                        }));
                         break;
                     case Content.TSV:
-                        Tool.tsv(response.content, out.get(), response.charset());
+                        Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                            t.out = out.get();
+                            t.charset = response.charset();
+                            t.separator = '\t';
+                            t.clouser = '\0';/* none */
+                            t.innerSeparator = ",";
+                        }));
                         break;
                     default:
                         other.run();
@@ -605,7 +653,7 @@ public abstract class Response {
                     }
                 }), other);
             }));
-    
+
     /**
      * @param args Not use
      */

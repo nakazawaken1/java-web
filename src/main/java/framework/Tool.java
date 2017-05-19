@@ -95,11 +95,11 @@ import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
+import framework.annotation.Help;
 import framework.annotation.Stringer;
-import framework.annotation.Stringer.FromTo;
 
 /**
- * utility
+ * Utility
  */
 public class Tool {
 
@@ -176,6 +176,25 @@ public class Tool {
             value = i.get();
         }
         return Tool.of(value);
+    }
+
+    /**
+     * get first non-null value
+     *
+     * @param <T> value type
+     * @param value value
+     * @param suppliers value suppliers
+     * @return value
+     */
+    @SafeVarargs
+    public static <T> Optional<T> or(Optional<T> value, Supplier<Optional<T>>... suppliers) {
+        for (Supplier<Optional<T>> i : suppliers) {
+            if (value.isPresent()) {
+                break;
+            }
+            value = i.get();
+        }
+        return value;
     }
 
     /**
@@ -396,11 +415,11 @@ public class Tool {
                     if (isOptional && value == Optional.empty() && traverser.isCompact()) {
                         return;
                     }
-                    traverser.key(field.getName());
+                    traverser.key(Tool.of(field.getAnnotation(Help.class)).map(help -> help.value()[0]).orElse(field.getName()));
                     if (value != null) {
                         Stringer stringer = field.getAnnotation(Stringer.class);
                         if (stringer != null) {
-                            Stringer.FromTo<Object> ft = (FromTo<Object>) Reflector.instance(stringer.value());
+                            Stringer.FromTo<Object> ft = (Stringer.FromTo<Object>) Reflector.instance(stringer.value());
                             ft.toString(value, traverser);
                         } else if (!isOptional
                                 && Reflector.method(value.getClass(), "toString").map(Method::getDeclaringClass).filter(i -> i != Object.class).isPresent()) {
@@ -430,7 +449,7 @@ public class Tool {
      * @return text
      */
     public static String json(Object o) {
-        return traverse(o, new JsonTraverser(null, null));
+        return traverse(o, new JsonTraverser());
     }
 
     /**
@@ -439,57 +458,68 @@ public class Tool {
      * @param charset Charset
      */
     public static void json(Object o, OutputStream out, Charset charset) {
-        traverse(o, new JsonTraverser(out, charset));
+        traverse(o, Tool.peek(new JsonTraverser(), t -> {
+            t.out = out;
+            t.charset = charset;
+        }));
     }
 
     /**
      * Json traverser
      */
-    static class JsonTraverser implements Traverser {
+    public static class JsonTraverser implements Traverser {
         /**
          * Key-value separator
          */
-        String separator = ": ";
+        public String separator = ": ";
         /**
          * Suffix
          */
-        String suffix = ",";
+        public String suffix = ",";
         /**
          * Newline
          */
-        String newline = Xml.newline;
+        public String newline = Xml.newline;
         /**
          * Indent
          */
-        String indent = Xml.indent;
+        public String indent = Xml.indent;
         /**
          * Buffer size
          */
-        int bufferSize = 1024 * 1024;
+        public int bufferSize = 1024 * 1024;
         /**
          * String closure
          */
-        char closure = '"';
+        public char closure = '"';
         /**
          * Array start character
          */
-        char startArray = '[';
+        public char startArray = '[';
         /**
          * Array end character
          */
-        char endArray = ']';
+        public char endArray = ']';
         /**
          * Object start character
          */
-        char startObject = '{';
+        public char startObject = '{';
         /**
          * Object end character
          */
-        char endObject = '}';
+        public char endObject = '}';
         /**
          * If true, the Optional.empty field is not output
          */
-        boolean isCompact = true;
+        public boolean isCompact = true;
+        /**
+         * Output(return string if null)
+         */
+        public OutputStream out = null;
+        /**
+         * Charset(required if output is not null)
+         */
+        public Charset charset = null;
 
         /**
          * Buffer
@@ -511,23 +541,6 @@ public class Tool {
          * True if first output
          */
         private boolean done = false;
-        /**
-         * Output(return string if null)
-         */
-        private OutputStream out;
-        /**
-         * Charset(required if output is not null)
-         */
-        private Charset charset;
-
-        /**
-         * @param out Output(return string if null)
-         * @param charset Charset(required if output is not null)
-         */
-        JsonTraverser(OutputStream out, Charset charset) {
-            this.out = out;
-            this.charset = charset;
-        }
 
         /**
          * Trim unnecessary suffix
@@ -674,7 +687,7 @@ public class Tool {
      * @return text
      */
     public static String xml(Object o) {
-        return traverse(o, new XmlTraverser(null, null));
+        return traverse(o, new XmlTraverser());
     }
 
     /**
@@ -683,53 +696,65 @@ public class Tool {
      * @param charset Charset
      */
     public static void xml(Object o, OutputStream out, Charset charset) {
-        traverse(o, new XmlTraverser(out, charset));
+        traverse(o, Tool.peek(new XmlTraverser(), t -> {
+            t.out = out;
+            t.charset = charset;
+        }));
     }
 
     /**
      * Xml traverser
      */
-    static class XmlTraverser implements Traverser {
+    public static class XmlTraverser implements Traverser {
         /**
          * Newline
          */
-        String newline = Xml.newline;
+        public String newline = Xml.newline;
         /**
          * Indent
          */
-        String indent = Xml.indent;
+        public String indent = Xml.indent;
         /**
          * Buffer size
          */
-        int bufferSize = 1024 * 1024;
+        public int bufferSize = 1024 * 1024;
         /**
          * Array start character
          */
-        char prefix = '<';
+        public char prefix = '<';
         /**
          * Array end character
          */
-        char suffix = '>';
+        public char suffix = '>';
         /**
          * Object start character
          */
-        char endPrefix = '/';
-        /**
-         * Root name
-         */
-        String root = "root";
+        public char endPrefix = '/';
         /**
          * Header output if true
          */
-        boolean hasHeader = true;
-        /**
-         * Class to tag name
-         */
-        Function<Class<?>, String> classToTag = Class::getSimpleName;
+        public boolean hasHeader = true;
         /**
          * If true, the Optional.empty field is not output
          */
-        boolean isCompact = true;
+        public boolean isCompact = true;
+        /**
+         * Class name mapping
+         */
+        public final Map<String, String> classMap = Tool.map("Object", "root");
+        /**
+         * Class to tag name
+         */
+        public Function<Class<?>, String> classToTag = clazz -> Tool
+                .val(Tool.of(clazz.getAnnotation(Help.class)).map(help -> help.value()[0]).orElseGet(clazz::getSimpleName), i -> classMap.getOrDefault(i, i));
+        /**
+         * Output(return string if null)
+         */
+        public OutputStream out = null;
+        /**
+         * Charset(required if output is not null)
+         */
+        public Charset charset = null;
 
         /**
          * Buffer
@@ -743,23 +768,6 @@ public class Tool {
          * Tag name stack
          */
         private Deque<String> tags = new LinkedList<>();
-        /**
-         * Output(return string if null)
-         */
-        private OutputStream out;
-        /**
-         * Charset(required if output is not null)
-         */
-        private Charset charset;
-
-        /**
-         * @param out Output(return string if null)
-         * @param charset Charset(required if output is not null)
-         */
-        XmlTraverser(OutputStream out, Charset charset) {
-            this.out = out;
-            this.charset = charset;
-        }
 
         /**
          * Flush buffer
@@ -782,7 +790,7 @@ public class Tool {
             if (hasHeader) {
                 buffer.append("<?xml version=\"1.0\" encoding=\"").append(charset.name()).append("\"?>").append(newline);
             }
-            buffer.append(prefix).append(root).append(suffix);
+            buffer.append(prefix).append(classToTag.apply(Object.class)).append(suffix);
             currentIndent.append(indent);
         }
 
@@ -820,8 +828,16 @@ public class Tool {
          */
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
-            buffer.append(newline).append(currentIndent).append(prefix).append(tags.peek()).append(suffix).append(value).append(prefix).append(endPrefix)
-                    .append(tags.peek()).append(suffix);
+            String tag = tags.peek();
+            buffer.append(newline).append(currentIndent);
+            if (tag != null) {
+                buffer.append(prefix).append(tag).append(suffix);
+
+            }
+            buffer.append(value == null ? "" : value);
+            if (tag != null) {
+                buffer.append(prefix).append(endPrefix).append(tag).append(suffix);
+            }
         }
 
         /*
@@ -844,7 +860,7 @@ public class Tool {
          */
         @Override
         public String get() {
-            buffer.append(newline).append(prefix).append(endPrefix).append(root).append(suffix);
+            buffer.append(newline).append(prefix).append(endPrefix).append(classToTag.apply(Object.class)).append(suffix);
             if (out != null) {
                 flush();
                 return null;
@@ -868,7 +884,7 @@ public class Tool {
      * @return text
      */
     public static String csv(Object o) {
-        return traverse(o, new CsvTraverser(null, null));
+        return traverse(o, new CsvTraverser());
     }
 
     /**
@@ -877,7 +893,10 @@ public class Tool {
      * @param charset Charset
      */
     public static void csv(Object o, OutputStream out, Charset charset) {
-        traverse(o, new CsvTraverser(out, charset));
+        traverse(o, Tool.peek(new CsvTraverser(), t -> {
+            t.out = out;
+            t.charset = charset;
+        }));
     }
 
     /**
@@ -885,7 +904,7 @@ public class Tool {
      * @return text
      */
     public static String tsv(Object o) {
-        return traverse(o, Tool.peek(new CsvTraverser(null, null), t -> {
+        return traverse(o, Tool.peek(new CsvTraverser(), t -> {
             t.separator = '\t';
             t.clouser = '\0';/* none */
             t.innerSeparator = ",";
@@ -898,7 +917,9 @@ public class Tool {
      * @param charset Charset
      */
     public static void tsv(Object o, OutputStream out, Charset charset) {
-        traverse(o, Tool.peek(new CsvTraverser(out, charset), t -> {
+        traverse(o, Tool.peek(new CsvTraverser(), t -> {
+            t.out = out;
+            t.charset = charset;
             t.separator = '\t';
             t.clouser = '\0';/* none */
             t.innerSeparator = ",";
@@ -908,31 +929,39 @@ public class Tool {
     /**
      * Tsv traverser
      */
-    static class CsvTraverser implements Traverser {
+    public static class CsvTraverser implements Traverser {
         /**
          * Newline
          */
-        String newline = Xml.newline;
+        public String newline = Xml.newline;
         /**
          * Separator
          */
-        char separator = ',';
+        public char separator = ',';
         /**
          * Array start character
          */
-        char clouser = '"';
+        public char clouser = '"';
         /**
          * Buffer size
          */
-        int bufferSize = 1024 * 1024;
+        public int bufferSize = 1024 * 1024;
         /**
          * Header output if true
          */
-        boolean hasHeader = true;
+        public boolean hasHeader = true;
         /**
          * Nested value seprator
          */
-        String innerSeparator = ";";
+        public String innerSeparator = ";";
+        /**
+         * Output(return string if null)
+         */
+        public OutputStream out = null;
+        /**
+         * Charset(required if output is not null)
+         */
+        public Charset charset = null;
 
         /**
          * Buffer
@@ -954,24 +983,6 @@ public class Tool {
          * Nesting level
          */
         private int level = 0;
-
-        /**
-         * Output(return string if null)
-         */
-        private OutputStream out;
-        /**
-         * Charset(required if output is not null)
-         */
-        private Charset charset;
-
-        /**
-         * @param out Output(return string if null)
-         * @param charset Charset(required if output is not null)
-         */
-        CsvTraverser(OutputStream out, Charset charset) {
-            this.out = out;
-            this.charset = charset;
-        }
 
         /**
          * Flush buffer
@@ -1024,6 +1035,10 @@ public class Tool {
          */
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
+            if (level == 0) {
+                buffer.append(value);
+                return;
+            }
             if (level != 2) {
                 nested.add(value);
                 return;
@@ -1073,7 +1088,11 @@ public class Tool {
                     if (!firstColumn) {
                         buffer.append(separator);
                     }
-                    buffer.append(line);
+                    if (clouser != '\0') {
+                        buffer.append(clouser).append(line).append(clouser);
+                    } else {
+                        buffer.append(line);
+                    }
                 }
                 nested.clear();
                 firstColumn = false;

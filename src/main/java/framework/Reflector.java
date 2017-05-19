@@ -215,11 +215,22 @@ public class Reflector {
 
     /**
      * @param field Field
-     * @param index index
-     * @return generic type
+     * @param index Index
+     * @return Generic type
      */
     public static Class<?> getGenericParameter(Field field, int index) {
         return (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[index];
+    }
+
+    /**
+     * @param <T> Return type
+     * @param clazz Class
+     * @param index Index
+     * @return Generic type
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Class<T> getGenericParameter(Class<?> clazz, int index) {
+        return (Class<T>) ((ParameterizedType) clazz.getGenericSuperclass()).getActualTypeArguments()[index];
     }
 
     /**

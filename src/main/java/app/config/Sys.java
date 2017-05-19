@@ -169,7 +169,7 @@ public class Sys {
 
     @Help("job packages")
     public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
-    
+
     @Help("redirect url if not loggged in(not recirect if empty)")
     public static Optional<String> redirect_if_not_login = Tool.of("login.html");
 

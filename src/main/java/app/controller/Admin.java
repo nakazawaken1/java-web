@@ -18,6 +18,7 @@ import framework.Response.Render;
 import framework.Response.Status;
 import framework.Session;
 import framework.Tool;
+import framework.Tool.XmlTraverser;
 import framework.Try;
 import framework.Xml;
 import framework.annotation.Accept;
@@ -171,6 +172,11 @@ public class Admin {
      */
     @Route(extensions = {})
     Object persons(Db db) {
-        return db.find(Person.class).map(p -> Tool.map("id", p.id, "name", p.name, "age", p.getAge().map(Object::toString).orElse("不明")));
+        return Response.of(db.find(Person.class)).traverser(XmlTraverser.class, t -> t.classMap.putAll(Tool.map("Object", "名簿", "LinkedHashMap", "個人")));// .map(p
+                                                                                                                                                         // ->
+                                                                                                                                                         // Tool.map("id",
+        // p.id, "name", p.name,
+        // "age",
+        // p.getAge().map(Object::toString).orElse("不明")));
     }
 }

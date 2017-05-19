@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -407,7 +406,7 @@ public class ServletImpl implements javax.servlet.Servlet {
                 @SuppressWarnings("unchecked")
                 @Override
                 public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Tool.of(request.getParameterValues(name)).map(a -> Arrays.asList(a));
+                    return (Optional<T>) Tool.of(request.getParameterValues(name)).map(a -> Tool.list(a));
                 }
 
                 @Override

@@ -4,7 +4,6 @@ import java.io.FileNotFoundException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Connection;
@@ -22,7 +21,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
@@ -812,7 +810,7 @@ public class Db implements AutoCloseable {
      */
     public Query select(String... fields) {
         Query q = new Query(this);
-        q.fields = Arrays.asList(fields);
+        q.fields = Tool.list(fields);
         return q;
     }
 
@@ -868,7 +866,7 @@ public class Db implements AutoCloseable {
             pad = ", ";
         }
         if (primary > 0) {
-            sql.append(join(", PRIMARY KEY(", Arrays.asList(names).subList(0, primary), ", ")).append(")");
+            sql.append(join(", PRIMARY KEY(", Tool.list(names).subList(0, primary), ", ")).append(")");
         }
         return sql.append(")").toString();
     }
@@ -1066,7 +1064,7 @@ public class Db implements AutoCloseable {
          * @return native sql
          */
         public String fn(String function, String... args) {
-            return function + "(" + join("", Arrays.asList(args), ", ") + ")";
+            return function + "(" + join("", Tool.list(args), ", ") + ")";
         }
 
         /**
@@ -1172,9 +1170,9 @@ public class Db implements AutoCloseable {
             case "YEAR":
             case "MONTH":
             case "DAY":
-                return "DATE_PART('" + function + "'" + join(", ", Arrays.asList(args), ", ") + ")";
+                return "DATE_PART('" + function + "'" + join(", ", Tool.list(args), ", ") + ")";
             }
-            return function + "(" + join("", Arrays.asList(args), ", ") + ")";
+            return function + "(" + join("", Tool.list(args), ", ") + ")";
         }
     }
 
@@ -1291,9 +1289,9 @@ public class Db implements AutoCloseable {
             case "YEAR":
             case "MONTH":
             case "DAY":
-                return "EXTRACT(" + function + " FROM " + join("", Arrays.asList(args), ", ") + ")";
+                return "EXTRACT(" + function + " FROM " + join("", Tool.list(args), ", ") + ")";
             }
-            return function + "(" + join("", Arrays.asList(args), ", ") + ")";
+            return function + "(" + join("", Tool.list(args), ", ") + ")";
         }
 
         /*
@@ -1983,6 +1981,8 @@ public class Db implements AutoCloseable {
             targetColumns = Tool.array("*");
             fields = Reflector.mappingFields(clazz).values().stream().filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
         } else {
+            targetColumns = Stream.of(targetColumns).map(name -> Reflector.field(clazz, name).orElse(null)).map(Reflector::mappingFieldName)
+                    .toArray(String[]::new);
             fields = Stream.of(targetColumns).map(s -> Reflector.mappingField(clazz, s)).filter(Optional::isPresent).map(Optional::get)
                     .collect(Collectors.toList());
         }
@@ -1993,10 +1993,27 @@ public class Db implements AutoCloseable {
                     }));
         } else {
             return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream()
-                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?>>collect(() -> Reflector.instance(clazz.getName() + "$Builder"),
+                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?, ?>>collect(() -> Reflector.instance(clazz.getName() + "$Builder"),
                             Try.biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                             }).get());
         }
+    }
+
+    /**
+     * @param <T> taget class type
+     * @param clazz target class
+     * @return object
+     */
+    public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
+        Map<String, Field> map = Reflector.fields(clazz);
+        return Try.f(rs -> {
+            T object = Reflector.instance(clazz);
+            ResultSetMetaData meta = rs.getMetaData();
+            IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
+                Tool.of(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
+            });
+            return object;
+        });
     }
 
     /**
@@ -2011,7 +2028,8 @@ public class Db implements AutoCloseable {
      */
     @SuppressWarnings("unchecked")
     public static <T extends Enum<T>> Object resultSetToObject(Field field, ResultSet rs, String name) throws SQLException {
-        if (Reflector.hasAnnotation(Join.class).test(field)) {
+        Join join = field.getAnnotation(Join.class);
+        if (join != null) {
             return null;
         }
         Stringer stringer = field.getAnnotation(Stringer.class);
@@ -2020,11 +2038,12 @@ public class Db implements AutoCloseable {
         }
         Class<?> baseType = field.getType();
         boolean isOptional = baseType == Optional.class;
-        Class<?> type = isOptional ? (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0] : baseType;
+        Class<?> type = isOptional ? Reflector.getGenericParameter(field, 0) : baseType;
         Optional<Object> optional = Optional.empty();
         if (Enum.class.isAssignableFrom(type)) {
             if (IntSupplier.class.isAssignableFrom(type)) {
-                optional = Optional.of(type.getEnumConstants()[rs.getInt(name)]);
+                int n = rs.getInt(name);
+                optional = Stream.<Object>of(type.getEnumConstants()).filter(i -> ((IntSupplier) i).getAsInt() == n).findFirst();
             } else {
                 optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
@@ -2110,23 +2129,6 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * @param <T> taget class type
-     * @param clazz target class
-     * @return object
-     */
-    public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
-        Map<String, Field> map = Reflector.fields(clazz);
-        return Try.f(rs -> {
-            T object = Reflector.instance(clazz);
-            ResultSetMetaData meta = rs.getMetaData();
-            IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
-                Tool.of(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
-            });
-            return object;
-        });
-    }
-
-    /**
      * @param clazz target class
      * @return SQL
      */
@@ -2143,7 +2145,7 @@ public class Db implements AutoCloseable {
             Column c = new Column(name);
             c.type = field.getType();
             if (Optional.class.isAssignableFrom(c.type)) {
-                c.type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+                c.type = Reflector.getGenericParameter(field, 0);
                 c.nullable();
             }
             Tool.of(field.getAnnotation(Help.class)).ifPresent(help -> c.display(String.join(" ", help.value())));

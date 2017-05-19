@@ -384,7 +384,7 @@ public @interface Config {
             if (sort) {
                 Collections.sort(lines);
                 return lines.stream().flatMap(line -> {
-                    List<String> reverse = Arrays.asList(line.split("\b"));
+                    List<String> reverse = Tool.list(line.split("\b"));
                     Collections.reverse(reverse);
                     return reverse.stream();
                 }).collect(Collectors.toList());

@@ -11,6 +11,7 @@ import framework.Db;
 import framework.Tool;
 import framework.Tool.Traverser;
 import framework.Try;
+import framework.annotation.Help;
 import framework.annotation.Mapping;
 import framework.annotation.Only.User;
 import framework.annotation.Required;
@@ -21,6 +22,7 @@ import framework.annotation.Stringer;
  */
 @SuppressWarnings("serial")
 @Mapping("t_account")
+@Help("アカウント")
 public class Account implements Serializable {
 
     /**
@@ -33,12 +35,14 @@ public class Account implements Serializable {
      */
     @Required
     @Mapping("login_id")
+    @Help("ログインID")
     public final String id;
 
     /**
      * name
      */
     @Required
+    @Help("表示名")
     public final String name;
 
     /**
@@ -66,6 +70,7 @@ public class Account implements Serializable {
      * role
      */
     @Stringer(Roles.class)
+    @Help("権限")
     public final Class<? extends User>[] roles;
 
     /**
@@ -76,35 +81,18 @@ public class Account implements Serializable {
     protected Account(String id, String name, Class<? extends User>[] roles) {
         this.id = Objects.requireNonNull(id);
         this.name = Objects.requireNonNull(name);
-        this.roles = Objects.requireNonNull(roles);
+        this.roles = roles == null ? Tool.array() : roles;
     }
 
     /**
      * Builder
      */
     @SuppressWarnings("javadoc")
-    public static class Builder extends AbstractBuilder<Account, Builder> {
-        enum F {
+    public static class Builder extends AbstractBuilder<Account, Builder, Builder.Fields> {
+        enum Fields {
             id,
             name,
             roles,
-        }
-
-        public Builder() {
-            super(F.class, Account.class);
-        }
-
-        public Builder id(String id) {
-            return set(F.id, id);
-        }
-
-        public Builder name(String name) {
-            return set(F.name, name);
-        }
-
-        @SafeVarargs
-        public final Builder roles(Class<? extends User>... roles) {
-            return set(F.roles, roles);
         }
     }
 

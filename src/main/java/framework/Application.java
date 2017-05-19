@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -107,7 +108,7 @@ public abstract class Application implements Attributes<Object> {
                             String right = Tool.string(trio.r.r.path()).orElse(m.getName());
                             m.setAccessible(true);
                             map.compute(left + right, (k, v) -> {
-                                if(v != null) {
+                                if (v != null) {
                                     Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
                                 }
                                 return Tuple.of(c, m);
@@ -164,7 +165,7 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* action */
-        Optional<String> mime;
+        final Optional<String> mime;
         final String action;
         final String extension;
         final int index = path.lastIndexOf('.');
@@ -178,19 +179,18 @@ public abstract class Application implements Attributes<Object> {
             extension = "";
         }
         final Tuple<Class<?>, Method> pair = routing.get(action);
-        final String mimeText = mime.orElse("");
         Predicate<Method> test = method -> {
             String[] extensions = method.getAnnotation(Route.class).extensions();
             boolean result = extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension));
             Optional<String[]> values = Tool.of(method.getAnnotation(Content.class)).map(Content::value);
-            result = result || values.map(i -> Tool.list(i).contains(mimeText)).orElse(false);
+            result = result || values.map(i -> Tool.list(i).contains(mime.orElse(""))).orElse(false);
             return result;
         };
         if (pair != null && test.test(pair.r)) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);
-                if (http == null || http.value().length > 0 && !Arrays.asList(http.value()).contains(request.getMethod())) {
+                if (http == null || http.value().length > 0 && !Tool.list(http.value()).contains(request.getMethod())) {
                     break;
                 }
                 Only only = Tool.or(method.getAnnotation(Only.class), () -> method.getDeclaringClass().getAnnotation(Only.class)).orElse(null);
@@ -225,21 +225,26 @@ public abstract class Application implements Attributes<Object> {
                                     return new Binder(request.getParameters()).bind(p.getName(), type,
                                             types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
                                 }).toArray());
-                        if (response instanceof Response) {
-                            Tool.peek((Response) response, r -> r.charset.orElseGet(() -> Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null)).flush();
-                        } else {
+                        Consumer<Response> setContentType = r -> {
                             Content content = method.getAnnotation(Content.class);
                             String[] accept = request.getHeaders().get("accept").stream()
                                     .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase()))
                                     .toArray(String[]::new);
-                            if (!mime.isPresent()) {
-                                mime = content == null ? Stream.of(accept).findFirst()
-                                        : Stream.of(accept).filter(i -> Stream.of(content.value()).anyMatch(i::equals)).findFirst();
-                            }
-                            Tool.ifPresentOr(mime, m -> Response.of(response).contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null).flush(),
-                                    () -> {
+                            Tool.ifPresentOr(
+                                    Tool.or(mime,
+                                            () -> Stream.of(accept).filter(i -> content == null || Stream.of(content.value()).anyMatch(i::equals)).findFirst()),
+                                    m -> r.contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null), () -> {
                                         throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
                                     });
+                        };
+                        if (response instanceof Response) {
+                            Tool.peek((Response) response, r -> {
+                                if (r.headers == null || !r.headers.containsKey("Content-Type")) {
+                                    setContentType.accept(r);
+                                }
+                            }).flush();
+                        } else {
+                            Tool.peek(Response.of(response), r -> setContentType.accept(r)).flush();
                         }
                         return;
                     } catch (InvocationTargetException e) {
