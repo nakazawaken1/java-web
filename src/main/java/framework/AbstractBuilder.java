@@ -37,9 +37,9 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     public String entrySeparator = ", ";
 
     /**
-     * Cache
+     * Meta info
      */
-    final Cache<VALUE, NAMES> cache;
+    final Meta<VALUE, NAMES> meta;
     /**
      * Field values
      */
@@ -48,15 +48,15 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     /**
      * Caches
      */
-    private static final Map<Class<?>, Cache<?, Enum<?>>> caches = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Meta<?, Enum<?>>> caches = new ConcurrentHashMap<>();
 
     /**
-     * Cached items
+     * Meta info
      * 
      * @param <T> Value type
      * @param <U> Names type
      */
-    private static class Cache<T, U extends Enum<?>> {
+    private static class Meta<T, U extends Enum<?>> {
         /**
          * Target class
          */
@@ -80,17 +80,17 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      */
     @SuppressWarnings("unchecked")
     public AbstractBuilder() {
-        cache = (Cache<VALUE, NAMES>) caches.computeIfAbsent(getClass(), key -> {
+        meta = (Meta<VALUE, NAMES>) caches.computeIfAbsent(getClass(), key -> {
             Type[] types = ((ParameterizedType) key.getGenericSuperclass()).getActualTypeArguments();
-            Cache<VALUE, NAMES> c = new Cache<>();
-            c.clazz = (Class<VALUE>) types[0];
-            c.names = ((Class<NAMES>) types[2]).getEnumConstants();
-            c.fields = Stream.of(c.names).map(name -> Reflector.field(c.clazz, name.name()).orElseThrow(IllegalArgumentException::new)).toArray(Field[]::new);
-            c.constructor = (Constructor<VALUE>) Reflector.constructor(c.clazz, Stream.of(c.fields).map(Field::getType).toArray(Class[]::new))
+            Meta<VALUE, NAMES> m = new Meta<>();
+            m.clazz = (Class<VALUE>) types[0];
+            m.names = ((Class<NAMES>) types[2]).getEnumConstants();
+            m.fields = Stream.of(m.names).map(name -> Reflector.field(m.clazz, name.name()).orElseThrow(IllegalArgumentException::new)).toArray(Field[]::new);
+            m.constructor = (Constructor<VALUE>) Reflector.constructor(m.clazz, Stream.of(m.fields).map(Field::getType).toArray(Class[]::new))
                     .orElseThrow(IllegalArgumentException::new);
-            return (Cache<?, Enum<?>>) c;
+            return (Meta<?, Enum<?>>) m;
         });
-        values = Stream.of(cache.fields).map(field -> field.getType() == Optional.class ? Optional.empty() : null).toArray(Object[]::new);
+        values = Stream.of(meta.fields).map(field -> field.getType() == Optional.class ? Optional.empty() : null).toArray(Object[]::new);
     }
 
     /**
@@ -101,7 +101,22 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     @SuppressWarnings("unchecked")
     public BUILDER set(NAMES name, Object value) {
         int i = name.ordinal();
-        values[i] = cache.fields[i].getType() == Optional.class && !(value instanceof Optional) ? Optional.ofNullable(value) : value;
+        values[i] = meta.fields[i].getType() == Optional.class && !(value instanceof Optional) ? Optional.ofNullable(value) : value;
+        return (BUILDER) this;
+    }
+
+    /**
+     * @param name Field name
+     * @param value Field value
+     * @param pairs Name-value pairs
+     * @return Self
+     */
+    @SuppressWarnings("unchecked")
+    public BUILDER set(NAMES name, Object value, Object... pairs) {
+        set(name, value);
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            set((NAMES) pairs[i], pairs[i + 1]);
+        }
         return (BUILDER) this;
     }
 
@@ -111,7 +126,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      * @return Self
      */
     public BUILDER set(String name, Object value) {
-        return set(Stream.of(cache.names).filter(n -> n.name().equalsIgnoreCase(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
+        return set(Stream.of(meta.names).filter(n -> n.name().equalsIgnoreCase(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
     }
 
     /**
@@ -120,9 +135,9 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      */
     @SuppressWarnings("unchecked")
     public BUILDER set(VALUE source) {
-        for (NAMES i : cache.names) {
+        for (NAMES i : meta.names) {
             try {
-                set(i, cache.fields[i.ordinal()].get(source));
+                set(i, meta.fields[i.ordinal()].get(source));
             } catch (IllegalArgumentException | IllegalAccessException e) {
                 throw new InternalError(e);
             }
@@ -138,7 +153,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     @Override
     public VALUE get() {
         try {
-            return cache.constructor.newInstance(values);
+            return meta.constructor.newInstance(values);
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | SecurityException e) {
             throw new RuntimeException(e);
         }
@@ -154,7 +169,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     public String toString() {
         return IntStream.range(0, values.length).mapToObj(i -> {
             Object v = values[i];
-            return cache.names[i] + pairSeparator + (v instanceof Optional ? ((Optional<Object>) v).orElse(empty) : v);
+            return meta.names[i] + pairSeparator + (v instanceof Optional ? ((Optional<Object>) v).orElse(empty) : v);
         }).collect(Collectors.joining(entrySeparator));
     }
 
