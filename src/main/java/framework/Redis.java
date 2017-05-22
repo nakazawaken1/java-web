@@ -131,7 +131,7 @@ public class Redis implements AutoCloseable {
      * @throws IOException I/O error
      */
     public void command(String... texts) throws IOException {
-        Log.config("[Redis] " + String.join(" ", texts));
+        Log.config(() -> "[Redis] " + String.join(" ", texts));
         writeln(("*" + texts.length).getBytes(StandardCharsets.UTF_8));
         for (String text : texts) {
             writeBulk(text.getBytes(StandardCharsets.UTF_8));
@@ -146,7 +146,7 @@ public class Redis implements AutoCloseable {
      * @throws IOException I/O error
      */
     public void command(Object... texts) throws IOException {
-        Log.config("[Redis] " + Stream.of(texts).map(i -> i instanceof byte[] ? "(bytes)" : i.toString()).collect(Collectors.joining(" ")));
+        Log.config(() -> "[Redis] " + Stream.of(texts).map(i -> i instanceof byte[] ? "(bytes)" : i.toString()).collect(Collectors.joining(" ")));
         writeln(("*" + texts.length).getBytes(StandardCharsets.UTF_8));
         for (Object text : texts) {
             writeBulk(text instanceof byte[] ? (byte[]) text : text.toString().getBytes(StandardCharsets.UTF_8));
