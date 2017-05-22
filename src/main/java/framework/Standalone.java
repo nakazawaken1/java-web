@@ -7,9 +7,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -318,9 +318,180 @@ public class Standalone {
     }
 
     /**
+     * Session store interface
+     */
+    interface SessionStore extends AutoCloseable {
+
+        /**
+         * @param id Session id
+         * @return Key values
+         */
+        Map<String, Serializable> load(String id);
+
+        /**
+         * @param id Session id
+         * @param keyValues Save key-values
+         * @param removeKeys Remove keys
+         */
+        void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys);
+    }
+
+    /**
+     * Session store with database
+     */
+    public static class SessionStoreDb implements SessionStore {
+
+        /**
+         * Database
+         */
+        final Db db = Db.connect(Sys.Db.session_suffix);
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Standalone.SessionStore#set(java.lang.String, java.util.Map)
+         */
+        @Override
+        public void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys) {
+            if (!keyValues.isEmpty()) {
+                Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ? AND name = ?", update -> {
+                    update.setString(3, id);
+                    List<String> namesUpdate = new ArrayList<>();
+                    List<String> valuesUpdate = new ArrayList<>();
+                    db.prepare("INSERT INTO t_session(id, name, value, last_access) VALUES(?, ?, ?, ?)", insert -> {
+                        insert.setString(1, id);
+                        List<String> namesInsert = new ArrayList<>();
+                        List<String> valuesInsert = new ArrayList<>();
+                        ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        keyValues.forEach(Try.biC((name, value) -> {
+                            if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? AND name = ? FOR UPDATE", select -> {
+                                select.setString(1, id);
+                                select.setString(2, name);
+                                return Tool.array(id, name);
+                            }, rs -> {
+                                namesUpdate.add(name);
+                                valuesUpdate.add(Objects.toString(value));
+                                update.setBytes(1, Tool.serialize(value, out));
+                                update.setTimestamp(2, now);
+                                update.setString(4, name);
+                                update.executeUpdate();
+                            }) <= 0) {
+                                namesInsert.add(name);
+                                valuesInsert.add(Objects.toString(value));
+                                insert.setString(2, name);
+                                insert.setBytes(3, Tool.serialize(value, out));
+                                insert.setTimestamp(4, now);
+                                insert.executeUpdate();
+                            }
+                        }));
+                        return namesInsert.isEmpty() ? null : Tool.array(id, namesInsert, valuesInsert, now);
+                    });
+                    return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, now, id, namesUpdate);
+                });
+            }
+            if (!removeKeys.isEmpty()) {
+                db.prepare("DELETE FROM t_session WHERE id = ? AND name = ?", delete -> {
+                    delete.setString(1, id);
+                    removeKeys.forEach(Try.c(name -> {
+                        delete.setString(2, name);
+                        delete.executeUpdate();
+                    }));
+                    return Tool.array(id, removeKeys);
+                });
+            }
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.lang.AutoCloseable#close()
+         */
+        @Override
+        public void close() throws Exception {
+            db.close();
+        }
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see framework.Standalone.SessionStore#load(java.lang.String)
+         */
+        @Override
+        public Map<String, Serializable> load(String id) {
+            Map<String, Serializable> map = new ConcurrentHashMap<>();
+            int timeout = Sys.session_timeout_minutes;
+            if (timeout > 0) {
+                db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
+            }
+            db.select("name", "value").from("t_session").where("id", id).rows(rs -> {
+                try (InputStream in = rs.getBinaryStream(2); ObjectInputStream i = new ObjectInputStream(in)) {
+                    if (in != null) {
+                        map.put(rs.getString(1), (Serializable) i.readObject());
+                    }
+                }
+            });
+            return map;
+        }
+    }
+
+    /**
+     * Session store with Redis
+     */
+    public static class SessionStoreRedis implements SessionStore {
+
+        /**
+         * Redis client
+         */
+        final Redis redis = Try.s(() -> new Redis(Sys.session_redis_host, Sys.session_redis_port)).get();
+
+        /*
+         * (non-Javadoc)
+         * 
+         * @see java.lang.AutoCloseable#close()
+         */
+        @Override
+        public void close() throws Exception {
+            redis.close();
+        }
+
+        @Override
+        public void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            keyValues.forEach(Try.biC((key, value) -> {
+                redis.command("HSET", id, key, Tool.serialize(value, out));
+            }));
+            removeKeys.forEach(Try.c(key -> {
+                redis.command("HDEL", id, key);
+            }));
+        }
+
+        @Override
+        public Map<String, Serializable> load(String id) {
+            Map<String, Serializable> map = new ConcurrentHashMap<>();
+            try {
+                redis.command("HGETALL", id);
+                for (int i = 0, end = (int) redis.readLong('*'); i + 1 < end; i += 2) {
+                    map.put(new String(redis.readBulk(), StandardCharsets.UTF_8), Tool.deserialize(redis.readBulk()));
+                }
+                redis.command("EXPIRE", id, String.valueOf(Sys.session_timeout_minutes * 60));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return map;
+        }
+    }
+
+    /**
      * Session implementation
      */
     public static class SessionImpl extends Session {
+
+        /**
+         * Session store factory
+         */
+        @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
+        public static Supplier<SessionStore> factory = "redis".equals(Sys.session_store) ? SessionStoreRedis::new : SessionStoreDb::new;
 
         /**
          * session id
@@ -359,25 +530,11 @@ public class Standalone {
          */
         Map<String, Serializable> oldAttributes() {
             if (oldAttributes == null) {
-                try (Db db = Db.connect()) {
-                    int timeout = Sys.session_timeout_minutes;
-                    if (timeout > 0) {
-                        db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
-                    }
-                    db.select("name", "value").from("t_session").where("id", id).rows(rs -> {
-                        try (InputStream in = rs.getBinaryStream(2); ObjectInputStream i = new ObjectInputStream(in)) {
-                            if (in != null) {
-                                if (oldAttributes == null) {
-                                    oldAttributes = new ConcurrentHashMap<>();
-                                }
-                                oldAttributes.put(rs.getString(1), (Serializable) i.readObject());
-                            }
-                        }
-                    });
+                try (SessionStore store = factory.get()) {
+                    oldAttributes = store.load(id);
+                } catch (Exception e) {
+                    Log.warning(e, () -> "close error");
                 }
-            }
-            if (oldAttributes == null) {
-                oldAttributes = new ConcurrentHashMap<>();
             }
             return oldAttributes;
         }
@@ -472,11 +629,11 @@ public class Standalone {
         @Override
         public void removeAttr(String name) {
             if (oldAttributes().containsKey(name)) {
-                newAttributes().remove(name);
                 if (removeAttributes == null) {
                     removeAttributes = new HashSet<>();
                 }
                 removeAttributes.add(name);
+                Tool.of(newAttributes).ifPresent(a -> a.remove(name));
             }
         }
 
@@ -489,64 +646,20 @@ public class Standalone {
             if (!hasNew && !hasRemove) {
                 return;
             }
-            try (Db db = Db.connect(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            try (SessionStore store = factory.get(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                store.save(id, hasNew ? newAttributes : Collections.emptyMap(), hasRemove ? removeAttributes : Collections.emptySet());
                 if (hasNew) {
-                    Timestamp now = Timestamp.valueOf(LocalDateTime.now());
-                    db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ? AND name = ?", update -> {
-                        update.setString(3, id);
-                        List<String> namesUpdate = new ArrayList<>();
-                        List<String> valuesUpdate = new ArrayList<>();
-                        db.prepare("INSERT INTO t_session(id, name, value, last_access) VALUES(?, ?, ?, ?)", insert -> {
-                            insert.setString(1, id);
-                            List<String> namesInsert = new ArrayList<>();
-                            List<String> valuesInsert = new ArrayList<>();
-                            newAttributes.forEach(Try.biC((name, object) -> {
-                                try (ObjectOutputStream o = new ObjectOutputStream(out)) {
-                                    o.writeObject(object);
-                                }
-                                byte[] value = out.toByteArray();
-                                out.reset();
-                                if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? AND name = ? FOR UPDATE", select -> {
-                                    select.setString(1, id);
-                                    select.setString(2, name);
-                                    return Tool.array(id, name);
-                                }, rs -> {
-                                    namesUpdate.add(name);
-                                    valuesUpdate.add(Objects.toString(object));
-                                    update.setBytes(1, value);
-                                    update.setTimestamp(2, now);
-                                    update.setString(4, name);
-                                    update.executeUpdate();
-                                }) <= 0) {
-                                    namesInsert.add(name);
-                                    valuesInsert.add(Objects.toString(object));
-                                    insert.setString(2, name);
-                                    insert.setBytes(3, value);
-                                    insert.setTimestamp(4, now);
-                                    insert.executeUpdate();
-                                }
-                            }));
-                            return namesInsert.isEmpty() ? null : Tool.array(id, namesInsert, valuesInsert, now);
-                        });
-                        return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, now, id, namesUpdate);
-                    });
                     newAttributes.forEach(oldAttributes::put);
                     newAttributes = null;
                 }
                 if (hasRemove) {
-                    db.prepare("DELETE FROM t_session WHERE id = ? AND name = ?", delete -> {
-                        delete.setString(1, id);
-                        removeAttributes.forEach(Try.c(name -> {
-                            delete.setString(2, name);
-                            delete.executeUpdate();
-                        }));
-                        return Tool.array(id, removeAttributes);
-                    });
                     removeAttributes.forEach(oldAttributes::remove);
                     removeAttributes = null;
                 }
             } catch (IOException e) {
                 Log.severe(e, () -> "session save error");
+            } catch (Exception e) {
+                Log.warning(e, () -> "close error");
             }
         }
     }

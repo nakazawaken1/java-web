@@ -90,6 +90,9 @@ public class Sys {
 
         @Help({ "database auto config", "CREATE: drop and create", "[UPDATE]: create if not exists", "RELOAD: delete and insert", "NONE: no operation" })
         public static Setup setup = Setup.UPDATE;
+
+        @Help("session store db suffix")
+        public static String session_suffix = "";
     }
 
     @Help("session cookie name")
@@ -184,6 +187,15 @@ public class Sys {
 
     @Help("Initial vector for Tool.enctypt and decrypt")
     public static String IV = "CYKJRWWIYWJHSLEU";
+
+    @Help("Session store(db or redis)")
+    public static Object session_store = "db";
+
+    @Help("host if use redis")
+    public static String session_redis_host = "127.0.0.1";
+
+    @Help("port if use redis")
+    public static int session_redis_port = 6379;
 
     public enum Item implements Message {
         title,

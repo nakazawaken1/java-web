@@ -7,10 +7,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
@@ -2613,6 +2616,36 @@ public class Tool {
             return function.apply(resource);
         } catch (Exception e) {
             Log.warning(e, () -> "resource error");
+            return null;
+        }
+    }
+
+    /**
+     * @param object Object
+     * @param outs Output(auto create if empty)
+     * @return Serialized value
+     */
+    public static byte[] serialize(Serializable object, ByteArrayOutputStream... outs) {
+        ByteArrayOutputStream out = outs.length > 0 ? outs[0] : new ByteArrayOutputStream();
+        try (ObjectOutputStream o = new ObjectOutputStream(out)) {
+            o.writeObject(object);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        byte[] value = out.toByteArray();
+        out.reset();
+        return value;
+    }
+
+    /**
+     * @param bytes Bytes
+     * @return object
+     */
+    public static Serializable deserialize(byte[] bytes) {
+        try (InputStream in = new ByteArrayInputStream(bytes); ObjectInputStream i = new ObjectInputStream(in)) {
+            return (Serializable) i.readObject();
+        } catch (Exception e) {
+            Try.catcher.accept(e);
             return null;
         }
     }
