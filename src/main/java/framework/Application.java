@@ -48,14 +48,14 @@ public abstract class Application implements Attributes<Object> {
     /**
      * @return singleton
      */
-    static Optional<Application> current() {
+    public static Optional<Application> current() {
         return Tool.of(CURRENT);
     }
 
     /**
      * @return context path
      */
-    abstract String getContextPath();
+    public abstract String getContextPath();
 
     @Override
     public String toString() {
@@ -157,8 +157,9 @@ public abstract class Application implements Attributes<Object> {
     void handle(Request request, Session session) {
         Log.info(request::toString);
 
-        /* no slash root access */
         final String path = request.getPath();
+
+        /* no slash root access */
         if (path == null) {
             Response.redirect(getContextPath(), Status.Moved_Permamently).flush();
             return;
@@ -194,6 +195,13 @@ public abstract class Application implements Attributes<Object> {
                     break;
                 }
                 Only only = Tool.or(method.getAnnotation(Only.class), () -> method.getDeclaringClass().getAnnotation(Only.class)).orElse(null);
+
+                /* go login page if not logged in */
+                if (only != null && Sys.redirect_if_not_login.filter(i -> !i.equals(path)).isPresent() && !session.isLoggedIn()) {
+                    Response.redirect(getContextPath() + Sys.redirect_if_not_login.get()).flush();
+                    return;
+                }
+
                 boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
                     forbidden = !session.getAccount().hasAnyRole(only.value());

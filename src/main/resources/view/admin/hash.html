@@ -1,4 +1,4 @@
-#{F:include('template/header.html')}
+#{F:includeV('template/header.html', [Sys.Item.adminTitle, Sys.Item.hash])}
 <style type="text/css">
 td {
   font-family: monospace;
@@ -7,12 +7,16 @@ td {
 th, td {
   border: 1px solid #e2e2e2;
 }
+#hash {
+  display: table;
+  margin: 10px auto;
+}
 </style>
-<form method="post" class="padding">
+<form method="post" id="hash">
   <table>
     <tr>
       <th>source</th>
-      <td><input type="text" name="text" value="${text = R.firstParameters.text}" /> <input type="submit" value="{Sys.Item.run}" /> <input type="submit" onclick="this.form.text.value=''" value="{Sys.Item.clear}" /> <a href="${P}">{Sys.Item.back}</a></td>
+      <td><input type="text" name="text" value="${text = R.firstParameters.text}" /> <input class="button s" type="submit" value="{Sys.Item.run}" /> <input class="button i" type="submit" onclick="this.form.text.value=''" value="{Sys.Item.clear}" /> <a class="button" href="${P}">{Sys.Item.back}</a></td>
     </tr>
     <tr>
       <th>MD2</th>

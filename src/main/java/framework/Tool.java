@@ -2249,11 +2249,8 @@ public class Tool {
         int end = path.lastIndexOf('/');
         if (end < 0) {
             end = path.lastIndexOf('\\');
-            if (end < 0) {
-                end = 0;
-            }
         }
-        return path.substring(0, end);
+        return path.substring(0, end + 1);
     }
 
     /**
@@ -2267,15 +2264,12 @@ public class Tool {
         int start = path.lastIndexOf('/');
         if (start < 0) {
             start = path.lastIndexOf('\\');
-            if (start < 0) {
-                start = 0;
-            }
         }
         int end = path.lastIndexOf('.');
         if (end < 0 || start > end) {
             end = path.length();
         }
-        return path.substring(start, end);
+        return path.substring(start + 1, end);
     }
 
     /**

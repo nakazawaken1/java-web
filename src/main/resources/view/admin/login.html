@@ -1,0 +1,18 @@
+#{F:includeV('template/simple_header.html', [Sys.Item.login])}
+<nav>
+  <h2>{Sys.Item.title} &raquo; {Sys.Item.login}</h2>
+</nav>
+<div style="margin:auto;width:320px;padding:10% 0 0 0;text-align:center">
+  <div>{Sys.Prompt.login}</div>
+  <form method="post" action="${P}login" class="padding margin-top">
+    <div class="padding margin">
+        <table class="margin noborder">
+            <tr><th><label for="loginId">{Sys.Item.loginId}</label></th><td><input type="text" class="ascii focus" id="loginId" name="loginId"/></td></tr>
+            <tr><th><label for="password">{Sys.Item.password}</label></th><td><input type="password" class="ascii" id="password" name="password"/></td></tr>
+            <tr><td colspan="2" class="right"><input class="button s" type="submit" value="{Sys.Item.login}"/> <input class="button i" type="reset" value="{Sys.Item.reset}"/></td></tr>
+        </table>
+    </div>
+  </form>
+  <div class="margin error" data-load="alert"></div>
+</div>
+#{F:include('template/footer.html')}

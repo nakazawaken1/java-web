@@ -1,6 +1,6 @@
 Sys.Alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください。
 
-Sys.Alert.login_failed = ログインIDまたはパスワードが違います。
+Sys.Alert.loginFailed = ログインIDまたはパスワードが違います。
 
 Sys.Item.after = 変更後
 
@@ -42,4 +42,16 @@ Sys.Item.title = タイトル
 
 Sys.Item.update = 変更
 
-Sys.Prompt.login = ログインID・ パスワードを入力して、 ログインボタンを押して下さい。
+Sys.Prompt.login = ログインID・パスワードを入力して、\nログインボタンを押して下さい。
+
+Sys.Item.adminTitle = 管理者メニュー
+
+Sys.Item.config = 設定情報
+
+Sys.Item.hash = 暗号化ツール
+
+Sys.Item.dbSettings = データベース情報
+
+Sys.Item.dbConsole = データベース操作
+
+Sys.Item.reset = リセット

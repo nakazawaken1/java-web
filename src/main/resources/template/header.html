@@ -1,3 +1,3 @@
-#{F:include('template/simple_header.html')}
-#{F:include('template/' += (S.isLoggedIn ? 'logged_in.html' : 'not_logged_in.html'))} 
+#{F:includeV('template/simple_header.html', V)}
+#{F:includeV('template/' += (S.isLoggedIn ? 'logged_in.html' : 'not_logged_in.html'), V)} 
 <div data-load="alert"></div>

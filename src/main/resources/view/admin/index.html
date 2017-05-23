@@ -1,0 +1,19 @@
+#{F:includeV('template/header.html', [Sys.Item.adminTitle])}
+<style type="text/css">
+#menu {
+  margin: 20px auto;
+  display: table;
+}
+#menu a {
+  font-size: 20pt;
+  line-height: 30pt;
+}
+</style>
+<ul id="menu">
+<li><a href="config">{Sys.item.config}</a></li>
+<li><a href="diff.html">{Sys.item.diff}</a></li>
+<li><a href="hash.html">{Sys.item.hash}</a></li>
+<li><a href="sql">{Sys.item.dbSettings}</a></li>
+<!--{Sys.h2_port.ifPresent(i -> '<li><a href="db">{Sys.item.dbConsole}</a></li>')}-->
+</ul>
+#{F:include('template/footer.html')}

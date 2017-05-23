@@ -3,7 +3,7 @@ package app.controller;
 import java.util.Optional;
 
 import app.config.Sys;
-import framework.Request;
+import framework.Application;
 import framework.Response;
 import framework.Session;
 import framework.annotation.Route;
@@ -13,21 +13,6 @@ import framework.annotation.Route.Method;
  * main controller
  */
 public class Main {
-
-    /**
-     * welcome page
-     * 
-     * @param session session
-     * @param request request
-     * @return response
-     */
-    @Route(extensions = ".html")
-    Object index(Session session, Request request) {
-        if (Sys.redirect_if_not_login.isPresent() && !session.isLoggedIn()) {
-            return Response.redirect(Sys.redirect_if_not_login.get());
-        }
-        return Response.file(request.getPath());
-    }
 
     /**
      * @param session session
@@ -41,8 +26,8 @@ public class Main {
             session.remove("alert");
             return Response.redirect("index.html");
         } else {
-            session.setAttr("alert", Sys.Alert.login_failed);
-            return Response.redirect("login.html");
+            session.setAttr("alert", Sys.Alert.loginFailed);
+            return Response.redirect(Sys.redirect_if_not_login.orElse(Application.current().get().getContextPath()));
         }
     }
 
@@ -53,7 +38,7 @@ public class Main {
     @Route
     Object logout(Session session) {
         session.logout();
-        return Response.redirect("login.html");
+        return Response.redirect("index.html");
     }
 
     /**

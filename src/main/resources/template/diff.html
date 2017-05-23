@@ -1,137 +1,120 @@
-<script type="text/javascript">
-    window.onload = function() {
-        document.getElementById('spacer').style.height = document.getElementById('menu').clientHeight;
-    }
-</script>
+#{F:includeV('template/header.html', empty breadcrumb ? [Sys.Item.adminTitle, Sys.Item.diff] : breadcrumb)}
 
 <style type="text/css">
-body, table, form {
-  padding: 0;
-  margin: 0;
-}
-
-table {
-  border-collapse: collapse;
-  border: 1px solid #e2e2e2;
-  table-layout: fixed;
-}
-
-table.full {
+#diff {
   width: 100%;
   min-width: 966px;
 }
 
-textarea {
-  width: 100%;
+#diff textarea {
+  width: 98%;
+  line-height: normal;
+  margin-top: 0;
 }
 
-#menu {
-  padding: 5px;
-  background-color: #ffffee;
-  width: 100%;
-  position: fixed;
-}
-
-.left {
-  float: left;
-}
-
-.legend {
-  margin: 0 10px 0 auto;
-}
-
-.legend td {
-  padding: 3px;
-  border: 1px solid #999;
-}
-
-td {
+#diff td {
   word-break: break-all;
+  border: none;
 }
 
-th {
+#diff th {
   border: 1px solid #e2e2e2;
   font-weight: normal;
 }
 
-tr.header th {
+#diff tr.header th {
   text-align: center;
-  background-color: #eee;
+  background-color: #ffffff;
 }
 
-th, td {
+#diff th, #diff td {
   font-family: monospace;
   font-size: 10pt;
+  background-color: #ffffff;
+  line-height: normal;
+  padding: 1px;
 }
 
-tr.equal th, tr.change th, tr.insert th, tr.delete th, tr.skip th {
+#diff tr.equal th, #diff tr.change th, #diff tr.insert th, #diff tr.delete th, #diff tr.skip th {
   text-align: right;
-  color: #999;
-  background-color: #eee;
+  color: #777777;
+  background-color: #f7f7f7;
 }
 
-tr.skip th, tr.skip td {
+#diff tr.skip th, #diff tr.skip td {
   text-align: center;
-  color: #999;
-  background-color: #eee;
+  color: #777777;
+  background-color: #f7f7f7;
 }
 
-tr.change th, tr.change td, td.g {
+#diff tr.change th, #diff tr.change td, td.g {
   background-color: #e2ffe2;
   color: #090;
 }
 
-tr.insert th, tr.insert td, td.b {
+#diff tr.insert th, #diff tr.insert td, td.b {
   background-color: #e2e2ff;
   color: #009;
 }
 
-tr.delete th, tr.delete td, td.r {
+#diff tr.delete th, #diff tr.delete td, td.r {
   background-color: #ffe2e2;
   color: #900;
 }
 
-b {
+#diff b {
   font-weight: normal;
   background-color: #99ff99;
   color: #009900;
+  font-size: inherit;
+  line-height: normal;
 }
 
-.header th:not (.index ) {
+#diff .header th:odd {
   width: 48%;
 }
 
-.header th.index {
+#diff .header th.even {
   width: 2%;
+}
+
+#legend {
+  margin: 0 5px 0 auto;
 }
 </style>
 
-<div id="menu">
-  <form method="post" class="left">
-    <input type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? Sys.Item.compact : Sys.Item.full}" /> <a href="${P}">{Sys.Item.back}</a>
+<div id="command">
+  <form method="post">
+    <input class="button s" type="submit" name="${isFull ? 'compact' : 'full'}" value="${isFull ? Sys.Item.compact : Sys.Item.full}" /> <a class="button"
+      href="${P}">{Sys.Item.back}</a>
   </form>
 
-  <table class="legend">
+  <div>
+    <table id="legend">
+      <tr>
+        <td class="g">{Sys.Item.update}</td>
+        <td class="b">{Sys.Item.insert}</td>
+        <td class="r">{Sys.Item.delete}</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<div class="padding">
+  <table id="diff">
+    <tr class="header">
+      <th class="index">{Sys.Item.index}</th>
+      <th>${empty before ? Sys.Item.before : before}</th>
+      <th class="index">{Sys.Item.index}</th>
+      <th>${empty after ? Sys.Item.after : after}</th>
+    </tr>
+    <!--{F:includeFor('template/diff_tr.html', diffs)}-->
     <tr>
-      <td class="g">{Sys.Item.update}</td>
-      <td class="b">{Sys.Item.insert}</td>
-      <td class="r">{Sys.Item.delete}</td>
+      <th>raw</th>
+      <td><textarea rows="10">${S.before}</textarea></td>
+      <th>raw</th>
+      <td><textarea rows="10">${S.after}</textarea></td>
     </tr>
   </table>
 </div>
-<div id="spacer"></div>
-<table class="full">
-  <tr class="header">
-    <th class="index">{Sys.Item.index}</th>
-    <th>${empty before ? Sys.Item.before : before}</th>
-    <th class="index">{Sys.Item.index}</th>
-    <th>${empty after ? Sys.Item.after : after}</th>
-  </tr>
-  <!--{F:includeFor('template/diff_tr.html', diffs)}-->
-  <tr>
-    <th>raw</th>
-    <td><textarea rows="10">${S.before}</textarea></td>
-    <th>raw</th>
-    <td><textarea rows="10">${S.after}</textarea></td>
-  </tr>
-</table>
+#{F:include('template/footer.html')}

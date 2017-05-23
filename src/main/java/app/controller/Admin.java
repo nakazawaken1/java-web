@@ -94,7 +94,7 @@ public class Admin {
     @Route
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
-                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定");
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb", Tool.list(Sys.Item.adminTitle, Sys.Item.config));
     }
 
     /**
@@ -118,7 +118,7 @@ public class Admin {
             return Response.template("diff.html").bind("isFull", isFull).bind("diffs",
                     Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
                             Sys.Item.reader.toString()));
-        })).orElseGet(() -> Response.file("diff.html"));
+        })).orElseGet(() -> Response.file("admin/diff.html"));
     }
 
     /**
@@ -151,7 +151,7 @@ public class Admin {
                         x.children().get(3).text(d.getAfterText());
                         return x;
                     }));
-        })).orElseGet(() -> Response.file("diff2.html"));
+        })).orElseGet(() -> Response.file("admin/diff2.html"));
     }
 
     /**

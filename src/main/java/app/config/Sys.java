@@ -174,7 +174,7 @@ public class Sys {
     public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
 
     @Help("redirect url if not loggged in(not recirect if empty)")
-    public static Optional<String> redirect_if_not_login = Tool.of("login.html");
+    public static Optional<String> redirect_if_not_login = Tool.of("admin/login.html");
 
     @Help("separator of array to text")
     public static String array_separator = "\n,\n";
@@ -202,7 +202,7 @@ public class Sys {
         login,
         logout,
         error,
-        login_id,
+        loginId,
         password,
         update,
         insert,
@@ -215,12 +215,21 @@ public class Sys {
         index,
         compact,
         full,
-        @Mapping("©2016, All Rights Reserved.")
+        @Mapping("©2017, All Rights Reserved.")
         copyright,
         @Mapping("...")
         reader,
         run,
-        clear,;
+        clear,
+        config,
+        hash,
+        @Mapping("Database Settings")
+        dbSettings,
+        @Mapping("Database Console")
+        dbConsole,
+        @Mapping("Administrator menu")
+        adminTitle,
+        reset;
 
         @Override
         public String toString() {
@@ -232,7 +241,7 @@ public class Sys {
         @Mapping("You do not have access rights. Please login with authorized account.")
         forbidden,
         @Mapping("Login ID or password is wrong.")
-        login_failed,;
+        loginFailed,;
 
         @Override
         public String toString() {

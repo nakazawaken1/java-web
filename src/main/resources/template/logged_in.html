@@ -1,6 +1,4 @@
 <nav>
-  <div><a href="${P}">{Sys.Item.title}</a></div>
-  <form action="logout" class="inline">&#9924; #{S.account.name} <button type="submit">{Sys.Item.logout}</button></form>
+  <h2><a href="${P}">{Sys.Item.title}</a>#{V.stream().reduce('', (l, r) -> l += ' &raquo; ' += r)}</h2>
+  <form action="${P}logout">&#9924; #{S.account.name} <button class="button" type="submit">{Sys.Item.logout}</button></form>
 </nav>
-<div id="nav">
-</div>

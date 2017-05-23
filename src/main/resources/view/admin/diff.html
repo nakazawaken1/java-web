@@ -1,0 +1,17 @@
+#{F:includeV('template/header.html', empty breadcrumb ? [Sys.Item.adminTitle, Sys.Item.diff] : breadcrumb)}
+<form method="post" class="padding">
+  <div>
+    <input class="button s" type="submit" value="{Sys.Item.diff}" /> <a class="button" href="${P}">{Sys.Item.back}</a>
+  </div>
+  <table class="margin-top full">
+    <tr>
+      <th>{Sys.Item.before}</th>
+      <th>{Sys.Item.after}</th>
+    </tr>
+    <tr>
+      <td style="text-align: center"><textarea name="before" rows="30" style="width: 98%">${S.before}</textarea></td>
+      <td style="text-align: center"><textarea name="after" rows="30" style="width: 98%">${S.after}</textarea></td>
+    </tr>
+  </table>
+</form>
+#{F:include('template/footer.html')}

@@ -53,6 +53,13 @@ public abstract class Request implements Attributes<Object> {
     /**
      * @return file name(without extension)
      */
+    public String getFolder() {
+        return Tool.getFolder(getPath());
+    }
+
+    /**
+     * @return file name(without extension)
+     */
     public String getName() {
         return Tool.getName(getPath());
     }
@@ -62,6 +69,13 @@ public abstract class Request implements Attributes<Object> {
      */
     public String getExtension() {
         return Tool.getExtension(getPath());
+    }
+
+    /**
+     * @return file name(without extension)
+     */
+    public String getFile() {
+        return getName() + getExtension();
     }
 
     /**

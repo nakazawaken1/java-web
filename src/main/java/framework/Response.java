@@ -380,7 +380,7 @@ public abstract class Response {
      * write response
      */
     void flush() {
-        boolean[] cancel = { false };
+        boolean[] cancel = { false }; // process next writer if true
         writeResponse(Try.c(out -> {
             for (Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>> pair : writers) {
                 if (pair.l.isAssignableFrom(content.getClass())) {
@@ -582,6 +582,9 @@ public abstract class Response {
                 /* no content */
                 if (Tool.list(".css", ".js").contains(Tool.getExtension(file))) {
                     response.status(Status.No_Content);
+                } else if (Paths.get(Sys.document_root_folder, "index.html").toString().replace('\\', '/').equals(file)) {
+                    response.setHeader("Location", Tool.trim(null, Application.current().get().getContextPath(), "/") + "admin/index.html")
+                            .status(Status.Moved_Permamently);
                 } else {
                     Log.info("not found: " + Tool.trim("/", file, null));
                     response.status(Status.Not_Found);
