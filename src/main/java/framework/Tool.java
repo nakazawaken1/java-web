@@ -1262,8 +1262,10 @@ public class Tool {
      * @param i index(support negative value)
      * @return element
      */
-    public static <T> T at(T[] array, int i) {
-        return array[i < 0 ? array.length + i : i];
+    public static <T> Optional<T> at(T[] array, int i) {
+        int max = array.length;
+        int n = i < 0 ? max + i : i;
+        return n < 0 || max <= n ? Optional.empty() : Optional.of(array[n]);
     }
 
     /**
@@ -2094,7 +2096,7 @@ public class Tool {
                 index = i.indexOf('\n');
             } else {
                 int index2 = i.indexOf('\n');
-                if(index2 > 0 && index2 < index) {
+                if (index2 > 0 && index2 < index) {
                     index = index2;
                 }
             }
@@ -2108,6 +2110,29 @@ public class Tool {
             }
             return i + (suffix ? " ..." : "");
         }).orElse(null);
+    }
+
+    /**
+     * Build path
+     * 
+     * @param parts Parts of path
+     * @return Separator to Path function
+     */
+    public static Function<String, String> path(String... parts) {
+        return separator -> {
+            StringBuilder s = new StringBuilder();
+            int end = parts.length - 1;
+            if (end > 0) {
+                s.append(trim(null, parts[0], separator));
+            }
+            for (int i = 1; i < end; i++) {
+                s.append(trim(null, prefix(parts[i], separator), separator));
+            }
+            if (end >= 0) {
+                s.append(prefix(parts[end], separator));
+            }
+            return s.toString();
+        };
     }
 
     /**

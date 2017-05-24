@@ -18,8 +18,8 @@ public class ToolTest extends Tester {
     {
         groupWith("add", g -> {
             Map<String, List<String>> map = new HashMap<>();
-            expect(g + ":1", () -> Tool.json(Tool.addValue(map, "key", "value1"))).toEqual(Tool.json(Tool.array("value1")));
-            expect(g + ":2", () -> Tool.json(Tool.addValue(map, "key", "value2"))).toEqual(Tool.json(Tool.array("value1", "value2")));
+            expect(g + ":1", () -> Tool.json(Tool.addValue(map, "key", "value1"))).toEqual(Tool.json("value1"));
+            expect(g + ":2", () -> Tool.json(Tool.addValue(map, "key", "value2"))).toEqual(Tool.json("value2"));
         });
 
         groupWith("trim", g -> {
@@ -78,6 +78,18 @@ public class ToolTest extends Tester {
                     to.apply(d -> (d.getMonthValue() < 2 || d.getMonthValue() == 2 && (d.getDayOfMonth() < 3 || d.getDayOfMonth() == 3 && d.getHour() < 10) ? d
                             : d.plusYears(1)).withMonth(2).withDayOfMonth(3).withHour(10).truncatedTo(ChronoUnit.HOURS)));
             expectWith(g + "2020/3/4 12:34:56", from).toEqual(to.apply(d -> ZonedDateTime.of(2020, 3, 4, 12, 34, 56, 0, ZoneId.systemDefault())));
+        });
+        
+        groupWith("path", group -> {
+            String g = group + ":";
+            Function<String, Object> from = s -> Tool.path(s.substring(g.length()).split(","));
+            expectWith(g + "a,b,c", from).toEqual("a/b/c");
+            expectWith(g + "/a,b,c", from).toEqual("/a/b/c");
+            expectWith(g + "a/,b,c", from).toEqual("a/b/c");
+            expectWith(g + "a,/b,c", from).toEqual("a/b/c");
+            expectWith(g + "a,b/,c", from).toEqual("a/b/c");
+            expectWith(g + "a,b,/c", from).toEqual("a/b/c");
+            expectWith(g + "a,b,c/", from).toEqual("a/b/c/");
         });
     }
 }

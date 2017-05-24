@@ -305,7 +305,7 @@ public class ServletImpl implements javax.servlet.Servlet {
             this.response = response;
             String uri = request.getRequestURI();
             int rootLength = request.getContextPath().length() + 1;
-            path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("index.html");
+            path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("/");
         }
 
         /**

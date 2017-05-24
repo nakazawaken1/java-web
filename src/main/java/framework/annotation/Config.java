@@ -175,7 +175,7 @@ public @interface Config {
                             if (c == null) {
                                 return null;
                             }
-                            c = Stream.of(c.getClasses()).filter(j -> i.equalsIgnoreCase(j.getSimpleName())).findAny().orElse(null);
+                            c = Stream.of(c.getClasses()).filter(j -> i.equals(j.getSimpleName())).findAny().orElse(null);
                         }
                     }
                     return c;

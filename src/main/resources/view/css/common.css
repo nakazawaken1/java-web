@@ -218,7 +218,7 @@ table.noborder th, table.noborder td {
   border: none;
 }
 
-[data-load=alert] {
+[data-load="/alert"] {
   color: red;
 }
 
@@ -226,7 +226,15 @@ table.noborder th, table.noborder td {
   padding: 5px;
 }
 
-.right {
+.text-left {
+  text-align: left;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
   text-align: right;
 }
 
@@ -266,14 +274,25 @@ table.noborder th, table.noborder td {
   margin-top: 5px;
 }
 
-.middle {
-  vertical-align: middle;
-  display: table;
-  margin: 0 auto;
+.margin-top-huge {
+  margin-top: 50px;
+}
+
+.margin-bottom {
+  margin-bottom: 5px;
+}
+
+.left {
+  margin-right: auto;
 }
 
 .center {
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.right {
+  margin-left: auto;
 }
 
 .cell {

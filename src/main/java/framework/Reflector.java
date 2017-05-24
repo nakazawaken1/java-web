@@ -332,6 +332,6 @@ public class Reflector {
      */
     @SuppressWarnings("unchecked")
     public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) {
-        return (T) method(instance.getClass(), name, argClasses).map(Try.f(m -> m.invoke(null, args))).orElse(null);
+        return (T) method(instance.getClass(), name, argClasses).map(Try.f(m -> m.invoke(instance, args))).orElse(null);
     }
 }

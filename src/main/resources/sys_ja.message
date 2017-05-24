@@ -16,7 +16,7 @@ Sys.Item.delete = 削除
 
 Sys.Item.diff = 差分表示
 
-Sys.Item.error = 何か間違っていませんか？
+Sys.Item.error = エラー
 
 Sys.Item.full = 全行表示
 

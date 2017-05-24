@@ -10,10 +10,10 @@
 }
 </style>
 <ul id="menu">
-<li><a href="config">{Sys.item.config}</a></li>
-<li><a href="diff.html">{Sys.item.diff}</a></li>
-<li><a href="hash.html">{Sys.item.hash}</a></li>
-<li><a href="sql">{Sys.item.dbSettings}</a></li>
-<!--{Sys.h2_port.ifPresent(i -> '<li><a href="db">{Sys.item.dbConsole}</a></li>')}-->
+<li><a href="config">{Sys.Item.config}</a></li>
+<li><a href="diff.html">{Sys.Item.diff}</a></li>
+<li><a href="hash.html">{Sys.Item.hash}</a></li>
+<li><a href="sql">{Sys.Item.dbSettings}</a></li>
+<!--{Sys.h2_port.map(i -> '<li><a href="db">' += Sys.Item.dbConsole += '</a></li>').orElse('')}-->
 </ul>
 #{F:include('template/footer.html')}

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -230,7 +231,7 @@ public abstract class Response {
      * @return response
      */
     public static Response template(String file) {
-        return of(Paths.get(Sys.template_folder, file)).charset(StandardCharsets.UTF_8);
+        return of(Paths.get(Sys.template_folder, file));
     }
 
     /**
@@ -532,62 +533,82 @@ public abstract class Response {
             }), //
             Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())), //
             Tuple.of(Path.class, (response, out, cancel) -> {
+                BiConsumer<String, InputStream> load = (file, in) -> {
+                    response.contentType(Tool.getContentType(file), response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                    if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
+                        try (Stream<String> lines = Tool.lines(in);
+                                PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                            Function<Formatter, Formatter.Result> exclude;
+                            Function<Object, String> escape;
+                            if (file.endsWith(".js")) {
+                                exclude = Formatter::excludeForScript;
+                                escape = Formatter::scriptEscape;
+                            } else if (file.endsWith(".css")) {
+                                exclude = Formatter::excludeForStyle;
+                                escape = null;
+                            } else {
+                                exclude = Formatter::excludeForHtml;
+                                escape = Tool::htmlEscape;
+                            }
+                            try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map,
+                                    Tool.of(response.values).map(List::toArray).orElseGet(Tool::array))) {
+                                lines.forEach(line -> writer.println(formatter.format(line)));
+                            }
+                        }
+                    } else {
+                        Tool.copy(in, out.get(), new byte[1024]);
+                    }
+                };
                 String file = ((Path) response.content).toString().replace('\\', '/');
                 Optional<URL> url = Tool.toURL(file);
                 if (url.isPresent()) {
                     URL u = url.get();
                     try (InputStream in = u.openStream()) {
-                        if (!("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
-                                && Try.s(() -> in.available() >= 0, e -> false).get()) {
-                            Log.config("[static load] " + u);
-                            response.contentType(Tool.getContentType(file),
-                                    response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                            if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
-                                try (Stream<String> lines = Tool.lines(in);
-                                        PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                                    Function<Formatter, Formatter.Result> exclude;
-                                    Function<Object, String> escape;
-                                    if (file.endsWith(".js")) {
-                                        exclude = Formatter::excludeForScript;
-                                        escape = Formatter::scriptEscape;
-                                    } else if (file.endsWith(".css")) {
-                                        exclude = Formatter::excludeForStyle;
-                                        escape = null;
-                                    } else {
-                                        exclude = Formatter::excludeForHtml;
-                                        escape = Tool::htmlEscape;
-                                    }
-                                    try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, response.values)) {
-                                        lines.forEach(line -> writer.println(formatter.format(line)));
-                                    }
-                                }
-                            } else {
-                                Tool.copy(in, out.get(), new byte[1024]);
+                        if (("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
+                                && Try.s(() -> in.available() >= 0, e -> false).get()) { // Is Folder
+                            if (!Request.current().map(Request::getPath).orElse("").endsWith("/")) {
+                                String path = Tool.suffix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
+                                Log.info("folder redirect: " + path);
+                                response.status(Status.Moved_Permamently).addHeader("Location", path);
+                                out.get();
+                                return;
                             }
-                        } else {
-                            String prefix = Paths.get(Sys.document_root_folder).toString().replace('\\', '/');
-                            String path = file.startsWith(prefix) ? file.substring(prefix.length()) : file;
-                            Log.info(file + " : " + path);
-                            response.setHeader("Location",
-                                    Tool.trim(null, Application.current().get().getContextPath(), "/") + Tool.suffix(path, "/") + "index.html")
-                                    .status(Status.Moved_Permamently);
-                            out.get();
+                            String folder = Tool.suffix(file, "/");
+                            for (String page : Sys.default_pages) {
+                                if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
+                                    Log.config("[static load] " + p);
+                                    Tool.using(p::openStream, i -> {
+                                        load.accept(page, i);
+                                        return null;
+                                    });
+                                }, () -> {
+                                })) {
+                                    return;
+                                }
+                            }
+                        } else { // Is File
+                            Log.config("[static load] " + u);
+                            load.accept(file, in);
+                            return;
                         }
                     } catch (NullPointerException e) {
                         /* noop */
                     }
-                    return;
                 }
 
                 /* no content */
                 if (Tool.list(".css", ".js").contains(Tool.getExtension(file))) {
                     response.status(Status.No_Content);
-                } else if (Paths.get(Sys.document_root_folder, "index.html").toString().replace('\\', '/').equals(file)) {
-                    response.setHeader("Location", Tool.trim(null, Application.current().get().getContextPath(), "/") + "admin/index.html")
-                            .status(Status.Moved_Permamently);
                 } else {
-                    Log.info("not found: " + Tool.trim("/", file, null));
-                    response.status(Status.Not_Found);
+                    String path = Tool.prefix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
+                    String aliase = Sys.aliases.get(path);
+                    if (aliase != null) {
+                        Log.info("aliase redirect: " + path + " -> " + aliase);
+                        response.status(Status.Moved_Permamently).addHeader("Location", aliase);
+                    } else {
+                        Log.info("not found: " + Tool.trim("/", file, null));
+                        response.status(Status.Not_Found);
+                    }
                 }
                 out.get();
             }), //

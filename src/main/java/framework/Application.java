@@ -198,7 +198,7 @@ public abstract class Application implements Attributes<Object> {
 
                 /* go login page if not logged in */
                 if (only != null && Sys.redirect_if_not_login.filter(i -> !i.equals(path)).isPresent() && !session.isLoggedIn()) {
-                    Response.redirect(getContextPath() + Sys.redirect_if_not_login.get()).flush();
+                    Response.redirect(Tool.path(getContextPath(), Sys.redirect_if_not_login.get()).apply("/")).flush();
                     return;
                 }
 
@@ -208,7 +208,7 @@ public abstract class Application implements Attributes<Object> {
                 }
                 if (forbidden) {
                     session.setAttr("alert", Sys.Alert.forbidden);
-                    Response.redirect(getContextPath()).flush();
+                    Response.template("error.html").flush();
                     return;
                 }
                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {

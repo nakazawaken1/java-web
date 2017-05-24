@@ -28,7 +28,7 @@ public class Account implements Serializable {
     /**
      * user for not login
      */
-    public static final Account GUEST = new Account("guest", "guest", Tool.array());
+    public static final Account GUEST = new Account("guest", "guest", Tool.array(), null);
 
     /**
      * id
@@ -74,14 +74,22 @@ public class Account implements Serializable {
     public final Class<? extends User>[] roles;
 
     /**
-     * @param id id
-     * @param name name
-     * @param roles roles
+     * アバター
      */
-    protected Account(String id, String name, Class<? extends User>[] roles) {
+    @Help("アバター")
+    public final String avator;
+
+    /**
+     * @param id Id
+     * @param name Name
+     * @param roles Roles
+     * @param avator Avator
+     */
+    protected Account(String id, String name, Class<? extends User>[] roles, String avator) {
         this.id = Objects.requireNonNull(id);
         this.name = Objects.requireNonNull(name);
         this.roles = roles == null ? Tool.array() : roles;
+        this.avator = avator;
     }
 
     /**
@@ -93,6 +101,7 @@ public class Account implements Serializable {
             id,
             name,
             roles,
+            avator,
         }
     }
 
@@ -127,8 +136,8 @@ public class Account implements Serializable {
      * @return account or empty if login failed
      */
     public static Optional<Account> loginWithConfig(String loginId, String password) {
-        return Sys.accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst()
-                .map(a -> new Account(loginId, a[2], Tool.string(a[3]).map(User::fromString).map(Tool::array).orElse(Tool.array())));
+        return Sys.accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst().map(a -> new Account(loginId,
+                Tool.at(a, 2).orElse(loginId), Tool.at(a, 3).map(User::fromString).map(Tool::array).orElseGet(Tool::array), Tool.at(a, 4).orElse(null)));
     }
 
     /**
@@ -138,8 +147,8 @@ public class Account implements Serializable {
      */
     public static Optional<Account> loginWithDb(String loginId, String password) {
         try (Db db = Db.connect()) {
-            return db.queryFile("login.sql", Tool.map("id", loginId, "password", password)).findFirst().map(Try
-                    .f(rs -> new Account(loginId, rs.getString(1), Tool.string(rs.getString(2)).map(User::fromString).map(Tool::array).orElse(Tool.array()))));
+            return db.queryFile("login.sql", Tool.map("id", loginId, "password", password)).findFirst().map(Try.f(rs -> new Account(loginId, rs.getString(1),
+                    Tool.string(rs.getString(2)).map(User::fromString).map(Tool::array).orElseGet(Tool::array), null)));
         }
     }
 }

@@ -126,7 +126,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      * @return Self
      */
     public BUILDER set(String name, Object value) {
-        return set(Stream.of(meta.names).filter(n -> n.name().equalsIgnoreCase(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
+        return set(Stream.of(meta.names).filter(n -> n.name().equals(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
     }
 
     /**

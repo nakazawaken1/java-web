@@ -133,9 +133,9 @@ public class Sys {
     @Help("login method(must to be static method)")
     public static String login_method = Account.class.getName() + ".loginWithConfig";
 
-    @Help("accounts data(loginId:password:name:roles,...)")
-    @Separator(value = ';')
-    public static List<String> accounts = Tool.list("admin:Adm1n:Administrator:Administrator", "user:U5er:User:User");
+    @Help("accounts data(loginId:password:name:roles|...)")
+    @Separator('|')
+    public static List<String> accounts = Tool.list("admin:Adm1n:Administrator:Administrator:&#127877;", "user:U5er:User:User:&#128104;");
 
     @Help("file extension of text type contents")
     @Separator('|')
@@ -173,9 +173,6 @@ public class Sys {
     @Help("job packages")
     public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
 
-    @Help("redirect url if not loggged in(not recirect if empty)")
-    public static Optional<String> redirect_if_not_login = Tool.of("admin/login.html");
-
     @Help("separator of array to text")
     public static String array_separator = "\n,\n";
 
@@ -196,6 +193,18 @@ public class Sys {
 
     @Help("port if use redis")
     public static int session_redis_port = 6379;
+
+    @Help("redirect url if not loggged in(not redirect if empty)")
+    public static Optional<String> redirect_if_not_login = Tool.of("/admin/login.html");
+
+    @Help("Default pages")
+    public static List<String> default_pages = Tool.list("index.html", "index.htm");
+
+    @Help("Aliases if key file is not exists")
+    public static Map<String, String> aliases = Tool.map("/", "/index.html", "/index.html", "/admin/index.html");
+    
+    @Help("Default avator")
+    public static String default_avator = "&#9924;";
 
     public enum Item implements Message {
         title,

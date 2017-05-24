@@ -1,4 +1,5 @@
 <nav>
+  <h2><a href="${P}">{Sys.Item.title}</a>#{V.stream().reduce('', (l, r) -> l += ' &raquo; ' += r)}</h2>
   <form action="${P}login" method="post">
     <input type="text" name="loginId" /> <input type="password" name="password" />
     <button class="button" type="submit">{Sys.Item.login}</button>

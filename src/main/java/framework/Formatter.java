@@ -451,7 +451,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                     value = Tool.string(result).orElse(null);
                     type = "raw " + type;
                 }
-                if(value != null && !isEl) {
+                if (value != null && !isEl) {
                     value = value.replaceAll("\n", "<br/>\n");
                 }
                 Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.Log.eval_max_letters));
@@ -683,8 +683,8 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                             if (method != null) {
                                 value = method.invoke(base);
                             } else {
-                                value = Reflector.field(clazz, (String) property).map(Try.f(f -> f.get(base)))
-                                        .orElseThrow(() -> new NoSuchFieldException(clazz.getSimpleName() + "." + property));
+                                Field f = Reflector.field(clazz, (String) property).orElseThrow(() -> new NoSuchFieldException(clazz.getSimpleName() + "." + property));
+                                value = f.get(base);
                             }
                             context.setPropertyResolved(true);
                             return value;

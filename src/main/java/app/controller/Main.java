@@ -6,6 +6,7 @@ import app.config.Sys;
 import framework.Application;
 import framework.Response;
 import framework.Session;
+import framework.Tool;
 import framework.annotation.Route;
 import framework.annotation.Route.Method;
 
@@ -28,7 +29,7 @@ public class Main {
             return Response.redirect(application.getContextPath());
         } else {
             session.setAttr("alert", Sys.Alert.loginFailed);
-            return Response.redirect(Sys.redirect_if_not_login.orElse(application.getContextPath()));
+            return Response.redirect(Tool.path(application.getContextPath(), Sys.redirect_if_not_login.orElse("")).apply("/"));
         }
     }
 

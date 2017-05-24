@@ -61,7 +61,7 @@ public class Admin {
      */
     @Route
     Object sql(Db db, Optional<String> sql) throws SQLException {
-        return Response.Template.of("table.html", (out, name, prefix) -> {
+        return Response.Template.of("admin/table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
                 return;
             }
@@ -115,7 +115,7 @@ public class Admin {
         return before.flatMap(b -> after2.map(a -> {
             session.put("before", b);
             session.put("after", a);
-            return Response.template("diff.html").bind("isFull", isFull).bind("diffs",
+            return Response.template("admin/diff.html").bind("isFull", isFull).bind("diffs",
                     Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))), isFull ? 0 : 3,
                             Sys.Item.reader.toString()));
         })).orElseGet(() -> Response.file("admin/diff.html"));
@@ -141,14 +141,14 @@ public class Admin {
             session.put("after", a);
             List<Diff<String>> list = Diff.compact(Diff.diff(b.split("\r?\n"), a.split("\r?\n"), Diff.IGNORE_SPACE, Diff.INLINE("b", 2).andThen(Diff.TAB(4))),
                     isFull ? 0 : 3, Sys.Item.reader.toString());
-            return Render.of("diff2.html",
+            return Render.of("admin/diff2.html",
                     xml -> xml.attr("name", isFull ? "compact" : "full").attr("value", isFull ? Sys.Item.compact.toString() : Sys.Item.full.toString()),
                     xml -> xml.repeat(list.stream(), (x, d) -> {
                         x.attr("class", d.type.toString());
-                        x.children().get(0).text(d.getBeforeIndexText());
-                        x.children().get(1).text(d.getBeforeText());
-                        x.children().get(2).text(d.getAfterIndexText());
-                        x.children().get(3).text(d.getAfterText());
+                        x.children().get(0).innerHtml(d.getBeforeIndexText());
+                        x.children().get(1).innerHtml(d.getBeforeText());
+                        x.children().get(2).innerHtml(d.getAfterIndexText());
+                        x.children().get(3).innerHtml(d.getAfterText());
                         return x;
                     }));
         })).orElseGet(() -> Response.file("admin/diff2.html"));
