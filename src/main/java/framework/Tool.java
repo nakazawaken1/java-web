@@ -2092,6 +2092,11 @@ public class Tool {
             int index = i.indexOf('\r');
             if (index < 0) {
                 index = i.indexOf('\n');
+            } else {
+                int index2 = i.indexOf('\n');
+                if(index2 > 0 && index2 < index) {
+                    index = index2;
+                }
             }
             if (index >= 0) {
                 i = i.substring(0, index);

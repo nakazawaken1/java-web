@@ -538,6 +538,10 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                         case "flatMap":
                             context.setPropertyResolved(true);
                             return o.flatMap(e -> (Optional<?>) lambda.invoke(context, e));
+                        case "ifPresent":
+                            context.setPropertyResolved(true);
+                            o.ifPresent(e -> lambda.invoke(context, e));
+                            return null;
                         case "orElseGet":
                             context.setPropertyResolved(true);
                             return o.orElseGet(() -> lambda.invoke(context));
