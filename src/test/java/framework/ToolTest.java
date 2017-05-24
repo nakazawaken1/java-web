@@ -18,8 +18,8 @@ public class ToolTest extends Tester {
     {
         groupWith("add", g -> {
             Map<String, List<String>> map = new HashMap<>();
-            expect(g + ":1", () -> Tool.json(Tool.add(map, "key", "value1").get("key"))).toEqual(Tool.json(Tool.array("value1")));
-            expect(g + ":2", () -> Tool.json(Tool.add(map, "key", "value2").get("key"))).toEqual(Tool.json(Tool.array("value1", "value2")));
+            expect(g + ":1", () -> Tool.json(Tool.addValue(map, "key", "value1"))).toEqual(Tool.json(Tool.array("value1")));
+            expect(g + ":2", () -> Tool.json(Tool.addValue(map, "key", "value2"))).toEqual(Tool.json(Tool.array("value1", "value2")));
         });
 
         groupWith("trim", g -> {
@@ -41,13 +41,21 @@ public class ToolTest extends Tester {
             String g = group + ":";
             ZonedDateTime now = ZonedDateTime.now();
             Function<String, Object> from = s -> now.plus(Tool.nextMillis(s.substring(g.length()), now), ChronoUnit.MILLIS);
-            Function<Function<ZonedDateTime, ZonedDateTime>, Object> to = d -> d.apply(now); 
+            Function<Function<ZonedDateTime, ZonedDateTime>, Object> to = d -> d.apply(now);
             expect(g + "all null", () -> Tool.nextMillis(null, null)).toThrow(NullPointerException.class);
             expect(g + "text null", () -> Tool.nextMillis(null, now)).toThrow(NullPointerException.class);
             expect(g + "from null", () -> Tool.nextMillis("", null)).toThrow(NullPointerException.class);
             expectWith(g + "", from).toEqual(now);
-            expectWith(g + "Fri 12:34", from).toEqual(to.apply(d -> (d.getDayOfWeek().getValue() < DayOfWeek.FRIDAY.getValue() || d.getDayOfWeek().getValue() == DayOfWeek.FRIDAY.getValue() && (d.getHour() < 12 || d.getHour() == 12 && d.getMinute() < 34) ? d : d.plusDays(7)).with(ChronoField.DAY_OF_WEEK, DayOfWeek.FRIDAY.getValue()).withHour(12).withMinute(34).truncatedTo(ChronoUnit.MINUTES)));
-            expectWith(g + "SUNDAY 11:00", from).toEqual(to.apply(d -> (d.getDayOfWeek().getValue() < DayOfWeek.SUNDAY.getValue() || d.getDayOfWeek().getValue() == DayOfWeek.SUNDAY.getValue() && d.getHour() < 11 ? d : d.plusDays(7)).with(ChronoField.DAY_OF_WEEK, DayOfWeek.SUNDAY.getValue()).withHour(11).truncatedTo(ChronoUnit.HOURS)));
+            expectWith(g + "Fri 12:34",
+                    from).toEqual(
+                            to.apply(d -> (d.getDayOfWeek().getValue() < DayOfWeek.FRIDAY.getValue()
+                                    || d.getDayOfWeek().getValue() == DayOfWeek.FRIDAY.getValue()
+                                            && (d.getHour() < 12 || d.getHour() == 12 && d.getMinute() < 34) ? d
+                                                    : d.plusDays(7)).with(ChronoField.DAY_OF_WEEK, DayOfWeek.FRIDAY.getValue()).withHour(12).withMinute(34)
+                                                            .truncatedTo(ChronoUnit.MINUTES)));
+            expectWith(g + "SUNDAY 11:00", from).toEqual(to.apply(d -> (d.getDayOfWeek().getValue() < DayOfWeek.SUNDAY.getValue()
+                    || d.getDayOfWeek().getValue() == DayOfWeek.SUNDAY.getValue() && d.getHour() < 11 ? d : d.plusDays(7))
+                            .with(ChronoField.DAY_OF_WEEK, DayOfWeek.SUNDAY.getValue()).withHour(11).truncatedTo(ChronoUnit.HOURS)));
             expectWith(g + "1D", from).toEqual(to.apply(d -> d.plus(1, ChronoUnit.DAYS)));
             expectWith(g + "2H", from).toEqual(to.apply(d -> d.plus(2, ChronoUnit.HOURS)));
             expectWith(g + "0.5H", from).toThrow(DateTimeParseException.class);
@@ -56,12 +64,19 @@ public class ToolTest extends Tester {
             expectWith(g + "100S", from).toEqual(to.apply(d -> d.plus(100, ChronoUnit.SECONDS)));
             expectWith(g + "2", from).toEqual(to.apply(d -> (d.getDayOfMonth() < 2 ? d : d.plusMonths(1)).withDayOfMonth(2).truncatedTo(ChronoUnit.DAYS)));
             expectWith(g + "12:00", from).toEqual(to.apply(d -> (d.getHour() < 12 ? d : d.plusDays(1)).withHour(12).truncatedTo(ChronoUnit.HOURS)));
-            expectWith(g + "12:34", from).toEqual(to.apply(d -> (d.getHour() < 12 || d.getHour() == 12 && d.getMinute() < 34 ? d : d.plusDays(1)).withHour(12).withMinute(34).truncatedTo(ChronoUnit.MINUTES)));
+            expectWith(g + "12:34", from).toEqual(to.apply(d -> (d.getHour() < 12 || d.getHour() == 12 && d.getMinute() < 34 ? d : d.plusDays(1)).withHour(12)
+                    .withMinute(34).truncatedTo(ChronoUnit.MINUTES)));
             expectWith(g + ":01", from).toEqual(to.apply(d -> (d.getMinute() < 1 ? d : d.plusHours(1)).withMinute(1).truncatedTo(ChronoUnit.MINUTES)));
-            expectWith(g + "::02", from).toEqual(to.apply(d -> (d.getSecond() < 2 ? d : d.plus(1, ChronoUnit.MINUTES)).withSecond(2).truncatedTo(ChronoUnit.SECONDS)));
-            expectWith(g + "12:34:56", from).toEqual(to.apply(d -> (d.getHour() < 12 || d.getHour() == 12 && (d.getMinute() < 34 || d.getMinute() == 34 && d.getSecond() < 56) ? d : d.plusDays(1)).withHour(12).withMinute(34).withSecond(56).truncatedTo(ChronoUnit.SECONDS)));
-            expectWith(g + "3 10:00", from).toEqual(to.apply(d -> (d.getDayOfMonth() < 3 || d.getDayOfMonth() == 3 && d.getHour() < 10 ? d : d.plusMonths(1)).withDayOfMonth(3).withHour(10).truncatedTo(ChronoUnit.HOURS)));
-            expectWith(g + "2/3 10:00", from).toEqual(to.apply(d -> (d.getMonthValue() < 2 || d.getMonthValue() == 2 && (d.getDayOfMonth() < 3 || d.getDayOfMonth() == 3 && d.getHour() < 10) ? d : d.plusYears(1)).withMonth(2).withDayOfMonth(3).withHour(10).truncatedTo(ChronoUnit.HOURS)));
+            expectWith(g + "::02", from)
+                    .toEqual(to.apply(d -> (d.getSecond() < 2 ? d : d.plus(1, ChronoUnit.MINUTES)).withSecond(2).truncatedTo(ChronoUnit.SECONDS)));
+            expectWith(g + "12:34:56", from).toEqual(to
+                    .apply(d -> (d.getHour() < 12 || d.getHour() == 12 && (d.getMinute() < 34 || d.getMinute() == 34 && d.getSecond() < 56) ? d : d.plusDays(1))
+                            .withHour(12).withMinute(34).withSecond(56).truncatedTo(ChronoUnit.SECONDS)));
+            expectWith(g + "3 10:00", from).toEqual(to.apply(d -> (d.getDayOfMonth() < 3 || d.getDayOfMonth() == 3 && d.getHour() < 10 ? d : d.plusMonths(1))
+                    .withDayOfMonth(3).withHour(10).truncatedTo(ChronoUnit.HOURS)));
+            expectWith(g + "2/3 10:00", from).toEqual(
+                    to.apply(d -> (d.getMonthValue() < 2 || d.getMonthValue() == 2 && (d.getDayOfMonth() < 3 || d.getDayOfMonth() == 3 && d.getHour() < 10) ? d
+                            : d.plusYears(1)).withMonth(2).withDayOfMonth(3).withHour(10).truncatedTo(ChronoUnit.HOURS)));
             expectWith(g + "2020/3/4 12:34:56", from).toEqual(to.apply(d -> ZonedDateTime.of(2020, 3, 4, 12, 34, 56, 0, ZoneId.systemDefault())));
         });
     }

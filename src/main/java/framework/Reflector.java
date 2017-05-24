@@ -306,4 +306,32 @@ public class Reflector {
         }
         return orElse.get();
     }
+
+    /**
+     * @param <T> Return type
+     * @param methodFullName Full method name
+     * @param argClasses Argument classes
+     * @param args Arguments
+     * @return return Value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(String methodFullName, Class<?>[] argClasses, Object... args) {
+        int i = methodFullName.lastIndexOf('.');
+        return i < 0 ? null
+                : (T) clazz(methodFullName.substring(0, i)).flatMap(c -> method(c, methodFullName.substring(i + 1), argClasses))
+                        .map(Try.f(m -> m.invoke(null, args))).orElse(null);
+    }
+
+    /**
+     * @param <T> Return type
+     * @param instance Instance
+     * @param name Method name
+     * @param argClasses Argument classes
+     * @param args Arguments
+     * @return return Value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) {
+        return (T) method(instance.getClass(), name, argClasses).map(Try.f(m -> m.invoke(null, args))).orElse(null);
+    }
 }

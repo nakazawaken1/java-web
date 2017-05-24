@@ -70,10 +70,11 @@ public abstract class Session implements Attributes<Serializable> {
      * @return true if success, else failure
      */
     public boolean login(String loginId, String password) {
-        Optional<Account> a = Try.s(() -> Tool.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
-            Log.warning(() -> Tool.print(e::printStackTrace));
-            return Optional.<Account>empty();
-        }).get();
+        Optional<Account> a = Try
+                .s(() -> Reflector.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
+                    Log.warning(() -> Tool.print(e::printStackTrace));
+                    return Optional.<Account>empty();
+                }).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
             Log.info("logged in : " + loginId + Arrays.toString(i.roles));

@@ -46,7 +46,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     /**
      * elClass entries
      */
-    static Map<String, Class<?>> elClassMap = Tool.map("Tool", Tool.class);
+    static Map<String, Class<?>> elClassMap = Tool.map("Sys", Sys.class, "Tool", Tool.class, "JapaneseDate", JapaneseDate.class);
 
     /**
      * cache enabled
@@ -378,7 +378,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      */
     public static String include(String path) {
         return Tool.toURL(path).map(url -> {
-            return current.get().copy().format(Tool.usingGet(url::openStream, Tool::loadText));
+            return current.get().copy().format(Tool.using(url::openStream, Tool::loadText));
         }).orElse("((not found: " + path + "))");
     }
 
@@ -389,7 +389,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      */
     public static String include(String path, List<Object> values) {
         return Tool.toURL(path).map(url -> {
-            return Tool.peek(current.get().copy(), c -> c.values = values.toArray()).format(Tool.usingGet(url::openStream, Tool::loadText));
+            return Tool.peek(current.get().copy(), c -> c.values = values.toArray()).format(Tool.using(url::openStream, Tool::loadText));
         }).orElse("((not found: " + path + "))");
     }
 
@@ -400,7 +400,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      */
     public static String includeFor(String path, Iterable<?> list) {
         return Tool.toURL(path).map(url -> {
-            String text = Tool.usingGet(url::openStream, Tool::loadText);
+            String text = Tool.using(url::openStream, Tool::loadText);
             Formatter formatter = current.get().copy();
             boolean backup = formatter.isCache;
             formatter.isCache = false;
@@ -425,7 +425,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 Formatter formatter = current.get().copy();
                 boolean backup = formatter.isCache;
                 formatter.isCache = false;
-                String result = formatter.format(Tool.usingGet(url::openStream, Tool::loadText));
+                String result = formatter.format(Tool.using(url::openStream, Tool::loadText));
                 formatter.isCache = backup;
                 return result;
             }
@@ -732,12 +732,10 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             } catch (NoSuchMethodException e) {
                 throw new InternalError(e);
             }
-            el.defineBean("JapaneseDate", new ELClass(JapaneseDate.class));
             el.defineBean("P", Sys.context_path);
             el.defineBean("R", Request.current().orElse(null));
             el.defineBean("S", Session.current().orElse(null));
-            el.defineBean("Sys", new ELClass(Sys.class));
-            el.defineBean("V", values == null ? Tool.list() : Tool.list(values));
+            el.defineBean("V", Tool.list(values));
             elClassMap.forEach((k, v) -> el.defineBean(k, new ELClass(v)));
             if (map != null) {
                 map.forEach(el::defineBean);

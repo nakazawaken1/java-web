@@ -17,7 +17,6 @@ import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -94,7 +93,6 @@ import javax.xml.bind.DatatypeConverter;
 
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
@@ -118,15 +116,6 @@ public class Tool {
      */
     public static <T> Predicate<T> not(Predicate<T> predicate) {
         return predicate.negate();
-    }
-
-    /**
-     * @param <T> Value type
-     * @param value value
-     * @return Equal predicate
-     */
-    public static <T> Predicate<T> equal(T value) {
-        return i -> value.equals(i);
     }
 
     /**
@@ -268,7 +257,7 @@ public class Tool {
             if (object != null) {
                 String text = object.toString();
                 if (text != null) {
-                    return Tool.of(fromString.apply(text));
+                    return of(fromString.apply(text));
                 }
             }
         } catch (Exception e) {
@@ -307,7 +296,7 @@ public class Tool {
      * @param c Class
      * @return True if array like class
      */
-    public static boolean isArray(Class<?> c) {
+    public static boolean isSequence(Class<?> c) {
         return c != null && (c.isArray() || Stream.class.isAssignableFrom(c) || Iterable.class.isAssignableFrom(c));
     }
 
@@ -608,7 +597,7 @@ public class Tool {
         @Override
         public void start(Class<?> clazz) {
             smartPrefix();
-            buffer.append(isArray(clazz) ? startArray : startObject);
+            buffer.append(isSequence(clazz) ? startArray : startObject);
             currentIndent.append(indent);
             if (out != null && buffer.length() > bufferSize) {
                 flush();
@@ -634,7 +623,7 @@ public class Tool {
          */
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
-            if (isArray(clazz)) {
+            if (isSequence(clazz)) {
                 smartPrefix();
             } else {
                 done = true;
@@ -656,7 +645,7 @@ public class Tool {
             currentIndent.setLength(currentIndent.length() - indent.length());
             trim();
             prefix();
-            buffer.append(isArray(clazz) ? endArray : endObject).append(suffix);
+            buffer.append(isSequence(clazz) ? endArray : endObject).append(suffix);
         }
 
         /*
@@ -804,7 +793,7 @@ public class Tool {
          */
         @Override
         public void start(Class<?> clazz) {
-            if (!isArray(clazz)) {
+            if (!isSequence(clazz)) {
                 buffer.append(newline).append(currentIndent).append(prefix).append(classToTag.apply(clazz)).append(suffix);
                 currentIndent.append(indent);
             }
@@ -850,7 +839,7 @@ public class Tool {
          */
         @Override
         public void end(Class<?> clazz) {
-            if (!isArray(clazz)) {
+            if (!isSequence(clazz)) {
                 currentIndent.setLength(currentIndent.length() - indent.length());
                 buffer.append(newline).append(currentIndent).append(prefix).append(endPrefix).append(classToTag.apply(clazz)).append(suffix);
             }
@@ -1420,26 +1409,6 @@ public class Tool {
     }
 
     /**
-     * build map{String: Object}
-     * 
-     * @param <T> value type
-     *
-     * @param keyValues key, value, key, value...
-     * @return map
-     */
-    @SafeVarargs
-    public static <T> Map<String, T> jsonMap(T... keyValues) {
-        if (keyValues == null) {
-            return null;
-        }
-        Map<String, T> map = new LinkedHashMap<>();
-        for (int i = 0; i + 1 < keyValues.length; i += 2) {
-            map.put(keyValues[i].toString(), keyValues[i + 1]);
-        }
-        return map;
-    }
-
-    /**
      * @param <K> key type
      * @param <V> value type
      * @param key key
@@ -1451,8 +1420,10 @@ public class Tool {
     public static <K, V> Map<K, V> map(K key, V value, Object... keyValues) {
         Map<K, V> map = new LinkedHashMap<>();
         map.put(key, value);
-        for (int i = 0; i + 1 < keyValues.length; i += 2) {
-            map.put((K) keyValues[i], (V) keyValues[i + 1]);
+        if (keyValues != null) {
+            for (int i = 0; i + 1 < keyValues.length; i += 2) {
+                map.put((K) keyValues[i], (V) keyValues[i + 1]);
+            }
         }
         return map;
     }
@@ -1475,8 +1446,10 @@ public class Tool {
     @SuppressWarnings("unchecked")
     public static <K, V> Map<K, V> map(Object[] keyValues) {
         Map<K, V> map = new LinkedHashMap<>();
-        for (int i = 0; i + 1 < keyValues.length; i += 2) {
-            map.put((K) keyValues[i], (V) keyValues[i + 1]);
+        if (keyValues != null) {
+            for (int i = 0; i + 1 < keyValues.length; i += 2) {
+                map.put((K) keyValues[i], (V) keyValues[i + 1]);
+            }
         }
         return map;
     }
@@ -1488,7 +1461,7 @@ public class Tool {
      */
     @SafeVarargs
     public static <T> Set<T> set(T... values) {
-        return new HashSet<T>(Arrays.asList(values));
+        return values == null ? new HashSet<>() : new HashSet<>(Arrays.asList(values));
     }
 
     /**
@@ -1498,7 +1471,7 @@ public class Tool {
      */
     @SafeVarargs
     public static <T> List<T> list(T... values) {
-        return new ArrayList<T>(Arrays.asList(values));
+        return values == null ? new ArrayList<>() : new ArrayList<>(Arrays.asList(values));
     }
 
     /**
@@ -1816,23 +1789,6 @@ public class Tool {
     }
 
     /**
-     * @param map map
-     * @param key key
-     * @param value value
-     * @return map
-     */
-    public static Map<String, List<String>> add(Map<String, List<String>> map, String key, String value) {
-        if (map.containsKey(key)) {
-            map.get(key).add(value);
-        } else {
-            List<String> list = new ArrayList<>();
-            list.add(value);
-            map.put(key, list);
-        }
-        return map;
-    }
-
-    /**
      * @param text text
      * @return Url encoded text
      */
@@ -2018,84 +1974,6 @@ public class Tool {
     }
 
     /**
-     * test
-     *
-     * @param args text
-     */
-    public static void main(String[] args) {
-        // Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Log::info);
-        // Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Log::info);
-        // // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
-        // // ZonedDateTime.now()));
-        // try(Stream<String> list = getResources("app/controller")) {
-        // list.forEach(Log::info);
-        // }
-        // try (Stream<Class<?>> list = getClasses("test")) {
-        // list.forEach(c -> Log.info(c.getCanonicalName()));
-        // }
-        // String text = "target text!";
-        // String password = "abcd123";
-        // Log.info("source: " + text);
-        // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        // try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
-        // out.write(text.getBytes(StandardCharsets.UTF_8));
-        // } catch (IOException e) {
-        // e.printStackTrace();
-        // }
-        // byte[] encrypted = bytes.toByteArray();
-        // Log.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
-        // Log.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
-        // password));
-        // Log.info("base128encoded: " + base128Decode(text));
-        // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
-        // Log.info(Session.currentLocale().toString());
-        // Log.info(camelToSnake("LoginURL"));
-        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
-    }
-
-    /**
-     * @param <T> return type
-     * @param methodFullName full method name
-     * @param argClasses argument classes
-     * @param args arguments
-     * @return return value
-     * @throws NoSuchMethodException method not found
-     * @throws IllegalAccessException access failed
-     * @throws IllegalArgumentException illegal argument
-     * @throws InvocationTargetException not throw
-     * @throws SecurityException security error
-     * @throws ClassNotFoundException class not found
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> T invoke(String methodFullName, Class<?>[] argClasses, Object... args) throws NoSuchMethodException, IllegalAccessException,
-            IllegalArgumentException, InvocationTargetException, SecurityException, ClassNotFoundException {
-        int i = methodFullName.lastIndexOf('.');
-        if (i < 0) {
-            throw new NoSuchMethodException(methodFullName);
-        }
-        return (T) Class.forName(methodFullName.substring(0, i)).getDeclaredMethod(methodFullName.substring(i + 1), argClasses).invoke(null, args);
-    }
-
-    /**
-     * @param <T> return type
-     * @param instance instance
-     * @param name method name
-     * @param argClasses argument classes
-     * @param args arguments
-     * @return return value
-     * @throws IllegalAccessException access failed
-     * @throws IllegalArgumentException illegal argument
-     * @throws InvocationTargetException not throw
-     * @throws NoSuchMethodException method not found
-     * @throws SecurityException security error
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args)
-            throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
-        return (T) instance.getClass().getDeclaredMethod(name, argClasses).invoke(instance, args);
-    }
-
-    /**
      * @param <T> return type
      * @param value optional value
      * @param ifPresent action if present
@@ -2119,17 +1997,6 @@ public class Tool {
     public static <T> Consumer<T> withIndex(ObjIntConsumer<T> consumer) {
         AtomicInteger n = new AtomicInteger(-1);
         return obj -> consumer.accept(obj, n.incrementAndGet());
-    }
-
-    /**
-     * @param <T> value type
-     * @param value value
-     * @param action action(not call if value is null)
-     */
-    public static <T> void let(T value, Consumer<T> action) {
-        if (value != null) {
-            action.accept(value);
-        }
     }
 
     /**
@@ -2587,25 +2454,12 @@ public class Tool {
 
     /**
      * @param <T> Resource type
-     * @param supplier Resource supplier
-     * @param consumer Resource consumer
-     */
-    public static <T extends AutoCloseable> void using(TrySupplier<T> supplier, TryConsumer<T> consumer) {
-        try (T resource = supplier.get()) {
-            consumer.accept(resource);
-        } catch (Exception e) {
-            Log.warning(e, () -> "resource error");
-        }
-    }
-
-    /**
-     * @param <T> Resource type
      * @param <U> Return type
      * @param supplier Resource supplier
      * @param function Resource function
      * @return Value
      */
-    public static <T extends AutoCloseable, U> U usingGet(TrySupplier<T> supplier, TryFunction<T, U> function) {
+    public static <T extends AutoCloseable, U> U using(TrySupplier<T> supplier, TryFunction<T, U> function) {
         try (T resource = supplier.get()) {
             return function.apply(resource);
         } catch (Exception e) {
@@ -2642,5 +2496,41 @@ public class Tool {
             Try.catcher.accept(e);
             return null;
         }
+    }
+
+    /**
+     * test
+     *
+     * @param args text
+     */
+    public static void main(String[] args) {
+        // Stream.of(null, "", "Abc", "abcDef", "AbcDefG", "URLEncoder").map(Tool::camelToSnake).forEach(Log::info);
+        // Stream.of(null, "", "abc", "abc___def_", "_abc_def_").map(Tool::snakeToCamel).forEach(Log::info);
+        // // Stream.concat(Stream.of("1d", "2h", "3m", "4s", "1", "1/1", "12:00", "01:02:03"), Stream.of(args)).forEach(text -> Tool.nextMillis(text,
+        // // ZonedDateTime.now()));
+        // try(Stream<String> list = getResources("app/controller")) {
+        // list.forEach(Log::info);
+        // }
+        // try (Stream<Class<?>> list = getClasses("test")) {
+        // list.forEach(c -> Log.info(c.getCanonicalName()));
+        // }
+        // String text = "target text!";
+        // String password = "abcd123";
+        // Log.info("source: " + text);
+        // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        // try (OutputStream out = withEncrypt(bytes, password)) { // must to close before decrypt
+        // out.write(text.getBytes(StandardCharsets.UTF_8));
+        // } catch (IOException e) {
+        // e.printStackTrace();
+        // }
+        // byte[] encrypted = bytes.toByteArray();
+        // Log.info("encrypted: " + hex(encrypted) + " / " + encrypt(text, password));
+        // Log.info("decrypted: " + loadText(withDecrypt(new ByteArrayInputStream(encrypted), password)) + " / " + decrypt(encrypt(text, password),
+        // password));
+        // Log.info("base128encoded: " + base128Decode(text));
+        // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
+        // Log.info(Session.currentLocale().toString());
+        // Log.info(camelToSnake("LoginURL"));
+        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
     }
 }

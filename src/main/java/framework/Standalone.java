@@ -148,11 +148,11 @@ public class Standalone {
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
-                Object db = Tool.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
+                Object db = Reflector.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
                         new Object[] { Tool.array("-properties", config.getParent()) });
-                Tool.invoke(db, "start", Tool.array());
+                Reflector.invoke(db, "start", Tool.array());
                 Runtime.getRuntime()
-                        .addShutdownHook(new Thread(Try.r(() -> Tool.invoke(db, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 stop error"))));
+                        .addShutdownHook(new Thread(Try.r(() -> Reflector.invoke(db, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 stop error"))));
                 Log.info("h2 console started on port " + port);
             } catch (Exception e) {
                 Log.warning(e, () -> "h2 error");
@@ -758,9 +758,9 @@ public class Standalone {
                                     Log.info("413 payload too large");
                                     break loop;
                                 }
-                                Tool.add(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
+                                Tool.addValue(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
                             } else {
-                                Tool.add(parameters, name, filename);
+                                Tool.addValue(parameters, name, filename);
                                 if (length > 0) {
                                     if (length < fileSizeThreshold) {
                                         byte[] bytes = new byte[length];
@@ -978,7 +978,7 @@ public class Standalone {
             scanner.forEachRemaining(Try.c(part -> {
                 String[] pair = part.split("[=]");
                 if (pair.length > 0) {
-                    Tool.add(parameters, URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()),
+                    Tool.addValue(parameters, URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()),
                             pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "");
                 }
             }));

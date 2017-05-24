@@ -15,35 +15,37 @@ import framework.annotation.Route.Method;
 public class Main {
 
     /**
-     * @param session session
-     * @param loginId login id
-     * @param password password
-     * @return response
+     * @param application Application
+     * @param session Session
+     * @param loginId Login id
+     * @param password Password
+     * @return Response
      */
     @Route(value = Method.POST)
-    Object login(Session session, Optional<String> loginId, Optional<String> password) {
+    Object login(Application application, Session session, Optional<String> loginId, Optional<String> password) {
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
-            return Response.redirect("index.html");
+            return Response.redirect(application.getContextPath());
         } else {
             session.setAttr("alert", Sys.Alert.loginFailed);
-            return Response.redirect(Sys.redirect_if_not_login.orElse(Application.current().get().getContextPath()));
+            return Response.redirect(Sys.redirect_if_not_login.orElse(application.getContextPath()));
         }
     }
 
     /**
-     * @param session session
-     * @return response
+     * @param application Application
+     * @param session Session
+     * @return Response
      */
     @Route
-    Object logout(Session session) {
+    Object logout(Application application, Session session) {
         session.logout();
-        return Response.redirect("index.html");
+        return Response.redirect(application.getContextPath());
     }
 
     /**
-     * @param session session
-     * @return response
+     * @param session Session
+     * @return Response
      */
     @Route
     Object alert(Session session) {
