@@ -91,5 +91,16 @@ public class TestTool extends Tester {
             expectWith(g + "a,b,/c", from).toEqual("a/b/c");
             expectWith(g + "a,b,c/", from).toEqual("a/b/c/");
         });
+        
+        groupWith("isDirectory", group -> {
+            String g = group + ":";
+            Function<String, Object> from = s -> Tool.isDirectory(Tool.toURL(s.substring(g.length())).orElse(null));
+            expectWith(g + "", from).toEqual(true);
+            expectWith(g + "/view", from).toEqual(true);
+            expectWith(g + "/view/index.html", from).toEqual(false);
+            expectWith(g + "view", from).toEqual(true);
+            expectWith(g + "view/", from).toEqual(true);
+            expectWith(g + "view/index.html", from).toEqual(false);
+        });
     }
 }

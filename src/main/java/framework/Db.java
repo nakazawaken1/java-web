@@ -862,7 +862,7 @@ public class Db implements AutoCloseable {
             if (!(column.value == null || !Tool.string(column.value).isPresent() && !builder.supportNullString)) {
                 sql.append(" DEFAULT ").append(builder.escape(column.value));
             }
-            Tool.string(column.display).map(j -> " COMMENT " + j).ifPresent(sql::append);
+            Tool.string(column.display).map(j -> " COMMENT '" + j + "'").ifPresent(sql::append);
             pad = ", ";
         }
         if (primary > 0) {

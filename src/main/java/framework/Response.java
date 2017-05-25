@@ -1,9 +1,11 @@
 package framework;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -533,66 +535,61 @@ public abstract class Response {
             }), //
             Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())), //
             Tuple.of(Path.class, (response, out, cancel) -> {
-                BiConsumer<String, InputStream> load = (file, in) -> {
-                    response.contentType(Tool.getContentType(file), response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                    if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
-                        try (Stream<String> lines = Tool.lines(in);
-                                PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                            Function<Formatter, Formatter.Result> exclude;
-                            Function<Object, String> escape;
-                            if (file.endsWith(".js")) {
-                                exclude = Formatter::excludeForScript;
-                                escape = Formatter::scriptEscape;
-                            } else if (file.endsWith(".css")) {
-                                exclude = Formatter::excludeForStyle;
-                                escape = null;
-                            } else {
-                                exclude = Formatter::excludeForHtml;
-                                escape = Tool::htmlEscape;
+                BiConsumer<String, URL> load = (file, url) -> {
+                    Log.config("[static load] " + url);
+                    try (InputStream in = url.openStream()) {
+                        response.contentType(Tool.getContentType(file),
+                                response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                        if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
+                            try (Stream<String> lines = Tool.lines(in);
+                                    PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                                Function<Formatter, Formatter.Result> exclude;
+                                Function<Object, String> escape;
+                                if (file.endsWith(".js")) {
+                                    exclude = Formatter::excludeForScript;
+                                    escape = Formatter::scriptEscape;
+                                } else if (file.endsWith(".css")) {
+                                    exclude = Formatter::excludeForStyle;
+                                    escape = null;
+                                } else {
+                                    exclude = Formatter::excludeForHtml;
+                                    escape = Tool::htmlEscape;
+                                }
+                                try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map,
+                                        Tool.of(response.values).map(List::toArray).orElseGet(Tool::array))) {
+                                    lines.forEach(line -> writer.println(formatter.format(line)));
+                                }
                             }
-                            try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map,
-                                    Tool.of(response.values).map(List::toArray).orElseGet(Tool::array))) {
-                                lines.forEach(line -> writer.println(formatter.format(line)));
-                            }
+                        } else {
+                            Tool.copy(in, out.get(), new byte[1024]);
                         }
-                    } else {
-                        Tool.copy(in, out.get(), new byte[1024]);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
                     }
                 };
                 String file = ((Path) response.content).toString().replace('\\', '/');
-                Optional<URL> url = Tool.toURL(file);
-                if (url.isPresent()) {
-                    URL u = url.get();
-                    try (InputStream in = u.openStream()) {
-                        if (("file".equals(u.getProtocol()) && Paths.get(u.toURI()).toFile().isDirectory())
-                                && Try.s(() -> in.available() >= 0, e -> false).get()) { // Is Folder
-                            if (!Request.current().map(Request::getPath).orElse("").endsWith("/")) {
-                                String path = Tool.suffix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
-                                Log.info("folder redirect: " + path);
-                                response.status(Status.Moved_Permamently).addHeader("Location", path);
-                                out.get();
-                                return;
-                            }
-                            String folder = Tool.suffix(file, "/");
-                            for (String page : Sys.default_pages) {
-                                if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
-                                    Log.config("[static load] " + p);
-                                    Tool.using(p::openStream, i -> {
-                                        load.accept(page, i);
-                                        return null;
-                                    });
-                                }, () -> {
-                                })) {
-                                    return;
-                                }
-                            }
-                        } else { // Is File
-                            Log.config("[static load] " + u);
-                            load.accept(file, in);
+                URL url = Tool.toURL(file).orElse(null);
+                if (url != null) {
+                    if (Tool.isDirectory(url)) { // Is Folder
+                        if (!Request.current().map(Request::getPath).orElse("").endsWith("/")) {
+                            String path = Tool.suffix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
+                            Log.info("folder redirect: " + path);
+                            response.status(Status.Moved_Permamently).addHeader("Location", path);
+                            out.get();
                             return;
                         }
-                    } catch (NullPointerException e) {
-                        /* noop */
+                        String folder = Tool.suffix(file, "/");
+                        for (String page : Sys.default_pages) {
+                            if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
+                                load.accept(page, p);
+                            }, () -> {
+                            })) {
+                                return;
+                            }
+                        }
+                    } else { // Is File
+                        load.accept(file, url);
+                        return;
                     }
                 }
 

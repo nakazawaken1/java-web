@@ -22,6 +22,7 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.JarURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -135,6 +136,26 @@ public class Tool {
     public static Stream<URL> toURLs(String... relativePath) {
         String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
         return Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(path));
+    }
+
+    /**
+     * @param url URL
+     * @return true if directory
+     */
+    public static boolean isDirectory(URL url) {
+        if(url == null) {
+            return false;
+        }
+        try {
+            if ("jar".equals(url.getProtocol())) {
+                JarURLConnection c = (JarURLConnection) url.openConnection();
+                return using(() -> c.getJarFile().getInputStream(c.getJarEntry()), in -> in == null);
+            } else {
+                return new File(url.toURI()).isDirectory();
+            }
+        } catch (IOException | URISyntaxException e) {
+            return false;
+        }
     }
 
     /**
@@ -1316,7 +1337,8 @@ public class Tool {
      * @return file name stream(must to close)
      */
     private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
-        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(location)).map(i -> trim("/", i.substring(location.length()), null));
+        String l = trim("/", location, null);
+        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(l)).map(i -> trim("/", i.substring(l.length()), null));
     }
 
     /**
