@@ -82,7 +82,7 @@ public class TestTool extends Tester {
         
         groupWith("path", group -> {
             String g = group + ":";
-            Function<String, Object> from = s -> Tool.path(s.substring(g.length()).split(","));
+            Function<String, Object> from = s -> Tool.path(s.substring(g.length()).split(",")).apply("/");
             expectWith(g + "a,b,c", from).toEqual("a/b/c");
             expectWith(g + "/a,b,c", from).toEqual("/a/b/c");
             expectWith(g + "a/,b,c", from).toEqual("a/b/c");
