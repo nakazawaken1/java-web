@@ -1,8 +1,10 @@
 package app.model;
 
 import java.io.Serializable;
+import java.sql.ResultSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import app.config.Sys;
@@ -131,13 +133,41 @@ public class Account implements Serializable {
     }
 
     /**
+     * Instantiate from array
+     * 
+     * @param loginId loginId
+     * @return Function of "Array" to "Account"
+     */
+    public static Function<String[], Account> fromArray(String loginId) {
+        return a -> new Account(loginId, Tool.at(a, 2).orElse(loginId), Tool.at(a, 3).map(User::fromString).map(Tool::array).orElseGet(Tool::array),
+                Tool.at(a, 4).orElse(Sys.default_avator));
+    }
+
+    /**
+     * Instantiate from ResultSet
+     * 
+     * @param loginId loginId
+     * @return Function of "ResultSet" to "Account"
+     */
+    @SuppressWarnings("unchecked")
+    public static Function<ResultSet, Account> fromResultSet(String loginId) {
+        return Try.f(rs -> {
+            int max = rs.getMetaData().getColumnCount();
+            return new Account(loginId,
+                    max < 1 ? loginId : rs.getString(1), Tool.string(max < 2 ? null : rs.getString(2))
+                            .map(s -> Stream.of(s.split(",")).map(User::fromString).toArray(Class[]::new)).orElseGet(Tool::array),
+                    Tool.string(max < 3 ? null : rs.getString(3)).orElse(Sys.default_avator));
+        });
+    }
+
+    /**
      * @param loginId login id
      * @param password password
      * @return account or empty if login failed
      */
     public static Optional<Account> loginWithConfig(String loginId, String password) {
-        return Sys.accounts.stream().map(i -> i.split(":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst().map(a -> new Account(loginId,
-                Tool.at(a, 2).orElse(loginId), Tool.at(a, 3).map(User::fromString).map(Tool::array).orElseGet(Tool::array), Tool.at(a, 4).orElse(null)));
+        return Sys.accounts.stream().map(Tool.bindRight(String::split, ":")).filter(a -> a[0].equals(loginId) && a[1].equals(password)).findFirst()
+                .map(fromArray(loginId));
     }
 
     /**
@@ -147,8 +177,7 @@ public class Account implements Serializable {
      */
     public static Optional<Account> loginWithDb(String loginId, String password) {
         try (Db db = Db.connect()) {
-            return db.queryFile("login.sql", Tool.map("id", loginId, "password", password)).findFirst().map(Try.f(rs -> new Account(loginId, rs.getString(1),
-                    Tool.string(rs.getString(2)).map(User::fromString).map(Tool::array).orElseGet(Tool::array), null)));
+            return db.queryFile("login.sql", Tool.map("id", loginId, "password", password)).findFirst().map(fromResultSet(loginId));
         }
     }
 }

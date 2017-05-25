@@ -62,6 +62,7 @@ import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.ObjIntConsumer;
@@ -2526,6 +2527,30 @@ public class Tool {
             Try.catcher.accept(e);
             return null;
         }
+    }
+
+    /**
+     * @param <L> Left parameter type
+     * @param <R> Right parameter type
+     * @param <V> Return type
+     * @param biFunction Function
+     * @param left Left value
+     * @return Function
+     */
+    public static <L, R, V> Function<R, V> bindLeft(BiFunction<L, R, V> biFunction, L left) {
+        return right -> biFunction.apply(left, right);
+    }
+
+    /**
+     * @param <L> Left parameter type
+     * @param <R> Right parameter type
+     * @param <V> Return type
+     * @param biFunction Function
+     * @param right Right value
+     * @return Function
+     */
+    public static <L, R, V> Function<L, V> bindRight(BiFunction<L, R, V> biFunction, R right) {
+        return left -> biFunction.apply(left, right);
     }
 
     /**

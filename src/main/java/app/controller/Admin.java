@@ -9,7 +9,6 @@ import java.util.stream.IntStream;
 
 import app.config.Sys;
 import app.model.Account;
-import app.model.Person;
 import framework.Db;
 import framework.Diff;
 import framework.Request;
@@ -28,8 +27,6 @@ import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
 import framework.annotation.Route;
-import framework.annotation.Valid;
-import framework.annotation.Valid.Read;
 
 /**
  * main controller
@@ -94,10 +91,13 @@ public class Admin {
     @Route
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
-                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb", Tool.list(Sys.Item.adminTitle, Sys.Item.config));
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb",
+                        Tool.list(Sys.Item.adminTitle, Sys.Item.config));
     }
 
     /**
+     * EL version
+     * 
      * @param session session
      * @param request request
      * @param before before
@@ -122,6 +122,8 @@ public class Admin {
     }
 
     /**
+     * Render version
+     * 
      * @param session session
      * @param request request
      * @param before before
@@ -156,27 +158,18 @@ public class Admin {
 
     /**
      * @param db db
-     * @param account condition
      * @return response
      */
     @Route
     @Accept(Accept.FORM)
     @Content({ Content.JSON, Content.HTML, Content.TEXT, Content.XML, Content.CSV, Content.TSV })
-    Object accounts(Db db, @Valid(Read.class) Optional<Account> account) {
-        return db.find(Account.class);
-    }
-
-    /**
-     * @param db db
-     * @return response
-     */
-    @Route(extensions = {})
-    Object persons(Db db) {
-        return Response.of(db.find(Person.class)).traverser(XmlTraverser.class, t -> t.classMap.putAll(Tool.map("Object", "名簿", "LinkedHashMap", "個人")));// .map(p
-                                                                                                                                                         // ->
-                                                                                                                                                         // Tool.map("id",
-        // p.id, "name", p.name,
-        // "age",
-        // p.getAge().map(Object::toString).orElse("不明")));
+    Object accounts(Db db) {
+        Object o;
+        if (Sys.login_method.endsWith("loginWithConfig")) {
+            o = Sys.accounts.stream().map(Tool.bindRight(String::split, "[:]")).map(array -> Account.fromArray(array[0]).apply(array));
+        } else {
+            o = db.find(Account.class);
+        }
+        return Response.of(o).traverser(XmlTraverser.class, t -> t.classMap.put("Object", "アカウント一覧"));
     }
 }

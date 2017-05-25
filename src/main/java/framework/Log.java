@@ -230,6 +230,11 @@ public class Log extends Handler {
     private static volatile Handler handler;
 
     /**
+     * For access to stack trace
+     */
+    static final JavaLangAccess access = SharedSecrets.getJavaLangAccess();
+
+    /**
      * log initialize
      */
     public static void startup() {
@@ -447,7 +452,6 @@ public class Log extends Handler {
         if (thrown != null) {
             record.setThrown(thrown);
         }
-        JavaLangAccess access = SharedSecrets.getJavaLangAccess();
         Throwable throwable = new Throwable();
         int depth = access.getStackTraceDepth(throwable);
         for (int i = 0; i < depth; i++) {

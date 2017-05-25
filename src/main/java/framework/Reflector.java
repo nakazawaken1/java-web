@@ -2,6 +2,7 @@ package framework;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -131,8 +132,8 @@ public class Reflector {
      * @return Stream of field name and instance
      */
     public static Map<String, Field> fields(Class<?> clazz) {
-        return fields.computeIfAbsent(clazz,
-                c -> Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).collect(Collectors.toMap(Field::getName, f -> f)));
+        return fields.computeIfAbsent(clazz, c -> Stream.concat(Stream.of(c.getFields()), Stream.of(c.getDeclaredFields()).peek(f -> f.setAccessible(true)))
+                .distinct().collect(Collectors.toMap(Field::getName, f -> f)));
     }
 
     /**
@@ -308,6 +309,8 @@ public class Reflector {
     }
 
     /**
+     * Static method invoke
+     * 
      * @param <T> Return type
      * @param methodFullName Full method name
      * @param argClasses Argument classes
@@ -333,5 +336,35 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) {
         return (T) method(instance.getClass(), name, argClasses).map(Try.f(m -> m.invoke(instance, args))).orElse(null);
+    }
+
+    /**
+     * @param clazz Target class
+     * @param annotation Target annotation
+     * @param value New value
+     */
+    @SuppressWarnings("unchecked")
+    public static void chagneAnnotation(Class<?> clazz, Class<? extends Annotation> annotation, Annotation value) {
+        Object data = invoke(clazz, "annotationData", Tool.array());
+        field(data.getClass(), "annotations").map(Try.f(f -> Map.class.cast(f.get(data)))).ifPresent(map -> map.put(annotation, value));
+    }
+
+    /**
+     * @param field Target field
+     * @param annotation Target annotation
+     * @param value New value
+     */
+    public static void chagneAnnotation(Field field, Class<? extends Annotation> annotation, Annotation value) {
+        Reflector.<Map<Class<? extends Annotation>, Annotation>>invoke(field, "declaredAnnotations", Tool.array()).put(annotation, value);
+    }
+
+    /**
+     * @param executable Target method or constructor
+     * @param annotation Target annotation
+     * @param value New value
+     */
+    @SuppressWarnings("unchecked")
+    public static void chagneAnnotation(Executable executable, Class<? extends Annotation> annotation, Annotation value) {
+        method(Executable.class, "declaredAnnotations").map(Try.f(m -> Map.class.cast(m.invoke(executable)))).ifPresent(map -> map.put(annotation, value));
     }
 }

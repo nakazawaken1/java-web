@@ -1,1 +1,1 @@
-SELECT name, roles FROM t_account WHERE login_id = ${id} AND password = ${Tool.hash(password)}
+SELECT name, roles, avator FROM t_account WHERE login_id = ${id} AND password = ${Tool.hash(password)}

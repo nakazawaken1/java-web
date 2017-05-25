@@ -9,17 +9,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Value object builder
+ * Value object builder base
  * 
  * @param <VALUE> Value type
  * @param <BUILDER> Builder type
- * @param <NAMES> Names type
+ * @param <NAMES> Field names type
  */
 public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VALUE, BUILDER, NAMES>, NAMES extends Enum<?>> implements Supplier<VALUE> {
 
@@ -35,6 +37,10 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      * Entry separator in "toString"
      */
     public String entrySeparator = ", ";
+    /**
+     * Validator
+     */
+    public Runnable validator = null;
 
     /**
      * Meta info
@@ -44,6 +50,10 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      * Field values
      */
     final Object[] values;
+    /**
+     * Converter
+     */
+    final Function<Object, Object>[] converters;
 
     /**
      * Caches
@@ -90,7 +100,9 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
                     .orElseThrow(IllegalArgumentException::new);
             return (Meta<?, Enum<?>>) m;
         });
-        values = Stream.of(meta.fields).map(field -> field.getType() == Optional.class ? Optional.empty() : null).toArray(Object[]::new);
+        values = new Object[meta.fields.length];
+        reset();
+        converters = new Function[values.length];
     }
 
     /**
@@ -108,14 +120,14 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     /**
      * @param name Field name
      * @param value Field value
-     * @param pairs Name-value pairs
+     * @param nameValues Name-value pairs
      * @return Self
      */
     @SuppressWarnings("unchecked")
-    public BUILDER set(NAMES name, Object value, Object... pairs) {
+    public BUILDER set(NAMES name, Object value, Object... nameValues) {
         set(name, value);
-        for (int i = 0; i + 1 < pairs.length; i += 2) {
-            set((NAMES) pairs[i], pairs[i + 1]);
+        for (int i = 0; i + 1 < nameValues.length; i += 2) {
+            set((NAMES) nameValues[i], nameValues[i + 1]);
         }
         return (BUILDER) this;
     }
@@ -145,6 +157,55 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
         return (BUILDER) this;
     }
 
+    /**
+     * @param setup Setup
+     * @return Self
+     */
+    @SuppressWarnings("unchecked")
+    public BUILDER setup(Consumer<BUILDER> setup) {
+        setup.accept((BUILDER) this);
+        return (BUILDER) this;
+    }
+
+    /**
+     * @param name Field name
+     * @return Field
+     */
+    public Field getField(NAMES name) {
+        return meta.fields[name.ordinal()];
+    }
+
+    /**
+     * @param name Field name
+     * @return Field value
+     */
+    public Object getValue(NAMES name) {
+        return values[name.ordinal()];
+    }
+
+    /**
+     * Reset values
+     * 
+     * @return Self
+     */
+    @SuppressWarnings("unchecked")
+    public BUILDER reset() {
+        System.arraycopy(Stream.of(meta.fields).map(field -> field.getType() == Optional.class ? Optional.empty() : null).toArray(Object[]::new), 0, values, 0,
+                values.length);
+        return (BUILDER) this;
+    }
+
+    /**
+     * @param name Field name
+     * @param converter Converter
+     * @return Self
+     */
+    @SuppressWarnings("unchecked")
+    public BUILDER converter(NAMES name, Function<Object, Object> converter) {
+        converters[name.ordinal()] = converter;
+        return (BUILDER) this;
+    }
+
     /*
      * (non-Javadoc)
      * 
@@ -153,7 +214,11 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
     @Override
     public VALUE get() {
         try {
-            return meta.constructor.newInstance(values);
+            if (validator != null) {
+                validator.run();
+            }
+            IntFunction<Object> convert = i -> converters[i] == null ? values[i] : converters[i].apply(values[i]);
+            return meta.constructor.newInstance(IntStream.range(0, values.length).mapToObj(convert).toArray());
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | SecurityException e) {
             throw new RuntimeException(e);
         }
@@ -171,15 +236,5 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
             Object v = values[i];
             return meta.names[i] + pairSeparator + (v instanceof Optional ? ((Optional<Object>) v).orElse(empty) : v);
         }).collect(Collectors.joining(entrySeparator));
-    }
-
-    /**
-     * @param setup Setup
-     * @return Self
-     */
-    @SuppressWarnings("unchecked")
-    public BUILDER setup(Consumer<BUILDER> setup) {
-        setup.accept((BUILDER) this);
-        return (BUILDER) this;
     }
 }

@@ -55,3 +55,5 @@ Sys.Item.dbSettings = データベース情報
 Sys.Item.dbConsole = データベース操作
 
 Sys.Item.reset = リセット
+
+Sys.Item.accountList = アカウント一覧

@@ -14,7 +14,7 @@ import java.util.function.Function;
 /**
  * Tool test
  */
-public class ToolTest extends Tester {
+public class TestTool extends Tester {
     {
         groupWith("add", g -> {
             Map<String, List<String>> map = new HashMap<>();

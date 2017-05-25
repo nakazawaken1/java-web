@@ -130,7 +130,7 @@ public class Sys {
     @Help("scheduled job thread count")
     public static int job_threads = 1;
 
-    @Help("login method(must to be static method)")
+    @Help("login method: static java.util.Optional<framework.Account> ?(java.lang.String loginId, java.lang.String password)")
     public static String login_method = Account.class.getName() + ".loginWithConfig";
 
     @Help("accounts data(loginId:password:name:roles|...)")
@@ -238,7 +238,9 @@ public class Sys {
         dbConsole,
         @Mapping("Administrator menu")
         adminTitle,
-        reset;
+        reset,
+        @Mapping("Account list")
+        accountList;
 
         @Override
         public String toString() {
