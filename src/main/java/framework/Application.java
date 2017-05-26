@@ -83,9 +83,8 @@ public abstract class Application implements Attributes<Object> {
 
         /* load config */
         List<Class<?>> configClasses;
-        try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage().getName())) {
-            configClasses = cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject)
-                    .peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c)).collect(Collectors.toList());
+        try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage().getName()).filter(c -> Tool.fullName(c).indexOf('.') < 0)) {
+            configClasses = cs.peek(Config.Injector::inject).peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c)).collect(Collectors.toList());
         }
         Log.startup();
         Log.info(() -> "---- setting ----" + Letters.CRLF

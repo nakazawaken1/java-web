@@ -143,7 +143,7 @@ public class Tool {
      * @return true if directory
      */
     public static boolean isDirectory(URL url) {
-        if(url == null) {
+        if (url == null) {
             return false;
         }
         try {
@@ -2573,6 +2573,16 @@ public class Tool {
      */
     public static <L, R, V> Function<L, V> bindRight(BiFunction<L, R, V> biFunction, R right) {
         return left -> biFunction.apply(left, right);
+    }
+
+    /**
+     * Get class full name without package name
+     * 
+     * @param clazz Target class
+     * @return Full name
+     */
+    public static String fullName(Class<?> clazz) {
+        return Tool.trim(".", clazz.getCanonicalName().substring(clazz.getPackage().getName().length()), null);
     }
 
     /**

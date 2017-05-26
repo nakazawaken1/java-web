@@ -61,7 +61,6 @@ public @interface Config {
      * properties inject to static fields
      */
     class Injector {
-
         /**
          * inject from class
          * 
@@ -73,7 +72,7 @@ public @interface Config {
 
             /* load config files form Config or classname.config */
             String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value).filter(a -> a.length > 0)
-                    .orElse(Tool.array(clazz.getSimpleName().toLowerCase(Locale.ENGLISH) + ".config"));
+                    .orElse(Tool.array(Tool.fullName(clazz).toLowerCase(Locale.ENGLISH) + ".config"));
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
             }
@@ -566,7 +565,7 @@ public @interface Config {
         /**
          * variable bracket beginning mark
          */
-        public static final String BEGIN = "${";
+        public static final String BEGIN = "{";
 
         /**
          * variable bracket ending mark
