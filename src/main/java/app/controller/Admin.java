@@ -91,7 +91,7 @@ public class Admin {
     @Route
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
-                Optional.of(String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb",
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dumpConfig(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb",
                         Tool.list(Sys.Item.adminTitle, Sys.Item.config));
     }
 

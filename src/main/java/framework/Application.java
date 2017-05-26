@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import app.config.Sys;
@@ -81,12 +82,15 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* load config */
+        List<Class<?>> configClasses;
         try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage().getName())) {
-            cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject).forEach(c -> Formatter.elClassMap.put(c.getSimpleName(), c));
+            configClasses = cs.filter(c -> c.getAnnotation(Config.class) != null).peek(Config.Injector::inject)
+                    .peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c)).collect(Collectors.toList());
         }
         Log.startup();
-        Log.info(() -> "---- setting ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dump(Sys.class, true)));
-        Log.info(() -> "---- message ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.messageDump()));
+        Log.info(() -> "---- setting ----" + Letters.CRLF
+                + configClasses.stream().map(c -> String.join(Letters.CRLF, Config.Injector.dumpConfig(c, true))).collect(Collectors.joining(Letters.CRLF)));
+        Log.info(() -> "---- message ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dumpMessage()));
 
         Log.info(Application.current().get()::toString);
 

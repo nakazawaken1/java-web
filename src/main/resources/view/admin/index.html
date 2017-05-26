@@ -14,7 +14,7 @@
 <li><a href="diff.html">{Sys.Item.diff}</a></li>
 <li><a href="hash.html">{Sys.Item.hash}</a></li>
 <li><a href="sql">{Sys.Item.dbSettings}</a></li>
-<!--{Sys.h2_port.map(i -> '<li><a href="db">' += Sys.Item.dbConsole += '</a></li>').orElse('')}-->
+<!--{Sys.h2_port.map(i -> '<li><a href="db" target="_blank">' += Sys.Item.dbConsole += '</a></li>').orElse('')}-->
 <li>{Sys.Item.accountList}(<a href="accounts.txt">Text</a>, <a href="accounts.csv">CSV</a>, <a href="accounts.xml">XML</a>, <a href="accounts.json">JSON</a>, <a href="accounts.tsv">TSV</a>)</li>
 </ul>
 #{F:include('template/footer.html')}

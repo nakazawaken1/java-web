@@ -490,7 +490,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 if (hasParameter) {
                     key = keys[0];
                 }
-                Optional<String> message = Config.Injector.get(key, locale);
+                Optional<String> message = Config.Injector.getValue(key, locale);
                 if (message.isPresent()) {
                     return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
                             "config");

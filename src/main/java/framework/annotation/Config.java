@@ -20,6 +20,7 @@ import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,7 +53,7 @@ import framework.Tuple;
 public @interface Config {
 
     /**
-     * @return file name(use class name if empty)
+     * @return file names(use class name if empty)
      */
     String[] value() default {};
 
@@ -71,7 +72,7 @@ public @interface Config {
             Properties sourceProperties = inject(clazz, new Properties(), "");
 
             /* load config files form Config or classname.config */
-            String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value)
+            String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value).filter(a -> a.length > 0)
                     .orElse(Tool.array(clazz.getSimpleName().toLowerCase(Locale.ENGLISH) + ".config"));
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
@@ -112,7 +113,7 @@ public @interface Config {
                 }
             }
 
-            defaultMap.put(clazz, String.join(Letters.CRLF, dump(clazz, true)));
+            defaultMap.put(clazz, String.join(Letters.CRLF, dumpConfig(clazz, true)));
             Map<String, Properties> propertiesMap = Tool.map("", sourceProperties);
             Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).collect(Collectors.groupingBy(t -> t.l)).entrySet()
                     .forEach(entry -> {
@@ -132,37 +133,33 @@ public @interface Config {
         }
 
         /**
+         * dump config
+         * 
          * @param clazz target class
          * @param sort sort if true
          * @return lines
          */
-        public static List<String> dump(Class<?> clazz, boolean sort) {
-            return dump(clazz, "", sort);
+        public static List<String> dumpConfig(Class<?> clazz, boolean sort) {
+            return dumpConfig(clazz, "", sort);
         }
 
         /**
-         * @param properties Properties
-         * @param sort sort if true
-         * @return lines
+         * @return message dump
          */
-        public static List<String> dump(Properties properties, boolean sort) {
-            List<String> lines = new ArrayList<>();
-            properties.forEach((key, value) -> lines.add(key + " = " + value));
-            if (sort) {
-                Collections.sort(lines);
-            }
-            return lines;
+        public static String[] dumpMessage() {
+            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag)
+                    .collect(Collectors.toSet());
+            Set<Class<?>> classes = sourceMap.keySet();
+            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"),
+                    classes.stream().flatMap(clazz -> dumpMessage(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
         }
 
         /**
-         * @param <T> Return type
-         * @param name property name
-         * @param locale locale
-         * @return property value
+         * @param name Field full name
+         * @return Field
          */
-        @SuppressWarnings("unchecked")
-        public static <T> Optional<T> get(String name, Locale locale) {
-            Field field = fieldCache.computeIfAbsent(name, fullName -> {
+        public static Field getField(String name) {
+            return fieldCache.computeIfAbsent(name, fullName -> {
                 int classIndex = fullName.indexOf('.');
                 int fieldIndex = fullName.lastIndexOf('.');
                 if (classIndex < 0 || fieldIndex < 0) {
@@ -191,6 +188,17 @@ public @interface Config {
                     return null;
                 }
             });
+        }
+
+        /**
+         * @param <T> Return type
+         * @param name property name
+         * @param locale locale
+         * @return property value
+         */
+        @SuppressWarnings("unchecked")
+        public static <T> Optional<T> getValue(String name, Locale locale) {
+            Field field = getField(name);
             if (field == null) {
                 return Optional.empty();
             }
@@ -222,17 +230,6 @@ public @interface Config {
                         .map(Map.Entry::getValue).forEach(p::putAll);
                 return p;
             });
-        }
-
-        /**
-         * @return message dump
-         */
-        public static String[] messageDump() {
-            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag)
-                    .collect(Collectors.toSet());
-            Set<Class<?>> classes = sourceMap.keySet();
-            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"),
-                    classes.stream().flatMap(clazz -> dump(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
         }
 
         /**
@@ -277,6 +274,11 @@ public @interface Config {
          */
         static final Map<String, Field> fieldCache = new ConcurrentHashMap<>();
 
+        /**
+         * Config keys(except message keys)
+         */
+        static final Set<String> configKeys = new HashSet<>();
+
         static {
             prefixDefault = Reflector.getDefaultValue(Separator.class, "prefix");
             valueDefault = Reflector.getDefaultValue(Separator.class, "value");
@@ -303,6 +305,7 @@ public @interface Config {
                 } else {
                     Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
                         String key = newPrefix + f.getName();
+                        configKeys.add(key);
                         String raw = properties.getProperty(key);
                         f.setAccessible(true);
                         Object value;
@@ -362,7 +365,7 @@ public @interface Config {
          * @param sort sort if true
          * @return lines
          */
-        static List<String> dump(Class<?> clazz, String prefix, boolean sort) {
+        static List<String> dumpConfig(Class<?> clazz, String prefix, boolean sort) {
             String newPrefix = prefix + clazz.getSimpleName().replace('$', '.') + '.';
             List<String> lines = new ArrayList<>();
             if (!Enum.class.isAssignableFrom(clazz)) {
@@ -380,7 +383,7 @@ public @interface Config {
                     }
                 });
             }
-            Stream.of(clazz.getClasses()).forEach(c -> lines.addAll(dump(c, newPrefix, false)));
+            Stream.of(clazz.getClasses()).forEach(c -> lines.addAll(dumpConfig(c, newPrefix, false)));
             if (sort) {
                 Collections.sort(lines);
                 return lines.stream().flatMap(line -> {
@@ -388,6 +391,26 @@ public @interface Config {
                     Collections.reverse(reverse);
                     return reverse.stream();
                 }).collect(Collectors.toList());
+            }
+            return lines;
+        }
+
+        /**
+         * inner use
+         * 
+         * @param properties Properties
+         * @param sort sort if true
+         * @return lines
+         */
+        static List<String> dumpMessage(Properties properties, boolean sort) {
+            List<String> lines = new ArrayList<>();
+            properties.forEach((key, value) -> {
+                if (!configKeys.contains(key)) {
+                    lines.add(key + " = " + value);
+                }
+            });
+            if (sort) {
+                Collections.sort(lines);
             }
             return lines;
         }
@@ -410,11 +433,14 @@ public @interface Config {
          */
         static Properties getProperties(String path) {
             Properties p = new Properties();
-            try (Reader reader = Tool.newReader(Tool.toURL(path).orElse(null).openStream())) {
-                p.load(reader);
-            } catch (IOException | NullPointerException e) {
-                Log.warning("cannot read " + path);
-            }
+            Tool.ifPresentOr(Tool.toURL(path), url -> {
+                Log.info("config load: " + url);
+                try (Reader reader = Tool.newReader(url.openStream())) {
+                    p.load(reader);
+                } catch (IOException e) {
+                    Log.warning(e, () -> "load error");
+                }
+            }, () -> Log.info("config scan: " + Tool.toURL("").get() + path));
             return p;
         }
 

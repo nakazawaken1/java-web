@@ -31,7 +31,11 @@ public interface Message {
         Class<?> clazz = getClass();
         String name = getClass().getSimpleName();
         do {
-            clazz = clazz.getDeclaringClass();
+            Class<?> c = clazz.getDeclaringClass();
+            if(c == null) {
+                break;
+            }
+            clazz = c;
             name = clazz.getSimpleName() + "." + name;
         } while (clazz.getAnnotation(Config.class) == null);
         return Config.Injector.getSource(clazz, locale).getProperty(name + "." + ((Enum<?>) this).name());
