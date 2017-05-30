@@ -4,7 +4,6 @@ import java.util.Optional;
 
 import app.config.Sys;
 import framework.Application;
-import framework.Request;
 import framework.Response;
 import framework.Session;
 import framework.Tool;
@@ -22,15 +21,15 @@ public class Main {
     /**
      * @param application Application
      * @param session Session
-     * @param request Request
+     * @param extension Extension
      * @param loginId Login id
      * @param password Password
      * @return Response
      */
-    @Route(value = Method.POST, extensions = { "", ".json" })
-    Object login(Application application, Session session, Request request,
+    @Route(value = "login(?<extension>\\.json|)", method = Method.POST)
+    Object login(Application application, Session session, String extension,
             @Required @Size(min = 4, value = 20) @Letters(Letters.ASCII) Optional<String> loginId, @Letters(Letters.ASCII) Optional<String> password) {
-        boolean isJson = ".json".equals(request.getExtension());
+        boolean isJson = ".json".equals(extension);
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
             if (isJson) {
@@ -48,22 +47,21 @@ public class Main {
 
     /**
      * @param application Application
-     * @param request Request
+     * @param extension Extension
      * @param session Session
      * @return Response
      */
-    @Route(extensions = { "", ".json" })
-    Object logout(Application application, Request request, Session session) {
+    @Route(value = "logout(?<extension>\\.json|)")
+    Object logout(Application application, String extension, Session session) {
         session.logout();
-        return ".json".equals(request.getExtension()) ? Response.of(Tool.array("", application.getContextPath()))
-                : Response.redirect(application.getContextPath());
+        return ".json".equals(extension) ? Response.of(Tool.array("", application.getContextPath())) : Response.redirect(application.getContextPath());
     }
 
     /**
      * @param session Session
      * @return Response
      */
-    @Route
+    @Route("alert")
     Object alert(Session session) {
         return session.flash("alert");
     }

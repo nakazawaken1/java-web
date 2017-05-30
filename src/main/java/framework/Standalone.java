@@ -702,7 +702,7 @@ public class Standalone {
             this.exchange = exchange;
             String p = exchange.getRequestURI().getPath();
             String r = Application.current().map(Application::getContextPath).orElse("");
-            path = p.length() <= r.length() ? "/" : p.substring(r.length());
+            path = p.length() <= r.length() ? "/" : Tool.prefix(p.substring(r.length()), "/");
             requestHeaders = exchange.getRequestHeaders();
             String contentType = requestHeaders.getFirst("Content-Type");
             // query parameter

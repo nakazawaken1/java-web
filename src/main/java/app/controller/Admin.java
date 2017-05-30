@@ -31,7 +31,7 @@ import framework.annotation.Route;
 /**
  * main controller
  */
-@Route
+@Route("admin")
 @Only(Administrator.class)
 public class Admin {
 
@@ -42,7 +42,7 @@ public class Admin {
      * @param request request
      * @return response
      */
-    @Route(extensions = ".html")
+    @Route(value = "index\\.html")
     Object index(Session session, Request request) {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
@@ -56,7 +56,7 @@ public class Admin {
      * @return response
      * @throws SQLException database error
      */
-    @Route
+    @Route("sql")
     Object sql(Db db, Optional<String> sql) throws SQLException {
         return Response.Template.of("admin/table.html", (out, name, prefix) -> {
             if (!"".equals(name)) {
@@ -78,7 +78,7 @@ public class Admin {
     /**
      * @return response
      */
-    @Route
+    @Route("db")
     Object db() {
         return Sys.h2_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
     }
@@ -88,11 +88,11 @@ public class Admin {
      * 
      * @return response
      */
-    @Route
+    @Route("config")
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
-                Optional.of(String.join(Letters.CRLF, Config.Injector.dumpConfig(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定").bind("breadcrumb",
-                        Tool.list(Sys.Item.adminTitle, Sys.Item.config));
+                Optional.of(String.join(Letters.CRLF, Config.Injector.dumpConfig(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定")
+                        .bind("breadcrumb", Tool.list(Sys.Item.adminTitle, Sys.Item.config));
     }
 
     /**
@@ -104,7 +104,7 @@ public class Admin {
      * @param after after
      * @return response
      */
-    @Route(extensions = ".html")
+    @Route("diff\\.html")
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -130,7 +130,7 @@ public class Admin {
      * @param after after
      * @return response
      */
-    @Route(extensions = ".html")
+    @Route("diff2\\.html")
     Object diff2(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -160,7 +160,7 @@ public class Admin {
      * @param db db
      * @return response
      */
-    @Route
+    @Route("accounts")
     @Accept(Accept.FORM)
     @Content({ Content.JSON, Content.HTML, Content.TEXT, Content.XML, Content.CSV, Content.TSV })
     Object accounts(Db db) {

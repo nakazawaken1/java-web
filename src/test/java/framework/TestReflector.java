@@ -27,8 +27,8 @@ public class TestReflector extends Tester {
     }
 
     {
-        groupWith("Reflector", g -> {
-            expect(g + ":changeAnnotation:class", () -> {
+        group("Reflector", g -> {
+            expect(g + ":changeAnnotation:class", n -> {
                 Class<?> target = Foo.class;
                 Reflector.chagneAnnotation(target, Help.class, new Help() {
 
@@ -44,7 +44,7 @@ public class TestReflector extends Tester {
                 });
                 return target.getAnnotation(Help.class).value();
             }).toArrayEqual(Tool.array("to"));
-            expect(g + ":changeAnnotation:field", () -> {
+            expect(g + ":changeAnnotation:field", n -> {
                 Field target = Reflector.field(Foo.class, "n").get();
                 Reflector.chagneAnnotation(target, Help.class, new Help() {
 
@@ -60,7 +60,7 @@ public class TestReflector extends Tester {
                 });
                 return target.getAnnotation(Help.class).value();
             }).toArrayEqual(Tool.array("def"));
-            expect(g + ":changeAnnotation:constructor", () -> {
+            expect(g + ":changeAnnotation:constructor", n -> {
                 Constructor<Foo> target = Reflector.constructor(Foo.class).get();
                 Reflector.chagneAnnotation(target, Help.class, new Help() {
 
@@ -76,7 +76,7 @@ public class TestReflector extends Tester {
                 });
                 return target.getAnnotation(Help.class).value();
             }).toArrayEqual(Tool.array("222"));
-            expect(g + ":changeAnnotation:method", () -> {
+            expect(g + ":changeAnnotation:method", n -> {
                 Method target = Reflector.method(Foo.class, "bar").get();
                 Reflector.chagneAnnotation(target, Help.class, new Help() {
 

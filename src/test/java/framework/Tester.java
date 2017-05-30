@@ -93,15 +93,11 @@ public class Tester {
      * @param stack test stack
      * @param name test name
      * @param supplier value supplier
-     * @param action non-value test action
      */
-    Tester(Deque<Tester> stack, String name, Supplier<Object> supplier, Runnable action) {
+    Tester(Deque<Tester> stack, String name, Supplier<Object> supplier) {
         this.stack = stack;
         description = Description.createTestDescription(getClass().getSimpleName(), name);
         getter = () -> {
-            if (action != null) {
-                action.run();
-            }
             return supplier != null ? supplier.get() : null;
         };
     }
@@ -113,30 +109,8 @@ public class Tester {
      * @param supplier value supplier
      * @return expect object
      */
-    public Expect expect(String name, Supplier<Object> supplier) {
-        return new Expect(stack.peek().add(new Tester(stack, name, supplier, null)));
-    }
-
-    /**
-     * test for value
-     * 
-     * @param name test name
-     * @param supplier value supplier
-     * @return expect object
-     */
-    public Expect expectWith(String name, Function<String, Object> supplier) {
-        return new Expect(stack.peek().add(new Tester(stack, name, () -> supplier.apply(name), null)));
-    }
-
-    /**
-     * test for non-value
-     * 
-     * @param name test name
-     * @param action value supplier
-     * @return expect object
-     */
-    public Expect expect(String name, Runnable action) {
-        return new Expect(stack.peek().add(new Tester(stack, name, null, action)));
+    public Expect expect(String name, Function<String, Object> supplier) {
+        return new Expect(stack.peek().add(new Tester(stack, name, () -> supplier.apply(name))));
     }
 
     /**
@@ -145,19 +119,7 @@ public class Tester {
      * @param name group name
      * @param action tests
      */
-    public void group(String name, Runnable action) {
-        stack.push(stack.peek().add(new Tester(stack, name)));
-        action.run();
-        stack.pop();
-    }
-
-    /**
-     * grouping
-     * 
-     * @param name group name
-     * @param action tests
-     */
-    public void groupWith(String name, Consumer<String> action) {
+    public void group(String name, Consumer<String> action) {
         stack.push(stack.peek().add(new Tester(stack, name)));
         action.accept(name);
         stack.pop();
@@ -292,7 +254,7 @@ public class Tester {
          * @param expected expected value
          */
         public void toArrayEqual(Object expected) {
-            tester.test = notifier -> Assert.assertArrayEquals((Object[])get(expected), (Object[])tester.get());
+            tester.test = notifier -> Assert.assertArrayEquals((Object[]) get(expected), (Object[]) tester.get());
         }
 
         /**

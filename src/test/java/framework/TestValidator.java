@@ -122,40 +122,40 @@ public class TestValidator extends Tester {
     }
 
     {
-        groupWith("time", g -> {
-            expectWith(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
-            expectWith(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);
-            expectWith(g + ":future:ok", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).minusSeconds(1).toString()))
+        group("time", g -> {
+            expect(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
+            expect(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);
+            expect(g + ":future:ok", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).minusSeconds(1).toString()))
                     .toEqual(true);
-            expectWith(g + ":future:ng", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).plusSeconds(1).toString()))
+            expect(g + ":future:ng", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).plusSeconds(1).toString()))
                     .toEqual(false);
-            expectWith(g + ":past:ok", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).plusSeconds(1).toString()))
+            expect(g + ":past:ok", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).plusSeconds(1).toString()))
                     .toEqual(true);
-            expectWith(g + ":past:ng", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).minusSeconds(1).toString()))
+            expect(g + ":past:ng", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).minusSeconds(1).toString()))
                     .toEqual(false);
         });
-        groupWith("range", g -> {
-            expectWith(g + ":null", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null))
+        group("range", g -> {
+            expect(g + ":null", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null))
                     .toEqual(true);
-            expectWith(g + ":empty", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, ""))
+            expect(g + ":empty", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, ""))
                     .toEqual(true);
-            expectWith(g + ":min:ok", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1")).toEqual(true);
-            expectWith(g + ":min:ng", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1.1")).toEqual(false);
-            expectWith(g + ":value:ok", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0")).toEqual(true);
-            expectWith(g + ":value:ng", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0.1")).toEqual(false);
-            expectWith(g + ":integerMin:ok",
+            expect(g + ":min:ok", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1")).toEqual(true);
+            expect(g + ":min:ng", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1.1")).toEqual(false);
+            expect(g + ":value:ok", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0")).toEqual(true);
+            expect(g + ":value:ng", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0.1")).toEqual(false);
+            expect(g + ":integerMin:ok",
                     n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "10.12")).toEqual(true);
-            expectWith(g + ":integerMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "9.1"))
+            expect(g + ":integerMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "9.1"))
                     .toEqual(false);
-            expectWith(g + ":integerMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "9.1")).toEqual(true);
-            expectWith(g + ":integerMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "10.12"))
+            expect(g + ":integerMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "9.1")).toEqual(true);
+            expect(g + ":integerMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "10.12"))
                     .toEqual(false);
-            expectWith(g + ":fractionMin:ok",
+            expect(g + ":fractionMin:ok",
                     n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "10.12")).toEqual(true);
-            expectWith(g + ":fractionMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "9.1"))
+            expect(g + ":fractionMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "9.1"))
                     .toEqual(false);
-            expectWith(g + ":fractionMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "9.1")).toEqual(true);
-            expectWith(g + ":fractionMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "10.12"))
+            expect(g + ":fractionMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "9.1")).toEqual(true);
+            expect(g + ":fractionMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "10.12"))
                     .toEqual(false);
         });
     }

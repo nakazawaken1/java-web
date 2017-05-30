@@ -10,15 +10,15 @@ import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,7 +47,7 @@ public abstract class Application implements Attributes<Object> {
     /**
      * routing table{path: {class: method}}
      */
-    static SortedMap<String, Tuple<Class<?>, Method>> routing;
+    static Map<Tuple<Set<Route.Method>, String>, Tuple<Class<?>, Method>> routing;
 
     /**
      * @return singleton
@@ -103,17 +103,16 @@ public abstract class Application implements Attributes<Object> {
 
         /* setup routing */
         if (routing == null) {
-            routing = new TreeMap<>();
+            routing = new HashMap<>();
             try (Stream<Class<?>> cs = Tool.getClasses(Main.class.getPackage().getName())) {
                 cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
                         .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> routing, (map, trio) -> {
                             Class<?> c = trio.l;
                             Method m = trio.r.l;
-                            String left = Tool.of(c.getAnnotation(Route.class)).map(a -> Tool.string(a.path()).orElse(c.getSimpleName().toLowerCase() + '/'))
-                                    .orElse("");
-                            String right = Tool.string(trio.r.r.path()).orElse(m.getName());
+                            String left = Tool.of(c.getAnnotation(Route.class)).map(Route::value).orElse("");
+                            String right = trio.r.r.value();
                             m.setAccessible(true);
-                            map.compute(left + right, (k, v) -> {
+                            map.compute(Tuple.of(Tool.set(trio.r.r.method()), Tool.path("/", left, right).apply("/")), (k, v) -> {
                                 if (v != null) {
                                     Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
                                 }
@@ -123,7 +122,8 @@ public abstract class Application implements Attributes<Object> {
             }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
-                routing.forEach((path, pair) -> writer.println(path + " -> " + pair.l.getName() + "." + pair.r.getName()));
+                routing.forEach((key, value) -> writer
+                        .println((key.l.isEmpty() ? "*" : key.l.toString()) + " " + key.r + " -> " + value.l.getName() + "." + value.r.getName()));
             }));
         }
 
@@ -172,34 +172,17 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* action */
-        final Optional<String> mime;
-        final String action;
-        final String extension;
-        final int index = path.lastIndexOf('.');
-        if (index >= 0 && path.lastIndexOf('/') < index) {
-            mime = Tool.of(Tool.getContentType(path));
-            action = path.substring(0, index);
-            extension = path.substring(index);
-        } else {
-            mime = Optional.empty();
-            action = path;
-            extension = "";
-        }
-        final Tuple<Class<?>, Method> pair = routing.get(action);
-        Predicate<Method> matchRoute = method -> {
-            String[] extensions = method.getAnnotation(Route.class).extensions();
-            boolean result = extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension));
-            Optional<String[]> values = Tool.of(method.getAnnotation(Content.class)).map(Content::value);
-            result = result || values.map(i -> Tool.list(i).contains(mime.orElse(""))).orElse(false);
-            return result;
-        };
-        if (pair != null && matchRoute.test(pair.r)) {
+        final Optional<String> mime = Tool.string(Tool.getExtension(path)).map(Tool::getContentType);
+        Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
+        final Tuple<Class<?>, Method> pair = routing.entrySet().stream().filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))
+                .map(e -> Tuple.of(Pattern.compile(e.getKey().r).matcher(path), e.getValue())).filter(p -> p.l.matches()).findAny().map(p -> {
+                    Reflector.<Map<String, Integer>>invoke(p.l.pattern(), "namedGroups", Tool.array())
+                            .forEach((k, v) -> Tool.addValue(parameters, k, p.l.group(v)));
+                    return p.r;
+                }).orElse(null);
+        if (pair != null && Tool.of(pair.r.getAnnotation(Content.class)).map(Content::value).map(i -> Tool.list(i).contains(mime.orElse(""))).orElse(true)) {
             do {
                 Method method = pair.r;
-                Route http = method.getAnnotation(Route.class);
-                if (http == null || http.value().length > 0 && !Tool.list(http.value()).contains(request.getMethod())) {
-                    break;
-                }
                 Only only = Tool.or(method.getAnnotation(Only.class), () -> method.getDeclaringClass().getAnnotation(Only.class)).orElse(null);
 
                 /* go login page if not logged in */
@@ -221,7 +204,7 @@ public abstract class Application implements Attributes<Object> {
 
                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                     Log.config("[invoke method] " + method.getDeclaringClass().getName() + "." + method.getName());
-                    Binder binder = new Binder(request.getParameters());
+                    Binder binder = new Binder(parameters);
                     Object[] args = Stream.of(method.getParameters()).map(p -> {
                         Class<?> type = p.getType();
                         if (Request.class.isAssignableFrom(type)) {
