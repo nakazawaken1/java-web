@@ -5,6 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import framework.AbstractValidator;
+
 /**
  * allowed or deny letters
  */
@@ -12,19 +14,24 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Letters {
     /**
-     * @return apply groups
+     * @return Apply groups
      */
-    Class<? extends Valid.All>[] groups() default {};
+    Class<? extends Valid.All>[] groups() default Valid.All.class;
 
     /**
-     * @return target letters
+     * @return Target letters
      */
     String value();
 
     /**
-     * @return true if exclude letters, else include letters
+     * @return True if exclude letters, else include letters
      */
     boolean deny() default false;
+
+    /**
+     * @return Error message
+     */
+    String message() default "{Sys.Alert.letters}";
 
     /**
      * 0 - 9
@@ -77,6 +84,11 @@ public @interface Letters {
     String ALPHABETS = ALPHABET_UPPERS + ALPHABET_LOWERS;
 
     /**
+     * Ascii characters
+     */
+    String ASCII = MARKS + DIGITS + ALPHABETS;
+
+    /**
      * katakana &amp; middle point &amp; space
      */
     String KATAKANA = "アイウエオヴァィゥェォカキクケコガギグゲゴサシスセソザジズゼゾタチツテトダヂヅデドナニヌネノハヒフヘホバビブベボパピプペポマミムメモヤユヨャュョラリルレロワヲンヮー・　";
@@ -85,4 +97,19 @@ public @interface Letters {
      * hiragana &amp; middle point &amp; space
      */
     String HIRAGANA = "あいうえおぁぃぅぇぉかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよゃゅょらりるれろわをんゎー・　";
+
+    @SuppressWarnings("javadoc")
+    class Validator extends AbstractValidator<Letters> {
+
+        public Validator(Letters annotation) {
+            super(annotation);
+        }
+
+        @Override
+        protected void validate(String name, String value, framework.AbstractValidator.ErrorAppender appender) {
+            if (value.chars().anyMatch(c -> annotation.value().indexOf(c) < 0)) {
+                appender.addError(name, value, annotation.message(), "value", annotation.value(), "deny", annotation.deny());
+            }
+        }
+    }
 }

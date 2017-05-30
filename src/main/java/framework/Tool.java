@@ -2257,12 +2257,8 @@ public class Tool {
         if (text == null) {
             return null;
         }
-        String string = text.toString();
-        if (string == null || string.isEmpty()) {
-            return null;
-        }
         StringBuilder s = new StringBuilder();
-        string.chars().forEach(c -> {
+        text.toString().chars().forEach(c -> {
             switch (c) {
             case '"':
                 s.append("\\\"");

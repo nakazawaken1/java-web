@@ -1,4 +1,4 @@
 <nav>
   <h2><a href="${P}">{Sys.Item.title}</a>#{V.stream().reduce('', (l, r) -> l += ' &raquo; ' += r)}</h2>
-  <form action="${P}logout">#{Tool.of(S.account.avator).orElse(Sys.default_avator)} #{S.account.name} <button class="button" type="submit">{Sys.Item.logout}</button></form>
+  <form action="${P}logout" data-confirm="{Sys.Confirm.logout}">#{Tool.of(S.account.avator).orElse(Sys.default_avator)} #{S.account.name} <button class="button" type="submit">{Sys.Item.logout}</button></form>
 </nav>

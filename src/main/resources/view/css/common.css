@@ -82,6 +82,12 @@ label.checkbox, label.radio, select, .button, label.file:after {
   -webkit-border-radius: 3px;
 }
 
+.round {
+  border-radius: 6px;
+  -moz-border-radius: 6px;
+  -webkit-border-radius: 6px;
+}
+
 label.checkbox, label.radio {
   border: 1pt solid silver;
   padding: 1pt 10pt;
@@ -109,6 +115,11 @@ label.file:after {
   font-style: normal;
   margin: 0;
   padding: 1pt 10pt;
+  -webkit-transition: 0.2s;
+  transition: 0.2s;
+}
+
+.trans {
   -webkit-transition: 0.2s;
   transition: 0.2s;
 }
@@ -243,6 +254,15 @@ table.noborder th, table.noborder td {
   text-align: center;
 }
 
+.input-error {
+  border: solid 1px red;
+}
+label.input-error {
+  color: red;
+  border: none;
+}
+
+
 .ascii {
   ime-mode: disabled;
 }
@@ -282,6 +302,10 @@ table.noborder th, table.noborder td {
   margin-bottom: 5px;
 }
 
+.margin-bottom-huge {
+  margin-bottom: 50px;
+}
+
 .left {
   margin-right: auto;
 }
@@ -297,4 +321,19 @@ table.noborder th, table.noborder td {
 
 .cell {
   display: table-cell;
+}
+
+.input {
+  margin: 5px 0;
+}
+.input .error {
+  text-align: left;
+}
+.input.vertical {
+  display: inline-block;
+}
+
+.input.vertical label {
+  display: block;
+  text-align: left;
 }

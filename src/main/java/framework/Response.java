@@ -636,7 +636,7 @@ public abstract class Response {
                     response.contentType(Content.TEXT, response.charset());
                     Tool.csv(response.content, out.get(), response.charset());
                 });
-                Tool.ifPresentOr(response.headers.getOrDefault("Content-Type", Tool.list()).stream().findFirst(), Try.c(contentType -> {
+                Tool.ifPresentOr(Tool.of(response.headers).flatMap(map -> map.getOrDefault("Content-Type", Tool.list()).stream().findFirst()), Try.c(contentType -> {
                     switch (Tool.splitAt(contentType, "\\s*;", 0)) {
                     case Content.JSON:
                     case Content.YML:

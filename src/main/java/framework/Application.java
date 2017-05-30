@@ -1,5 +1,6 @@
 package framework;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -10,6 +11,7 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -30,6 +32,7 @@ import framework.annotation.Job;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Route;
+import framework.annotation.Valid;
 
 /**
  * application scoped object
@@ -183,14 +186,14 @@ public abstract class Application implements Attributes<Object> {
             extension = "";
         }
         final Tuple<Class<?>, Method> pair = routing.get(action);
-        Predicate<Method> test = method -> {
+        Predicate<Method> matchRoute = method -> {
             String[] extensions = method.getAnnotation(Route.class).extensions();
             boolean result = extensions.length <= 0 || Stream.of(extensions).anyMatch(i -> i.equalsIgnoreCase(extension));
             Optional<String[]> values = Tool.of(method.getAnnotation(Content.class)).map(Content::value);
             result = result || values.map(i -> Tool.list(i).contains(mime.orElse(""))).orElse(false);
             return result;
         };
-        if (pair != null && test.test(pair.r)) {
+        if (pair != null && matchRoute.test(pair.r)) {
             do {
                 Method method = pair.r;
                 Route http = method.getAnnotation(Route.class);
@@ -205,6 +208,7 @@ public abstract class Application implements Attributes<Object> {
                     return;
                 }
 
+                /* forbidden check */
                 boolean forbidden = only != null && !session.isLoggedIn();
                 if (!forbidden && only != null && only.value().length > 0) {
                     forbidden = !session.getAccount().hasAnyRole(only.value());
@@ -214,61 +218,72 @@ public abstract class Application implements Attributes<Object> {
                     Response.template("error.html").flush();
                     return;
                 }
+
                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-                    try {
-                        Log.config("[invoke method] " + method.getDeclaringClass().getName() + "." + method.getName());
-                        Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l),
-                                Stream.of(method.getParameters()).map(p -> {
-                                    Class<?> type = p.getType();
-                                    if (Request.class.isAssignableFrom(type)) {
-                                        return request;
-                                    }
-                                    if (Session.class.isAssignableFrom(type)) {
-                                        return session;
-                                    }
-                                    if (Application.class.isAssignableFrom(type)) {
-                                        return this;
-                                    }
-                                    if (Db.class.isAssignableFrom(type)) {
-                                        return db.get();
-                                    }
-                                    Type types = p.getParameterizedType();
-                                    return new Binder(request.getParameters()).bind(p.getName(), type,
-                                            types instanceof ParameterizedType ? ((ParameterizedType) types).getActualTypeArguments() : Tool.array());
-                                }).toArray());
-                        Consumer<Response> setContentType = r -> {
-                            Content content = method.getAnnotation(Content.class);
-                            String[] accept = request.getHeaders().get("accept").stream()
-                                    .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase()))
-                                    .toArray(String[]::new);
-                            Tool.ifPresentOr(
-                                    Tool.or(mime,
-                                            () -> Stream.of(accept).filter(i -> content == null || Stream.of(content.value()).anyMatch(i::equals)).findFirst()),
-                                    m -> r.contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null), () -> {
-                                        throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
-                                    });
-                        };
-                        if (response instanceof Response) {
-                            Tool.peek((Response) response, r -> {
-                                if (r.headers == null || !r.headers.containsKey("Content-Type")) {
-                                    setContentType.accept(r);
-                                }
-                            }).flush();
-                        } else {
-                            Tool.peek(Response.of(response), r -> setContentType.accept(r)).flush();
+                    Log.config("[invoke method] " + method.getDeclaringClass().getName() + "." + method.getName());
+                    Binder binder = new Binder(request.getParameters());
+                    Object[] args = Stream.of(method.getParameters()).map(p -> {
+                        Class<?> type = p.getType();
+                        if (Request.class.isAssignableFrom(type)) {
+                            return request;
                         }
-                        return;
-                    } catch (InvocationTargetException e) {
-                        Throwable t = e.getCause();
-                        if (t instanceof RuntimeException) {
-                            throw (RuntimeException) t;
+                        if (Session.class.isAssignableFrom(type)) {
+                            return session;
                         }
-                        throw new RuntimeException(t);
-                    } catch (IllegalAccessException | IllegalArgumentException e) {
-                        throw new RuntimeException(e);
-                    } catch (RuntimeException e) {
-                        throw e;
+                        if (Application.class.isAssignableFrom(type)) {
+                            return this;
+                        }
+                        if (Db.class.isAssignableFrom(type)) {
+                            return db.get();
+                        }
+                        String name = p.getName();
+                        Type[] types = Tool.of(p.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
+                                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
+                        return binder.validator(value -> Stream.of(p.getAnnotations()).forEach(a -> {
+                            Class<? extends Annotation> c = a.annotationType();
+                            Stream.of(c.getDeclaredClasses()).filter(i -> AbstractValidator.class.isAssignableFrom(i)).findFirst()
+                                    .flatMap(i -> Reflector.constructor(i, c)).map(Try.f(n -> (AbstractValidator<?>) n.newInstance(a)))
+                                    .ifPresent(i -> i.validate(Valid.All.class, name, value, binder));
+                        })).bind(name, type, types);
+                    }).toArray();
+                    Object response;
+                    if (binder.errors.isEmpty()) {
+                        response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l), args);
+                    } else {
+                        response = Response.of(Tool.array(Sys.Alert.inputError, binder.errors));
                     }
+                    Consumer<Response> setContentType = r -> {
+                        Content content = method.getAnnotation(Content.class);
+                        String[] accept = request.getHeaders().get("accept").stream()
+                                .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase(Locale.ENGLISH)))
+                                .toArray(String[]::new);
+                        Tool.ifPresentOr(
+                                Tool.or(mime,
+                                        () -> Stream.of(accept).filter(i -> content == null || Stream.of(content.value()).anyMatch(i::equals)).findFirst()),
+                                m -> r.contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null), () -> {
+                                    throw new RuntimeException("not accept mime type: " + Arrays.toString(accept));
+                                });
+                    };
+                    if (response instanceof Response) {
+                        Tool.peek((Response) response, r -> {
+                            if (r.headers == null || !r.headers.containsKey("Content-Type")) {
+                                setContentType.accept(r);
+                            }
+                        }).flush();
+                    } else {
+                        Tool.peek(Response.of(response), r -> setContentType.accept(r)).flush();
+                    }
+                    return;
+                } catch (InvocationTargetException e) {
+                    Throwable t = e.getCause();
+                    if (t instanceof RuntimeException) {
+                        throw (RuntimeException) t;
+                    }
+                    throw new RuntimeException(t);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                } catch (RuntimeException e) {
+                    throw e;
                 }
             } while (false);
         }

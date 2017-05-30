@@ -240,7 +240,12 @@ public class Sys {
         adminTitle,
         reset,
         @Mapping("Account list")
-        accountList;
+        accountList,
+        yes,
+        no,
+        @Mapping("OK")
+        ok,
+        ;
 
         @Override
         public String toString() {
@@ -252,7 +257,22 @@ public class Sys {
         @Mapping("You do not have access rights. Please login with authorized account.")
         forbidden,
         @Mapping("Login ID or password is wrong.")
-        loginFailed,;
+        loginFailed,
+        @Mapping("System error!")
+        error,
+        @Mapping("Please enter from ${min} to ${value} characters.")
+        size,
+        @Mapping("Input error!")
+        inputError,
+        @Mapping("Invalid characer")
+        letters,
+        @Mapping("Input required")
+        required,
+        @Mapping("Value is out of range")
+        range,
+        @Mapping("Time is out of range")
+        time,
+        ;
 
         @Override
         public String toString() {
@@ -262,7 +282,20 @@ public class Sys {
 
     public enum Prompt implements Message {
         @Mapping("Please input user ID and password and press the login button.")
-        login,;
+        login,
+        ;
+
+        @Override
+        public String toString() {
+            return message();
+        }
+    }
+    
+
+    public enum Confirm implements Message {
+        @Mapping("Do you want to log out?")
+        logout,
+        ;
 
         @Override
         public String toString() {

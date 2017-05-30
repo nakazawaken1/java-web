@@ -1,59 +1,41 @@
+Sys.Alert.error = システムエラーが発生しました。お手数ですが再度操作をお願いします。
 Sys.Alert.forbidden = アクセス権限がありません。権限のあるアカウントでログインしてください。
-
+Sys.Alert.inputError = 入力エラーがあります。修正してもう一度実行してください。
+Sys.Alert.letters = 使用できない文字が含まれています。
 Sys.Alert.loginFailed = ログインIDまたはパスワードが違います。
+Sys.Alert.required = 必ず入力してください。
+Sys.Alert.size = ${min}文字以上${value}文字以下で入力してください。
 
-Sys.Item.after = 変更後
-
-Sys.Item.back = 戻る
-
-Sys.Item.before = 変更前
-
-Sys.Item.clear = クリア
-
-Sys.Item.compact = 省略表示
-
-Sys.Item.delete = 削除
-
-Sys.Item.diff = 差分表示
-
-Sys.Item.error = エラー
-
-Sys.Item.full = 全行表示
-
-Sys.Item.index = 行
-
-Sys.Item.insert = 追加
-
-Sys.Item.login = ログイン
-
-Sys.Item.loginId = ログインID
-
-Sys.Item.logout = ログアウト
-
-Sys.Item.password = パスワード
-
-Sys.Item.quit = 終了
-
-Sys.Item.reader = &#xFE19;
-
-Sys.Item.run = 実行
-
-Sys.Item.title = タイトル
-
-Sys.Item.update = 変更
-
-Sys.Prompt.login = ログインID・パスワードを入力して、\nログインボタンを押して下さい。
-
-Sys.Item.adminTitle = 管理者メニュー
-
-Sys.Item.config = 設定情報
-
-Sys.Item.hash = 暗号化ツール
-
-Sys.Item.dbSettings = データベース情報
-
-Sys.Item.dbConsole = データベース操作
-
-Sys.Item.reset = リセット
+Sys.Confirm.logout = ログアウトします。よろしいですか？
 
 Sys.Item.accountList = アカウント一覧
+Sys.Item.adminTitle = 管理者メニュー
+Sys.Item.after = 変更後
+Sys.Item.back = 戻る
+Sys.Item.before = 変更前
+Sys.Item.clear = クリア
+Sys.Item.compact = 省略表示
+Sys.Item.config = 設定情報
+Sys.Item.dbConsole = データベース操作
+Sys.Item.dbSettings = データベース情報
+Sys.Item.delete = 削除
+Sys.Item.diff = 差分表示
+Sys.Item.error = エラー
+Sys.Item.full = 全行表示
+Sys.Item.hash = 暗号化ツール
+Sys.Item.index = 行
+Sys.Item.insert = 追加
+Sys.Item.login = ログイン
+Sys.Item.loginId = ログインID
+Sys.Item.logout = ログアウト
+Sys.Item.no = いいえ
+Sys.Item.password = パスワード
+Sys.Item.quit = 終了
+Sys.Item.reader = &#xFE19;
+Sys.Item.reset = リセット
+Sys.Item.run = 実行
+Sys.Item.title = タイトル
+Sys.Item.update = 変更
+Sys.Item.yes = はい
+
+Sys.Prompt.login = ログインID・パスワードを入力して、\nログインボタンを押して下さい。

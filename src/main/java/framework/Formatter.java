@@ -368,7 +368,14 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map,
             Object... values) {
         try (Formatter formatter = new Formatter(exclude, escape, locale, map, values)) {
-            return formatter.format(text);
+            for(;;) {
+                String text0 = text;
+                text = formatter.format(text);
+                if(text0.equals(text)) {
+                    break;
+                }
+            }
+            return text;
         }
     }
 

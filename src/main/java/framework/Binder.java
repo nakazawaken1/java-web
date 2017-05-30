@@ -2,25 +2,59 @@ package framework;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
+
+import framework.AbstractValidator.ErrorAppender;
 
 /**
  * Binder
  */
-public class Binder {
+public class Binder implements ErrorAppender {
     /**
-     * parameters
+     * Parameters
      */
     Map<String, List<String>> parameters;
+
+    /**
+     * Validator(validatee, errors)
+     */
+    Consumer<String> validator;
+
+    /**
+     * Errors
+     */
+    Map<String, List<String>> errors = new LinkedHashMap<>();
 
     /**
      * @param parameters parameters
      */
     public Binder(Map<String, List<String>> parameters) {
         this.parameters = parameters;
+    }
+
+    /**
+     * @param validator Validator
+     * @return Self
+     */
+    public Binder validator(Consumer<String> validator) {
+        this.validator = validator;
+        return this;
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see framework.AbstractValidator.ErrorAppender#addError(java.lang.String, java.lang.String, java.lang.String, java.lang.Object[])
+     */
+    @Override
+    public void addError(String name, String value, String error, Object... keyValues) {
+        Tool.addValue(errors, name,
+                Formatter.format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)));
     }
 
     /**
@@ -41,6 +75,9 @@ public class Binder {
      * @return value
      */
     Object convert(String text, Type clazz, Function<Exception, Object> error) {
+        if (validator != null) {
+            validator.accept(text);
+        }
         Function<Function<String, Object>, Object> toNumber = f -> Try
                 .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error).get();
         if (clazz == String.class) {
