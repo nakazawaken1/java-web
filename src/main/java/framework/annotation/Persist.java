@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface InitialData {
+public @interface Persist {
     /**
      * @return field names(for insert table(?))
      */
@@ -19,5 +19,5 @@ public @interface InitialData {
     /**
      * @return values(for insert table(...) values(?))
      */
-    String[] value();
+    String[] value() default {};
 }

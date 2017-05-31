@@ -53,9 +53,8 @@ import framework.Try.TryFunction;
 import framework.annotation.Config;
 import framework.annotation.Help;
 import framework.annotation.Id;
-import framework.annotation.InitialData;
 import framework.annotation.Join;
-import framework.annotation.Mapping;
+import framework.annotation.Persist;
 import framework.annotation.Size;
 import framework.annotation.Stringer;
 
@@ -815,6 +814,21 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * SELECT clause(add field with multiple call)
+     *
+     * @param fields fields
+     * @return Query
+     */
+    public Query select(Enum<?>... fields) {
+        Query q = new Query(this);
+        q.fields = Stream.of(fields).map(field -> {
+            Class<?> clazz = Reflector.getGenericParameter(field.getDeclaringClass().getDeclaringClass(), 0);
+            return Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
+        }).collect(Collectors.toList());
+        return q;
+    }
+
+    /**
      * FROM clause(can use without select)
      *
      * @param table table
@@ -823,6 +837,18 @@ public class Db implements AutoCloseable {
     public Query from(String table) {
         Query q = new Query(this);
         q.table = table;
+        return q;
+    }
+
+    /**
+     * FROM clause(can use without select)
+     *
+     * @param table table
+     * @return Query
+     */
+    public Query from(Class<?> table) {
+        Query q = new Query(this);
+        q.table = Reflector.mappingClassName(table);
         return q;
     }
 
@@ -946,13 +972,14 @@ public class Db implements AutoCloseable {
             List<String> tableNames = tables.stream().map(tableName).collect(Collectors.toList());
 
             List<Tuple<String, Class<?>>> models = new ArrayList<>();
-            List<Tuple<String, InitialData>> modelDatas = new ArrayList<>();
+            List<Tuple<String, Persist>> modelDatas = new ArrayList<>();
             try (Stream<Class<?>> classes = Tool.getClasses(Account.class.getPackage().getName())) {
-                classes.filter(c -> c.getAnnotation(Mapping.class) != null).map(c -> Tuple.<String, Class<?>>of(Reflector.mappingClassName(c), c))
-                        .filter(t -> !tableNames.contains(t.l))
-                        .peek(t -> Tool.of(t.r.getAnnotation(InitialData.class)).filter(a -> !datas.contains(t.l))
-                                .ifPresent(a -> modelDatas.add(Tuple.of(t.l, a))))
-                        .filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(models::add);
+                classes.map(c -> Tuple.of(c, c.getAnnotation(Persist.class))).filter(t -> t.r != null)
+                        .map(t -> Tuple.of(Reflector.mappingClassName(t.l), t.l, t.r)).filter(t -> !tableNames.contains(t.l)).peek(t -> {
+                            if (!datas.contains(t.l)) {
+                                modelDatas.add(Tuple.of(t.l, t.r.r));
+                            }
+                        }).filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(t -> models.add(Tuple.of(t.l, t.r.l)));
             }
 
             /* get exists tables */
@@ -983,7 +1010,7 @@ public class Db implements AutoCloseable {
             Function<String, String> dataName = file -> file.substring(dataPrefix.length(), file.length() - suffix.length());
             datas.stream().filter(file -> reloadTables.contains(dataName.apply(file))).peek(file -> db.truncate(dataName.apply(file)))
                     .forEach(file -> db.executeFile(file, null));
-            modelDatas.stream().peek(t -> db.truncate(t.l)).forEach(t -> db.insert(t.l, t.r));
+            modelDatas.stream().peek(t -> db.truncate(t.l)).forEach(t -> db.insert(t.l, t.r.field(), t.r.value()));
         }
     }
 
@@ -1670,6 +1697,17 @@ public class Db implements AutoCloseable {
         }
 
         /**
+         * from
+         *
+         * @param table table
+         * @return preparedQuery
+         */
+        public Query from(Class<?> table) {
+            this.table = Reflector.mappingClassName(table);
+            return this;
+        }
+
+        /**
          * use row lock
          *
          * @return preparedQuery
@@ -1767,6 +1805,22 @@ public class Db implements AutoCloseable {
                 return where(field + " IS NULL");
             }
             return where(field + " = " + db.builder.escape(value));
+        }
+
+        /**
+         * condition(equals)
+         *
+         * @param field field
+         * @param value value
+         * @return preparedQuery
+         */
+        public Query where(Enum<?> field, Object value) {
+            Class<?> clazz = Reflector.getGenericParameter(field.getDeclaringClass().getDeclaringClass(), 0);
+            String name = Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
+            if (value == null) {
+                return where(name + " IS NULL");
+            }
+            return where(name + " = " + db.builder.escape(value));
         }
 
         /**
@@ -1966,7 +2020,7 @@ public class Db implements AutoCloseable {
      * @return stream of target class instance
      */
     public <T> Stream<T> findAll(Class<T> clazz) {
-        return from(Reflector.mappingClassName(clazz)).stream().map(toObject(clazz));
+        return from(Reflector.mappingClassName(clazz)).stream().map(Try.f(toObject(clazz)));
     }
 
     /**
@@ -2004,16 +2058,16 @@ public class Db implements AutoCloseable {
      * @param clazz target class
      * @return object
      */
-    public static <T> Function<ResultSet, T> toObject(Class<T> clazz) {
+    public static <T> TryFunction<ResultSet, T> toObject(Class<T> clazz) {
         Map<String, Field> map = Reflector.fields(clazz);
-        return Try.f(rs -> {
+        return rs -> {
             T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
             IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
                 Tool.of(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
             });
             return object;
-        });
+        };
     }
 
     /**
@@ -2163,11 +2217,12 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * @param table table
-     * @param data data
+     * @param table Table
+     * @param fields Fields(Comma separated)
+     * @param values Values(Comma separated)
      */
-    public void insert(String table, InitialData data) {
-        String prefix = "INSERT INTO " + table + Tool.string(data.field()).map(s -> "(" + s + ")").orElse("") + " VALUES(";
-        Stream.of(data.value()).map(value -> prefix + value + ")").forEach(sql -> execute(sql, null));
+    public void insert(String table, String fields, String[] values) {
+        String prefix = "INSERT INTO " + table + Tool.string(fields).map(s -> "(" + s + ")").orElse("") + " VALUES(";
+        Stream.of(values).map(value -> prefix + value + ")").forEach(sql -> execute(sql, null));
     }
 }

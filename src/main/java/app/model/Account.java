@@ -16,6 +16,7 @@ import framework.Try;
 import framework.annotation.Help;
 import framework.annotation.Mapping;
 import framework.annotation.Only.User;
+import framework.annotation.Persist;
 import framework.annotation.Required;
 import framework.annotation.Stringer;
 
@@ -25,6 +26,7 @@ import framework.annotation.Stringer;
 @SuppressWarnings("serial")
 @Mapping("t_account")
 @Help("アカウント")
+@Persist
 public class Account implements Serializable {
 
     /**

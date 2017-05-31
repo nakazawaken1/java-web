@@ -3,8 +3,10 @@ Sys.Alert.forbidden = アクセス権限がありません。権限のあるア�
 Sys.Alert.inputError = 入力エラーがあります。修正してもう一度実行してください。
 Sys.Alert.letters = 使用できない文字が含まれています。
 Sys.Alert.loginFailed = ログインIDまたはパスワードが違います。
+Sys.Alert.range = ${min}～${value}の範囲で入力してください。
 Sys.Alert.required = 必ず入力してください。
 Sys.Alert.size = ${min}文字以上${value}文字以下で入力してください。
+Sys.Alert.time = ${past}${unit}前～${future}${unit}後で入力してください。
 
 Sys.Confirm.logout = ログアウトします。よろしいですか？
 

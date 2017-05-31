@@ -17,7 +17,7 @@ public @interface Range {
     /**
      * @return apply groups
      */
-    Class<? extends Valid.All>[] groups() default {};
+    Class<? extends Valid.All>[] groups() default Valid.All.class;
 
     /**
      * @return minimum number

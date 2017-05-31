@@ -379,6 +379,9 @@ public class Tool {
                 traverser.value(null, null, false);
                 break;
             }
+            if (o instanceof Optional) {
+                o = ((Optional<?>) o).get();
+            }
             final Set<Object> cache = first ? new HashSet<>() : hashes[0];
             Class<?> c = o.getClass();
             if (o instanceof Iterable) {
@@ -421,10 +424,11 @@ public class Tool {
                 break;
             }
             traverser.start(c);
+            Object object = o;
             Stream.of(c.getDeclaredFields()).filter(f -> Tool.val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m))).forEach(field -> {
                 try {
                     field.setAccessible(true);
-                    Object value = field.get(o);
+                    Object value = field.get(object);
                     boolean isOptional = value instanceof Optional;
                     if (isOptional && value == Optional.empty() && traverser.isCompact()) {
                         return;
@@ -997,6 +1001,10 @@ public class Tool {
          * Nesting level
          */
         private int level = 0;
+        /**
+         * Max level
+         */
+        private int maxLevel = 0;
 
         /**
          * Flush buffer
@@ -1017,7 +1025,10 @@ public class Tool {
         @Override
         public void start(Class<?> clazz) {
             level++;
-            if (level == 2) {
+            if(level > maxLevel) {
+                maxLevel = level;
+            }
+            if (level == 1 || level == 2) {
                 firstColumn = true;
             }
         }
@@ -1029,7 +1040,7 @@ public class Tool {
          */
         @Override
         public void key(String key) {
-            if (level != 2 || values == null || !hasHeader) {
+            if (level > 2 || values == null || !hasHeader) {
                 return;
             }
             if (!firstColumn) {
@@ -1049,11 +1060,14 @@ public class Tool {
          */
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
+            if(value == null) {
+                value = "";
+            }
             if (level == 0) {
                 buffer.append(value);
                 return;
             }
-            if (level != 2) {
+            if (level > 2) {
                 nested.add(value);
                 return;
             }
@@ -1081,8 +1095,10 @@ public class Tool {
          */
         @Override
         public void end(Class<?> clazz) {
-            if (level == 2) {
-                buffer.append(newline);
+            if (level == 1 || level == 2) {
+                if(level == 2 || (buffer.length() > 0 && maxLevel < 2)) {
+                    buffer.append(newline);
+                }
                 if (values != null) {
                     String c = String.valueOf(clouser);
                     Collector<CharSequence, ?, String> collector = clouser != '\0' ? Collectors.joining(c + separator + c, c, c)

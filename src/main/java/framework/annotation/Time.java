@@ -18,7 +18,7 @@ public @interface Time {
     /**
      * @return apply groups
      */
-    Class<? extends Valid.All>[] value() default {};
+    Class<? extends Valid.All>[] value() default Valid.All.class;
 
     /**
      * @return forward offset
