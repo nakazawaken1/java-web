@@ -1,6 +1,5 @@
 package framework;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -33,6 +32,7 @@ import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Route;
 import framework.annotation.Valid;
+import framework.annotation.Validator;
 
 /**
  * application scoped object
@@ -223,10 +223,7 @@ public abstract class Application implements Attributes<Object> {
                         Type[] types = Tool.of(p.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
                                 .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
                         return binder.validator(value -> Stream.of(p.getAnnotations()).forEach(a -> {
-                            Class<? extends Annotation> c = a.annotationType();
-                            Stream.of(c.getDeclaredClasses()).filter(i -> AbstractValidator.class.isAssignableFrom(i)).findFirst()
-                                    .flatMap(i -> Reflector.constructor(i, c)).map(Try.f(n -> (AbstractValidator<?>) n.newInstance(a)))
-                                    .ifPresent(i -> i.validate(Valid.All.class, name, value, binder));
+                            Validator.Constructor.instance(a).validate(Valid.All.class, name, value, binder);
                         })).bind(name, type, types);
                     }).toArray();
                     Object response;

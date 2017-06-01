@@ -1025,7 +1025,7 @@ public class Tool {
         @Override
         public void start(Class<?> clazz) {
             level++;
-            if(level > maxLevel) {
+            if (level > maxLevel) {
                 maxLevel = level;
             }
             if (level == 1 || level == 2) {
@@ -1060,7 +1060,7 @@ public class Tool {
          */
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
-            if(value == null) {
+            if (value == null) {
                 value = "";
             }
             if (level == 0) {
@@ -1096,7 +1096,7 @@ public class Tool {
         @Override
         public void end(Class<?> clazz) {
             if (level == 1 || level == 2) {
-                if(level == 2 || (buffer.length() > 0 && maxLevel < 2)) {
+                if (level == 2 || (buffer.length() > 0 && maxLevel < 2)) {
                     buffer.append(newline);
                 }
                 if (values != null) {
@@ -2154,21 +2154,25 @@ public class Tool {
     /**
      * Build path
      * 
+     * @param first first part
      * @param parts Parts of path
      * @return Separator to Path function
      */
-    public static Function<String, String> path(String... parts) {
+    public static Function<String, String> path(String first, String... parts) {
         return separator -> {
             StringBuilder s = new StringBuilder();
-            int end = parts.length - 1;
+            String[] normalized = Stream.concat(Stream.of(first), Stream.of(parts)).filter(part -> part != null && !part.isEmpty()).toArray(String[]::new);
+            int end = normalized.length - 1;
             if (end > 0) {
-                s.append(trim(null, parts[0], separator));
+                s.append(trim(null, normalized[0], separator));
             }
             for (int i = 1; i < end; i++) {
-                s.append(trim(null, prefix(parts[i], separator), separator));
+                s.append(trim(null, prefix(normalized[i], separator), separator));
             }
-            if (end >= 0) {
-                s.append(prefix(parts[end], separator));
+            if (end == 0) {
+                s.append(normalized[end]);
+            } else if (end > 0) {
+                s.append(prefix(normalized[end], separator));
             }
             return s.toString();
         };

@@ -54,6 +54,7 @@ import framework.annotation.Config;
 import framework.annotation.Help;
 import framework.annotation.Id;
 import framework.annotation.Join;
+import framework.annotation.Factory;
 import framework.annotation.Persist;
 import framework.annotation.Size;
 import framework.annotation.Stringer;
@@ -822,7 +823,7 @@ public class Db implements AutoCloseable {
     public Query select(Enum<?>... fields) {
         Query q = new Query(this);
         q.fields = Stream.of(fields).map(field -> {
-            Class<?> clazz = Reflector.getGenericParameter(field.getDeclaringClass().getDeclaringClass(), 0);
+            Class<?> clazz = Reflector.getGenericParameter(field.getClass().getDeclaringClass(), 0);
             return Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
         }).collect(Collectors.toList());
         return q;
@@ -1815,7 +1816,7 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query where(Enum<?> field, Object value) {
-            Class<?> clazz = Reflector.getGenericParameter(field.getDeclaringClass().getDeclaringClass(), 0);
+            Class<?> clazz = Reflector.getGenericParameter(field.getClass().getDeclaringClass(), 0);
             String name = Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
             if (value == null) {
                 return where(name + " IS NULL");
@@ -2047,7 +2048,7 @@ public class Db implements AutoCloseable {
                     }));
         } else {
             return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream()
-                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?, ?>>collect(() -> Reflector.instance(clazz.getName() + "$Builder"),
+                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz),
                             Try.biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                             }).get());
         }

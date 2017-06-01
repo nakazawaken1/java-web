@@ -6,8 +6,8 @@ package framework;
 public class TestTraverser extends Tester {
     @SuppressWarnings("javadoc")
     static class O {
-        int key;
-        String value;
+        final int key;
+        final String value;
 
         O(int key, String value) {
             this.key = key;

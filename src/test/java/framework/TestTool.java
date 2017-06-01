@@ -80,18 +80,6 @@ public class TestTool extends Tester {
             expect(g + "2020/3/4 12:34:56", from).toEqual(to.apply(d -> ZonedDateTime.of(2020, 3, 4, 12, 34, 56, 0, ZoneId.systemDefault())));
         });
 
-        group("path", group -> {
-            String g = group + ":";
-            Function<String, Object> from = s -> Tool.path(s.substring(g.length()).split(",")).apply("/");
-            expect(g + "a,b,c", from).toEqual("a/b/c");
-            expect(g + "/a,b,c", from).toEqual("/a/b/c");
-            expect(g + "a/,b,c", from).toEqual("a/b/c");
-            expect(g + "a,/b,c", from).toEqual("a/b/c");
-            expect(g + "a,b/,c", from).toEqual("a/b/c");
-            expect(g + "a,b,/c", from).toEqual("a/b/c");
-            expect(g + "a,b,c/", from).toEqual("a/b/c/");
-        });
-
         group("isDirectory", group -> {
             String g = group + ":";
             Function<String, Object> from = s -> Tool.isDirectory(Tool.toURL(s.substring(g.length())).orElse(null));
@@ -101,6 +89,23 @@ public class TestTool extends Tester {
             expect(g + "view", from).toEqual(true);
             expect(g + "view/", from).toEqual(true);
             expect(g + "view/index.html", from).toEqual(false);
+        });
+
+        group("path", g -> {
+            expect(g + ":empty elements", n -> Tool.path("", "").apply("/")).toEqual("");
+            expect(g + ":a", n -> Tool.path("a").apply("/")).toEqual("a");
+            expect(g + ":/a", n -> Tool.path("/a").apply("/")).toEqual("/a");
+            expect(g + ":a/", n -> Tool.path("a/").apply("/")).toEqual("a/");
+            expect(g + ":/a/", n -> Tool.path("/a/").apply("/")).toEqual("/a/");
+            expect(g + ":a,b", n -> Tool.path("a", "b").apply("/")).toEqual("a/b");
+            expect(g + ":/a,b", n -> Tool.path("/a", "b").apply("/")).toEqual("/a/b");
+            expect(g + ":a/,b", n -> Tool.path("a/", "b").apply("/")).toEqual("a/b");
+            expect(g + ":a,/b", n -> Tool.path("a", "/b").apply("/")).toEqual("a/b");
+            expect(g + ":a,b/", n -> Tool.path("a", "b/").apply("/")).toEqual("a/b/");
+            expect(g + ":a/,/b", n -> Tool.path("a/", "/b").apply("/")).toEqual("a/b");
+            expect(g + ":,a,b", n -> Tool.path("", "a", "b").apply("/")).toEqual("a/b");
+            expect(g + ":a,,b", n -> Tool.path("a", "", "b").apply("/")).toEqual("a/b");
+            expect(g + ":a,b,", n -> Tool.path("a", "b", "").apply("/")).toEqual("a/b");
         });
     }
 }
