@@ -68,6 +68,16 @@ public abstract class Application implements Attributes<Object> {
     }
 
     /**
+     * @return Routes(method, path, action)
+     */
+    public static Stream<String[]> routes() {
+        return routing.entrySet().stream()
+                .map(route -> Tool.array(route.getKey().l.isEmpty() ? "*" : route.getKey().l.stream().map(Object::toString).collect(Collectors.joining(", ")),
+                        route.getKey().r.l.pattern(), route.getValue().l.getName() + "." + route.getValue().r.getName()))
+                .sorted(Comparator.<String[], String>comparing(a -> a[1]).thenComparing(a -> a[0]));
+    }
+
+    /**
      * setup
      *
      * @param factory response factory
@@ -123,11 +133,7 @@ public abstract class Application implements Attributes<Object> {
             }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
-                routing.entrySet().stream()
-                        .sorted(Comparator.<Map.Entry<Tuple3<Set<Route.Method>, Pattern, Map<String, String>>, Tuple<Class<?>, Method>>, String>comparing(
-                                e -> e.getKey().r.l.pattern()).thenComparing(e -> e.getKey().l.toString()))
-                        .forEach(e -> writer.println((e.getKey().l.isEmpty() ? "*" : e.getKey().l.toString()) + " " + e.getKey().r.l.pattern() + " -> "
-                                + e.getValue().l.getName() + "." + e.getValue().r.getName()));
+                routes().forEach(a -> writer.println(a[0] + " " + a[1] + " -> " + a[2]));
             }));
         }
 

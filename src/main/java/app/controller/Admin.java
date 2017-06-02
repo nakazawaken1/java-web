@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import app.config.Sys;
 import app.model.Account;
+import framework.Application;
 import framework.Db;
 import framework.Diff;
 import framework.Request;
@@ -42,7 +44,7 @@ public class Admin {
      * @param request request
      * @return response
      */
-    @Route(value = "index\\.html")
+    @Route(value = "index[.]html")
     Object index(Session session, Request request) {
         if (!session.isLoggedIn()) {
             return Response.redirect("login.html");
@@ -84,7 +86,7 @@ public class Admin {
     }
 
     /**
-     * default config file
+     * Config
      * 
      * @return response
      */
@@ -96,6 +98,17 @@ public class Admin {
     }
 
     /**
+     * Route
+     * 
+     * @return response
+     */
+    @Route("route")
+    Object route() {
+        return Response.of(Xml.of("table").child("tr").child("th", Stream.of("Method", "Path", "Action")).parent().get()
+                .child(Xml.of("tr").repeat(Application.routes(), (xml, a) -> xml.child("td", Stream.of(a))))).contentType(Content.HTML);
+    }
+
+    /**
      * EL version
      * 
      * @param session session
@@ -104,7 +117,7 @@ public class Admin {
      * @param after after
      * @return response
      */
-    @Route("diff\\.html")
+    @Route("diff[.]html")
     Response diff(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -130,7 +143,7 @@ public class Admin {
      * @param after after
      * @return response
      */
-    @Route("diff2\\.html")
+    @Route("diff2[.]html")
     Object diff2(Session session, Request request, Optional<String> before, Optional<String> after) {
         boolean isFull = request.getParameters().containsKey("full");
         if (isFull || request.getParameters().containsKey("compact")) {
@@ -160,9 +173,8 @@ public class Admin {
      * @param db db
      * @return response
      */
-    @Route("accounts")
+    @Route("accounts[.]?(|json|html|txt|xml|csv|tsv)")
     @Accept(Accept.FORM)
-    @Content({ Content.JSON, Content.HTML, Content.TEXT, Content.XML, Content.CSV, Content.TSV })
     Object accounts(Db db) {
         Object o;
         if (Sys.login_method.endsWith("loginWithConfig")) {

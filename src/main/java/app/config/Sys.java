@@ -248,6 +248,7 @@ public class Sys {
         no,
         @Mapping("OK")
         ok,
+        route,
         ;
 
         @Override

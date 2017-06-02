@@ -161,8 +161,8 @@ public class TestBinder extends Tester {
 
         expect("LocalDate", n -> binder("a=2017-01-11").bind("a", LocalDate.class)).toEqual(LocalDate.of(2017, 1, 11));
         expect("Class", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
-                .toEqual(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get());
-//        expect("List<Class>", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", List.class, User.class)).toEqual(
-//                Tool.list(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get()));
+                .toEqual(new User.Factory().set(id, 1, name, "abc", birthday, LocalDate.of(2001, 2, 3), gender, User.Gender.FEMALE).get());
+        // expect("List<Class>", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", List.class, User.class)).toEqual(
+        // Tool.list(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get()));
     }
 }

@@ -39,5 +39,6 @@ Sys.Item.run = 実行
 Sys.Item.title = タイトル
 Sys.Item.update = 変更
 Sys.Item.yes = はい
+Sys.Item.route = ルート情報
 
 Sys.Prompt.login = ログインID・パスワードを入力して、\nログインボタンを押して下さい。

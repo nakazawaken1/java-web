@@ -636,43 +636,47 @@ public abstract class Response {
                     response.contentType(Content.TEXT, response.charset());
                     Tool.csv(response.content, out.get(), response.charset());
                 });
-                Tool.ifPresentOr(Tool.of(response.headers).flatMap(map -> map.getOrDefault("Content-Type", Tool.list()).stream().findFirst()), Try.c(contentType -> {
-                    switch (Tool.splitAt(contentType, "\\s*;", 0)) {
-                    case Content.JSON:
-                    case Content.YML:
-                        Tool.traverse(response.content, Tool.peek(response.traverser(JsonTraverser.class), t -> {
-                            t.out = out.get();
-                            t.charset = response.charset();
-                        }));
-                        break;
-                    case Content.XML:
-                        Tool.traverse(response.content, Tool.peek(response.traverser(XmlTraverser.class), t -> {
-                            t.out = out.get();
-                            t.charset = response.charset();
-                        }));
-                        break;
-                    case Content.CSV:
-                        OutputStream o = out.get();
-                        o.write(Tool.BOM);
-                        Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
-                            t.out = o;
-                            t.charset = response.charset();
-                        }));
-                        break;
-                    case Content.TSV:
-                        Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
-                            t.out = out.get();
-                            t.charset = response.charset();
-                            t.separator = '\t';
-                            t.clouser = '\0';/* none */
-                            t.innerSeparator = ",";
-                        }));
-                        break;
-                    default:
-                        other.run();
-                        break;
-                    }
-                }), other);
+                Tool.ifPresentOr(Tool.of(response.headers).flatMap(map -> map.getOrDefault("Content-Type", Tool.list()).stream().findFirst()),
+                        Try.c(contentType -> {
+                            switch (Tool.splitAt(contentType, "\\s*;", 0)) {
+                            case Content.JSON:
+                            case Content.YML:
+                                Tool.traverse(response.content, Tool.peek(response.traverser(JsonTraverser.class), t -> {
+                                    t.out = out.get();
+                                    t.charset = response.charset();
+                                }));
+                                break;
+                            case Content.XML:
+                                Tool.traverse(response.content, Tool.peek(response.traverser(XmlTraverser.class), t -> {
+                                    t.out = out.get();
+                                    t.charset = response.charset();
+                                }));
+                                break;
+                            case Content.CSV:
+                                OutputStream o = out.get();
+                                o.write(Tool.BOM);
+                                Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                                    t.out = o;
+                                    t.charset = response.charset();
+                                }));
+                                break;
+                            case Content.TSV:
+                                Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                                    t.out = out.get();
+                                    t.charset = response.charset();
+                                    t.separator = '\t';
+                                    t.clouser = '\0';/* none */
+                                    t.innerSeparator = ",";
+                                }));
+                                break;
+                            case Content.HTML:
+                                out.get().write(response.content.toString().getBytes(response.charset()));
+                                break;
+                            default:
+                                other.run();
+                                break;
+                            }
+                        }), other);
             }));
 
     /**

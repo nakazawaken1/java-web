@@ -339,7 +339,7 @@ public class Xml {
                         }
                         if (singles.contains(name)) {
                             skipSpaces();
-                            eat("/");/*optional*/
+                            eat("/");/* optional */
                             eat(">");
                             handler.tagEnd(name);
                             stack.pop();
@@ -576,11 +576,13 @@ public class Xml {
     /**
      * Add children
      * 
+     * @param <T> Element type
+     * 
      * @param tag Tag
      * @param texts Texts
      * @return Self
      */
-    public Xml child(String tag, Stream<Object> texts) {
+    public <T> Xml child(String tag, Stream<T> texts) {
         texts.forEach(text -> child(tag).text(text));
         return this;
     }
@@ -848,25 +850,30 @@ public class Xml {
             t.children().get(2).text(i.r.r);
             return t;
         });
-        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + //
-                "<!DOCTYPE html>\n" + //
-                "<style type=\"text/css\">\nbody > div{\n  font-size:11pt;\n}\n</style>" + //
-                "<script type=\"text/javascript\">\nwindow.onload=function(){\n  if(Math.random() < 0.5) alert('1');\n}\n</script>" + //
-                "<!--abcde-->" + //
-                "<body>" + //
-                "<div data-render=\"0\">" + //
-                "<!--abcde-->" + //
-                "</div>" + //
-                "<ul data-render=\"1\">" + //
-                "  <li>a</li>" + //
-                "  <li>b</li>" + //
-                "</ul>" + //
-                "<table>" + //
-                "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
-                "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
-                "</table>" + //
-                "</body>", a, b, c)/*.stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text)
-                        .collect(Collectors.joining(System.lineSeparator()))*/);
+        System.out.println(parse(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + //
+                        "<!DOCTYPE html>\n" + //
+                        "<style type=\"text/css\">\nbody > div{\n  font-size:11pt;\n}\n</style>" + //
+                        "<script type=\"text/javascript\">\nwindow.onload=function(){\n  if(Math.random() < 0.5) alert('1');\n}\n</script>" + //
+                        "<!--abcde-->" + //
+                        "<body>" + //
+                        "<div data-render=\"0\">" + //
+                        "<!--abcde-->" + //
+                        "</div>" + //
+                        "<ul data-render=\"1\">" + //
+                        "  <li>a</li>" + //
+                        "  <li>b</li>" + //
+                        "</ul>" + //
+                        "<table>" + //
+                        "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
+                        "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
+                        "</table>"
+                        + //
+                        "</body>",
+                a, b,
+                c)/*
+                   * .stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text) .collect(Collectors.joining(System.lineSeparator()))
+                   */);
         // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
     }
 }
