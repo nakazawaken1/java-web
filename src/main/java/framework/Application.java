@@ -3,12 +3,11 @@ package framework;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +24,7 @@ import app.config.Sys;
 import app.controller.Main;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Response.Status;
+import framework.Tuple.Tuple3;
 import framework.annotation.Config;
 import framework.annotation.Content;
 import framework.annotation.Job;
@@ -45,9 +45,9 @@ public abstract class Application implements Attributes<Object> {
     static Application CURRENT;
 
     /**
-     * routing table{path: {class: method}}
+     * routing table{{request method, pattern, bind map}: {class: method}}
      */
-    static Map<Tuple<Set<Route.Method>, String>, Tuple<Class<?>, Method>> routing;
+    static Map<Tuple3<Set<Route.Method>, Pattern, Map<String, String>>, Tuple<Class<?>, Method>> routing;
 
     /**
      * @return singleton
@@ -112,18 +112,22 @@ public abstract class Application implements Attributes<Object> {
                             String left = Tool.of(c.getAnnotation(Route.class)).map(Route::value).orElse("");
                             String right = trio.r.r.value();
                             m.setAccessible(true);
-                            map.compute(Tuple.of(Tool.set(trio.r.r.method()), Tool.path("/", left, right).apply("/")), (k, v) -> {
-                                if (v != null) {
-                                    Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
-                                }
-                                return Tuple.of(c, m);
-                            });
+                            map.compute(Tuple.of(Tool.set(trio.r.r.method()), Pattern.compile(Tool.path("/", left, right).apply("/")),
+                                    Tool.parseMap(trio.r.r.bind(), ":")), (k, v) -> {
+                                        if (v != null) {
+                                            Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
+                                        }
+                                        return Tuple.of(c, m);
+                                    });
                         }, Map::putAll);
             }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
-                routing.forEach((key, value) -> writer
-                        .println((key.l.isEmpty() ? "*" : key.l.toString()) + " " + key.r + " -> " + value.l.getName() + "." + value.r.getName()));
+                routing.entrySet().stream()
+                        .sorted(Comparator.<Map.Entry<Tuple3<Set<Route.Method>, Pattern, Map<String, String>>, Tuple<Class<?>, Method>>, String>comparing(
+                                e -> e.getKey().r.l.pattern()).thenComparing(e -> e.getKey().l.toString()))
+                        .forEach(e -> writer.println((e.getKey().l.isEmpty() ? "*" : e.getKey().l.toString()) + " " + e.getKey().r.l.pattern() + " -> "
+                                + e.getValue().l.getName() + "." + e.getValue().r.getName()));
             }));
         }
 
@@ -175,10 +179,10 @@ public abstract class Application implements Attributes<Object> {
         final Optional<String> mime = Tool.string(Tool.getExtension(path)).map(Tool::getContentType);
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
         final Tuple<Class<?>, Method> pair = routing.entrySet().stream().filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))
-                .map(e -> Tuple.of(Pattern.compile(e.getKey().r).matcher(path), e.getValue())).filter(p -> p.l.matches()).findAny().map(p -> {
+                .map(e -> Tuple.of(e.getKey().r.l.matcher(path), e.getKey().r.r, e.getValue())).filter(p -> p.l.matches()).findAny().map(p -> {
                     Reflector.<Map<String, Integer>>invoke(p.l.pattern(), "namedGroups", Tool.array())
-                            .forEach((k, v) -> Tool.addValue(parameters, k, p.l.group(v)));
-                    return p.r;
+                            .forEach((k, v) -> Tool.setValue(parameters, p.r.l.getOrDefault(k, k), p.l.group(v)));
+                    return p.r.r;
                 }).orElse(null);
         if (pair != null && Tool.of(pair.r.getAnnotation(Content.class)).map(Content::value).map(i -> Tool.list(i).contains(mime.orElse(""))).orElse(true)) {
             do {
@@ -220,11 +224,9 @@ public abstract class Application implements Attributes<Object> {
                             return db.get();
                         }
                         String name = p.getName();
-                        Type[] types = Tool.of(p.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
-                                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
                         return binder.validator(value -> Stream.of(p.getAnnotations()).forEach(a -> {
                             Validator.Constructor.instance(a).validate(Valid.All.class, name, value, binder);
-                        })).bind(name, type, types);
+                        })).bind(name, type, Reflector.getGenericParameters(p));
                     }).toArray();
                     Object response;
                     if (binder.errors.isEmpty()) {

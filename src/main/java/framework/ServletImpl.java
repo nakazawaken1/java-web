@@ -28,6 +28,7 @@ import javax.servlet.http.HttpSession;
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.annotation.Route;
+import framework.annotation.Route.Method;
 
 /**
  * Servlet implementation
@@ -294,6 +295,11 @@ public class ServletImpl implements javax.servlet.Servlet {
         final String path;
 
         /**
+         * Request method
+         */
+        final Method method;
+
+        /**
          * constructor
          *
          * @param request servlet request
@@ -306,6 +312,10 @@ public class ServletImpl implements javax.servlet.Servlet {
             String uri = request.getRequestURI();
             int rootLength = request.getContextPath().length() + 1;
             path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("/");
+            method = Try.<String, Method>f(m -> Method.valueOf(m.toUpperCase()), (e, m) -> {
+                Log.info(e, () -> "Invalid method: " + m);
+                return null;
+            }).apply(Tool.of(request.getParameter(Sys.request_method_key)).orElseGet(request::getMethod));
         }
 
         /**

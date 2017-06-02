@@ -1,9 +1,14 @@
 package framework;
 
+import static framework.TestBinder.User.Factory.F.*;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Binder test
@@ -46,6 +51,45 @@ public class TestBinder extends Tester {
             return new BigDecimal(c.getField("MAX_VALUE").get(null).toString()).add(BigDecimal.valueOf(offset));
         } catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException | SecurityException e) {
             throw new InternalError(e);
+        }
+    }
+
+    @SuppressWarnings("javadoc")
+    static class User {
+        int id;
+        String name;
+        LocalDate birthday;
+        Gender gender;
+
+        enum Gender {
+            MALE,
+            FEMALE,
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof User && hashCode() == obj.hashCode();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, name, birthday, gender);
+        }
+
+        User(int id, String name, LocalDate birthday, Gender gender) {
+            this.id = id;
+            this.name = name;
+            this.birthday = birthday;
+            this.gender = gender;
+        }
+
+        static class Factory extends AbstractBuilder<User, Factory, Factory.F> {
+            enum F {
+                id,
+                name,
+                birthday,
+                gender
+            };
         }
     }
 
@@ -107,6 +151,18 @@ public class TestBinder extends Tester {
             expect(prefix + ":Optional:null", n -> binder("a=def").bind("s", Optional.class, String.class)).toEqual(Optional.empty());
         });
 
-        expect("Array", n -> binder("a=abc&a=def").bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
+        expect("String[]", n -> binder("a=abc&a=def").bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
+        expect("int[]", n -> binder("a=1&a=2").bind("a", int[].class)).toArrayEqual(new int[] { 1, 2 });
+        expect("List", n -> binder("a=abc&a=def").bind("a", List.class, String.class)).toEqual(Tool.list("abc", "def"));
+        expect("List<Long>", n -> binder("a=1234567890123&a=-222").bind("a", List.class, Long.class)).toEqual(Tool.list(1234567890123L, -222L));
+        expect("Set", n -> binder("a=abc&a=def").bind("a", Set.class, String.class)).toEqual(Tool.set("abc", "def"));
+        expect("Map", n -> binder("m.a=abc&m.b=def").bind("m", Map.class, String.class, String.class)).toEqual(Tool.map("a", "abc", "b", "def"));
+        expect("Map<int>", n -> binder("m.a=1&m.b=2").bind("m", Map.class, String.class, Integer.class)).toEqual(Tool.map("a", 1, "b", 2));
+
+        expect("LocalDate", n -> binder("a=2017-01-11").bind("a", LocalDate.class)).toEqual(LocalDate.of(2017, 1, 11));
+        expect("Class", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
+                .toEqual(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get());
+//        expect("List<Class>", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", List.class, User.class)).toEqual(
+//                Tool.list(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get()));
     }
 }

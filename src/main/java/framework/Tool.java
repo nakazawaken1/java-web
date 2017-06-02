@@ -230,8 +230,9 @@ public class Tool {
      * @param value value
      * @return optional
      */
+    @SuppressWarnings("unchecked")
     public static <T> Optional<T> of(T value) {
-        return Optional.ofNullable(value);
+        return value instanceof Optional ? (Optional<T>) value : Optional.ofNullable(value);
     }
 
     /**
@@ -1527,6 +1528,16 @@ public class Tool {
     }
 
     /**
+     * @param texts Text array
+     * @param pairSeparator Pair separator
+     * @return Map
+     */
+    public static Map<String, String> parseMap(String[] texts, String pairSeparator) {
+        return Stream.of(texts).collect(() -> new LinkedHashMap<String, String>(), (map, s) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])),
+                Map::putAll);
+    }
+
+    /**
      * @param <T> first stream type
      * @param <U> second stream type
      * @param left first stream
@@ -1644,7 +1655,7 @@ public class Tool {
                     Collections.reverse(values);
                     next = Tool.zip(fields.stream(), values.stream().map(Long::valueOf)).peek(i -> field[0] = i.l).reduce(next,
                             (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
-                    if (start.isAfter(next)) {
+                    if (from.isAfter(next)) {
                         next = next.plus(1, units[fields.indexOf(field[0])]);
                     }
                 }

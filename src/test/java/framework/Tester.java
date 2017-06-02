@@ -254,7 +254,25 @@ public class Tester {
          * @param expected expected value
          */
         public void toArrayEqual(Object expected) {
-            tester.test = notifier -> Assert.assertArrayEquals((Object[]) get(expected), (Object[]) tester.get());
+            if(expected instanceof int[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((int[]) get(expected), (int[]) tester.get());
+            } else if(expected instanceof short[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((short[]) get(expected), (short[]) tester.get());
+            } else if(expected instanceof long[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((long[]) get(expected), (long[]) tester.get());
+            } else if(expected instanceof boolean[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((boolean[]) get(expected), (boolean[]) tester.get());
+            } else if(expected instanceof byte[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((byte[]) get(expected), (byte[]) tester.get());
+            } else if(expected instanceof char[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((char[]) get(expected), (char[]) tester.get());
+            } else if(expected instanceof float[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((float[]) get(expected), (float[]) tester.get(), 0);
+            } else if(expected instanceof double[]) {
+                tester.test = notifier -> Assert.assertArrayEquals((double[]) get(expected), (double[]) tester.get(), 0);
+            } else {
+                tester.test = notifier -> Assert.assertArrayEquals((Object[]) get(expected), (Object[]) tester.get());
+            }
         }
 
         /**

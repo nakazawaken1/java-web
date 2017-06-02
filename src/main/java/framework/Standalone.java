@@ -693,6 +693,15 @@ public class Standalone {
          * path
          */
         final String path;
+        /**
+         * Request method
+         */
+        final Method method;
+
+        /**
+         * Accept methods
+         */
+        static final Set<String> methods = Stream.of(Method.values()).map(Enum::name).collect(Collectors.toSet());
 
         /**
          * @param exchange exchange
@@ -700,99 +709,110 @@ public class Standalone {
          */
         RequestImpl(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
-            String p = exchange.getRequestURI().getPath();
-            String r = Application.current().map(Application::getContextPath).orElse("");
-            path = p.length() <= r.length() ? "/" : Tool.prefix(p.substring(r.length()), "/");
-            requestHeaders = exchange.getRequestHeaders();
-            String contentType = requestHeaders.getFirst("Content-Type");
+            String path = exchange.getRequestURI().getPath();
+            String contextPath = Application.current().map(Application::getContextPath).orElse("");
+            this.path = path.length() <= contextPath.length() ? "/" : Tool.prefix(path.substring(contextPath.length()), "/");
+
             // query parameter
             String query = exchange.getRequestURI().getRawQuery();
             if (query != null) {
                 parse(parameters, new Scanner(query));
             }
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                if (contentType.startsWith("application/x-www-form-urlencoded")) {
-                    try (InputStream in = exchange.getRequestBody()) {
-                        parse(parameters, new Scanner(in, StandardCharsets.ISO_8859_1.name()));
-                    }
-                } else if (contentType.startsWith("multipart/form-data")) {
-                    final String boundary = "--" + new KeyValueAttr("Content-Type:" + contentType).attr.get("boundary");
-                    try (InputStream in = exchange.getRequestBody()) {
-                        readLine(in);// first boundary
-                        loop: for (;;) {
-                            String name = null;
-                            String filename = null;
-                            int length = 0;
-                            // read headers
-                            for (;;) {
-                                byte[] line = readLine(in);
-                                if (line == null) {
-                                    break loop;
-                                }
-                                if (line.length <= 2) {
-                                    break;
-                                }
-                                KeyValueAttr header = new KeyValueAttr(new String(line, 0, line.length - 2, StandardCharsets.UTF_8));
-                                if (header.key == null) {
-                                    continue;
-                                }
-                                switch (header.key) {
-                                case "content-disposition":
-                                    name = header.attr.get("name");
-                                    filename = header.attr.get("filename");
-                                    break;
-                                case "content-length":
-                                    length = Integer.parseInt(header.value);
-                                    break;
-                                }
-                            }
-                            if (name == null) {
-                                continue;
-                            }
-                            if (filename == null) {// parameter value
-                                Tuple<byte[], File> pair = readBody(in, boundary);
-                                if (pair.r != null) {
-                                    Log.config(pair.r + " deleted " + pair.r.delete());
-                                }
-                                if (pair.l == null) {
-                                    Log.info("413 payload too large");
-                                    break loop;
-                                }
-                                Tool.addValue(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
-                            } else {
-                                Tool.addValue(parameters, name, filename);
-                                if (length > 0) {
-                                    if (length < fileSizeThreshold) {
-                                        byte[] bytes = new byte[length];
-                                        int n = in.read(bytes);
-                                        files.put(filename, Tuple.of(Arrays.copyOfRange(bytes, 0, n), null));
-                                    } else {
-                                        File f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
-                                        f.deleteOnExit();
-                                        try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
-                                            to.transferFrom(Channels.newChannel(in), 0, length);
-                                        }
-                                        Log.info("saved " + f + " " + length + "bytes");
-                                        files.put(filename, Tuple.of(null, f));
-                                    }
-                                } else if (!filename.isEmpty()) {
-                                    files.put(filename, readBody(in, boundary));
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    try (InputStream in = exchange.getRequestBody()) {
+
+            // request body
+            requestHeaders = exchange.getRequestHeaders();
+            String contentType = requestHeaders.getFirst("Content-Type");
+            Function<String, Method> getMethod = Try.f(m -> Method.valueOf(m.toUpperCase()), (e, m) -> {
+                Log.info(e, () -> "Invalid method: " + m);
+                return null;
+            });
+            Method method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key).orElseGet(exchange::getRequestMethod));
+            if (contentType == null || method == null) {
+                this.method = method;
+                return;
+            }
+            if (contentType.startsWith("application/x-www-form-urlencoded")) {
+                try (InputStream in = exchange.getRequestBody()) {
+                    parse(parameters, new Scanner(in, StandardCharsets.ISO_8859_1.name()));
+                }
+            } else if (contentType.startsWith("multipart/form-data")) {
+                final String boundary = "--" + new KeyValueAttr("Content-Type:" + contentType).attr.get("boundary");
+                try (InputStream in = exchange.getRequestBody()) {
+                    readLine(in);// first boundary
+                    loop: for (;;) {
+                        String name = null;
+                        String filename = null;
+                        int length = 0;
+                        // read headers
                         for (;;) {
-                            byte[] bytes = readLine(in);
-                            if (bytes == null) {
+                            byte[] line = readLine(in);
+                            if (line == null) {
+                                break loop;
+                            }
+                            if (line.length <= 2) {
                                 break;
                             }
-                            System.out.print(new String(bytes, StandardCharsets.UTF_8));
+                            KeyValueAttr header = new KeyValueAttr(new String(line, 0, line.length - 2, StandardCharsets.UTF_8));
+                            if (header.key == null) {
+                                continue;
+                            }
+                            switch (header.key) {
+                            case "content-disposition":
+                                name = header.attr.get("name");
+                                filename = header.attr.get("filename");
+                                break;
+                            case "content-length":
+                                length = Integer.parseInt(header.value);
+                                break;
+                            }
+                        }
+                        if (name == null) {
+                            continue;
+                        }
+                        if (filename == null) {// parameter value
+                            Tuple<byte[], File> pair = readBody(in, boundary);
+                            if (pair.r != null) {
+                                Log.config(pair.r + " deleted " + pair.r.delete());
+                            }
+                            if (pair.l == null) {
+                                Log.info("413 payload too large");
+                                break loop;
+                            }
+                            Tool.addValue(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
+                        } else {
+                            Tool.addValue(parameters, name, filename);
+                            if (length > 0) {
+                                if (length < fileSizeThreshold) {
+                                    byte[] bytes = new byte[length];
+                                    int n = in.read(bytes);
+                                    files.put(filename, Tuple.of(Arrays.copyOfRange(bytes, 0, n), null));
+                                } else {
+                                    File f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
+                                    f.deleteOnExit();
+                                    try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
+                                        to.transferFrom(Channels.newChannel(in), 0, length);
+                                    }
+                                    Log.info("saved " + f + " " + length + "bytes");
+                                    files.put(filename, Tuple.of(null, f));
+                                }
+                            } else if (!filename.isEmpty()) {
+                                files.put(filename, readBody(in, boundary));
+                            }
                         }
                     }
                 }
+            } else {
+                try (InputStream in = exchange.getRequestBody()) {
+                    for (;;) {
+                        byte[] bytes = readLine(in);
+                        if (bytes == null) {
+                            break;
+                        }
+                        System.out.print(new String(bytes, StandardCharsets.UTF_8));
+                    }
+                }
             }
+            this.method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key).orElseGet(exchange::getRequestMethod));
         }
 
         @Override
@@ -823,7 +843,7 @@ public class Standalone {
 
         @Override
         public Method getMethod() {
-            return Enum.valueOf(Method.class, exchange.getRequestMethod());
+            return method;
         }
 
         @Override

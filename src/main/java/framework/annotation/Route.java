@@ -13,14 +13,19 @@ import java.lang.annotation.Target;
 public @interface Route {
 
     /**
-     * @return path
+     * @return Path
      */
     String value() default "";
 
     /**
-     * @return allowed method(not check if empty)
+     * @return Allowed method(not check if empty)
      */
     Method[] method() default {};
+    
+    /**
+     * @return Variable names(from:to)
+     */
+    String[] bind() default {};
 
     /**
      * http method

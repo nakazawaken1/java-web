@@ -2160,7 +2160,11 @@ public class Db implements AutoCloseable {
         List<String> keys = Reflector.fields(clazz).values().stream().filter(Reflector.hasAnnotation(Id.class)).map(Try.f(field -> {
             String name = Reflector.mappingFieldName(field);
             names.add(name);
-            values.add(field.get(model));
+            Object value = field.get(model);
+            if (field.getType().isPrimitive() && ((Number) value).intValue() == 0) {
+                value = null;/* for generate id */
+            }
+            values.add(value);
             return name;
         })).collect(Collectors.toList());
         if (targetColumns == null || targetColumns.length <= 0) {

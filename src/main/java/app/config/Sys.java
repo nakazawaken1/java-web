@@ -206,6 +206,9 @@ public class Sys {
     @Help("Default avator")
     public static String default_avator = "&#9924;";
 
+    @Help("Request method change parameter key")
+    public static String request_method_key = "_method";
+
     public enum Item implements Message {
         title,
         login,

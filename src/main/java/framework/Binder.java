@@ -1,13 +1,18 @@
 package framework;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Type;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import framework.AbstractValidator.ErrorAppender;
 
@@ -104,6 +109,12 @@ public class Binder implements ErrorAppender {
         if (clazz == double.class || clazz == Double.class) {
             return toNumber.apply(Double::valueOf);
         }
+        if(clazz == LocalDate.class) {
+            return LocalDate.parse(text);
+        }
+        if(Enum.class.isAssignableFrom((Class<?>)clazz)) {
+            return Reflector.invoke(((Class<?>)clazz).getName() + ".valueOf", Tool.array(String.class), text);
+        }
         return text;
     }
 
@@ -114,6 +125,17 @@ public class Binder implements ErrorAppender {
      * @return value
      */
     public Object bind(String name, Class<?> clazz, Type... parameterizedType) {
+        return bind(0, name, clazz, parameterizedType);
+    }
+
+    /**
+     * @param nest Nest level
+     * @param name name
+     * @param clazz class
+     * @param parameterizedType Parameterized type
+     * @return value
+     */
+    public Object bind(int nest, String name, Class<?> clazz, Type... parameterizedType) {
         if (clazz == null) {
             return null;
         }
@@ -123,15 +145,90 @@ public class Binder implements ErrorAppender {
         // Array
         Class<?> component = clazz.getComponentType();
         if (component != null) {
-            return values.stream().map(value -> convert(value, component, null)).toArray(n -> (Object[]) Array.newInstance(component, n));
+            Stream<Object> stream = values.stream().map(value -> convert(value, component, null));
+            if (clazz == int[].class) {
+                return stream.mapToInt(Integer.class::cast).toArray();
+            }
+            if (clazz == long[].class) {
+                return stream.mapToLong(Long.class::cast).toArray();
+            }
+            if (clazz == double[].class) {
+                return stream.mapToDouble(Double.class::cast).toArray();
+            }
+            if (clazz == boolean[].class) {
+                Object[] from = stream.toArray();
+                boolean[] to = new boolean[from.length];
+                for (int i = 0, end = from.length; i < end; i++) {
+                    to[i] = (boolean) from[i];
+                }
+                return to;
+            }
+            if (clazz == byte[].class) {
+                Object[] from = stream.toArray();
+                byte[] to = new byte[from.length];
+                for (int i = 0, end = from.length; i < end; i++) {
+                    to[i] = (byte) from[i];
+                }
+                return to;
+            }
+            if (clazz == short[].class) {
+                Object[] from = stream.toArray();
+                short[] to = new short[from.length];
+                for (int i = 0, end = from.length; i < end; i++) {
+                    to[i] = (short) from[i];
+                }
+                return to;
+            }
+            if (clazz == char[].class) {
+                Object[] from = stream.toArray();
+                char[] to = new char[from.length];
+                for (int i = 0, end = from.length; i < end; i++) {
+                    to[i] = (char) from[i];
+                }
+                return to;
+            }
+            if (clazz == float[].class) {
+                Object[] from = stream.toArray();
+                float[] to = new float[from.length];
+                for (int i = 0, end = from.length; i < end; i++) {
+                    to[i] = (float) from[i];
+                }
+                return to;
+            }
+            return stream.toArray(n -> (Object[]) Array.newInstance(component, n));
         }
 
-        // Optional
+        if (clazz == List.class) {
+            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+                    .collect(Collectors.toList());
+        }
+
+        if (clazz == Set.class) {
+            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+                    .collect(Collectors.toSet());
+        }
+
+        if (clazz == Map.class) {
+            String prefix = name + ".";
+            return parameters.entrySet()
+                    .stream().filter(
+                            e -> e.getKey().startsWith(prefix))
+                    .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey().substring(prefix.length()),
+                            bind(nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1] : Object.class)), Map::putAll);
+        }
+
         if (clazz == Optional.class) {
-            Object value = convert(first, parameterizedType[0], e -> null);
-            return Tool.of(value);
+            return Tool.of(bind(nest + 1, name, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class));
         }
 
-        return convert(first, clazz, null);
+        if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz) && !Tool.val(clazz.getName(), i -> Stream.of("java.", "com.sun.").anyMatch(i::startsWith))) {
+            Constructor<?> constructor = clazz.getDeclaredConstructors()[0];
+            constructor.setAccessible(true);
+            Object[] args = Stream.of(constructor.getParameters())
+                    .map(p -> bind(name + "." + p.getName(), p.getType(), Reflector.getGenericParameters(p))).toArray();
+            return Try.s(() -> constructor.newInstance(args)).get();
+        }
+
+        return convert(first, clazz, nest == 0 ? null : e -> null);
     }
 }
