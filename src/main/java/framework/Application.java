@@ -1,12 +1,17 @@
 package framework;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -40,9 +46,15 @@ import framework.annotation.Validator;
 public abstract class Application implements Attributes<Object> {
 
     /**
-     * singleton
+     * Singleton
      */
     static Application CURRENT;
+
+    /**
+     * Shutdown actions
+     */
+    protected List<Runnable> shutdowns = Tool.list(Log::shutdown, Job.Scheduler::shutdown, Try.r(Db::shutdown, e -> Log.warning("Db shutdown error")),
+            () -> Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver)));
 
     /**
      * routing table{{request method, pattern, bind map}: {class: method}}
@@ -73,7 +85,7 @@ public abstract class Application implements Attributes<Object> {
     public static Stream<String[]> routes() {
         return routing.entrySet().stream()
                 .map(route -> Tool.array(route.getKey().l.isEmpty() ? "*" : route.getKey().l.stream().map(Object::toString).collect(Collectors.joining(", ")),
-                        route.getKey().r.l.pattern(), route.getValue().l.getName() + "." + route.getValue().r.getName()))
+                        route.getKey().r.l.pattern(), route.getValue().l.getName() + "." + route.getValue().r.getName(), route.getKey().r.r.toString()))
                 .sorted(Comparator.<String[], String>comparing(a -> a[1]).thenComparing(a -> a[0]));
     }
 
@@ -117,25 +129,84 @@ public abstract class Application implements Attributes<Object> {
             try (Stream<Class<?>> cs = Tool.getClasses(Main.class.getPackage().getName())) {
                 cs.flatMap(c -> Stream.of(c.getDeclaredMethods()).map(m -> Tuple.of(m, m.getAnnotation(Route.class))).filter(pair -> pair.r != null)
                         .map(pair -> Tuple.of(c, pair.l, pair.r))).collect(() -> routing, (map, trio) -> {
-                            Class<?> c = trio.l;
-                            Method m = trio.r.l;
-                            String left = Tool.of(c.getAnnotation(Route.class)).map(Route::value).orElse("");
-                            String right = trio.r.r.value();
-                            m.setAccessible(true);
-                            map.compute(Tuple.of(Tool.set(trio.r.r.method()), Pattern.compile(Tool.path("/", left, right).apply("/")),
-                                    Tool.parseMap(trio.r.r.bind(), ":")), (k, v) -> {
-                                        if (v != null) {
-                                            Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + m);
-                                        }
-                                        return Tuple.of(c, m);
-                                    });
+                            Class<?> clazz = trio.l;
+                            Method method = trio.r.l;
+                            String path = Tool.path("/", Tool.of(clazz.getAnnotation(Route.class)).map(Route::value).orElse(""), trio.r.r.value()).apply("/");
+                            Map<String, String> renameMap = new HashMap<>();
+                            ByteArrayOutputStream out = new ByteArrayOutputStream();
+                            PrintWriter writer = new PrintWriter(out);
+                            Tool.printFormat(writer, path, (w, to, prefix) -> {
+                                String from;
+                                if (!to.chars().allMatch(i -> (Letters.ALPHABETS + Letters.DIGITS).indexOf(i) >= 0)) {
+                                    from = String.format("HasH%08x", to.hashCode());
+                                    renameMap.put(from, to);
+                                } else {
+                                    from = to;
+                                }
+                                writer.print("(?<" + from + ">");
+                            }, "(?<", ">");
+                            writer.flush();
+                            path = out.toString();
+                            method.setAccessible(true);
+                            map.compute(Tuple.of(Tool.set(trio.r.r.method()), Pattern.compile(out.toString()), renameMap), (k, v) -> {
+                                if (v != null) {
+                                    Log.warning("duplicated route: " + k + " [disabled] " + v.r + " [enabled] " + method);
+                                }
+                                return Tuple.of(clazz, method);
+                            });
                         }, Map::putAll);
             }
             Log.info(() -> Tool.print(writer -> {
                 writer.println("---- routing ----");
-                routes().forEach(a -> writer.println(a[0] + " " + a[1] + " -> " + a[2]));
+                routes().forEach(a -> writer.println(a[0] + " " + a[1] + " -> " + a[2] + " " + Tool.trim("{", a[3], "}")));
             }));
         }
+
+        /* start h2 tcp server */
+        Sys.h2_tcp_port.ifPresent(port -> {
+            try {
+                List<String> parameters = Tool.list("-tcpPort", String.valueOf(port));
+                if (Sys.h2_tcp_allow_remote) {
+                    parameters.add("-tcpAllowOthers");
+                }
+                if (Sys.h2_tcp_ssl) {
+                    parameters.add("-tcpSSL");
+                }
+                Object tcp = Reflector.invoke("org.h2.tools.Server.createTcpServer", Tool.array(String[].class),
+                        new Object[] { parameters.toArray(new String[parameters.size()]) });
+                Reflector.invoke(tcp, "start", Tool.array());
+                shutdowns.add(Try.r(() -> Reflector.invoke(tcp, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 tcp server stop error")));
+                Log.info("h2 tcp server started on port " + port);
+            } catch (Exception e) {
+                Log.warning(e, () -> "h2 tcp server error");
+            }
+        });
+
+        /* start H2 web interface */
+        Sys.h2_web_port.ifPresent(port -> {
+            try {
+                File config = new File(Tool.suffix(System.getProperty("java.io.tmpdir"), File.separator) + ".h2.server.properties");
+                List<String> lines = new ArrayList<>();
+                lines.add("webAllowOthers=" + Sys.h2_web_allow_remote);
+                lines.add("webPort=" + port);
+                lines.add("webSSL=" + Sys.h2_web_ssl);
+                AtomicInteger index = new AtomicInteger(-1);
+                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
+                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
+                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
+                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
+                        .forEach(lines::add);
+                Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
+                config.deleteOnExit();
+                Object db = Reflector.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
+                        new Object[] { Tool.array("-properties", config.getParent()) });
+                Reflector.invoke(db, "start", Tool.array());
+                shutdowns.add(Try.r(() -> Reflector.invoke(db, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 web interface stop error")));
+                Log.info("h2 web interface started on port " + port);
+            } catch (Exception e) {
+                Log.warning(e, () -> "h2 web interface error");
+            }
+        });
 
         /* database setup */
         Db.setup(Sys.Db.setup);
@@ -154,14 +225,8 @@ public abstract class Application implements Attributes<Object> {
      * shutdown
      */
     void shutdown() {
-        try {
-            Job.Scheduler.shutdown();
-            Db.shutdown();
-            Tool.stream(DriverManager.getDrivers()).forEach(Try.c(DriverManager::deregisterDriver));
-        } catch (Exception e) {
-            Log.warning(e, () -> "destroy error");
-        }
-        Log.shutdown();
+        Collections.reverse(shutdowns);
+        shutdowns.forEach(action -> action.run());
     }
 
     /**

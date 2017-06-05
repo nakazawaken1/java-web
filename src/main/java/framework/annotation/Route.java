@@ -21,11 +21,6 @@ public @interface Route {
      * @return Allowed method(not check if empty)
      */
     Method[] method() default {};
-    
-    /**
-     * @return Variable names(from:to)
-     */
-    String[] bind() default {};
 
     /**
      * http method

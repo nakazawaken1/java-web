@@ -37,7 +37,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import app.config.Sys;
 import framework.Log;
 import framework.Message;
 import framework.Reflector;
@@ -80,21 +79,21 @@ public @interface Config {
             /* add system properties */
             System.getProperties().forEach((k, v) -> {
                 String key = (String) k;
-                if (key.startsWith("Sys.")) {
+                if (key.startsWith("Sys.Db.") || sourceProperties.containsKey(key)) {
                     sourceProperties.setProperty(key, (String) v);
                 }
             });
 
             /* select db setting from Sys.Db.suffix */
-            Optional<String> suffix = Tool.string(sourceProperties.getProperty("Sys.Db.suffix"));
-            suffix.ifPresent(s -> {
-                Reflector.fields(Sys.Db.class).forEach((name, field) -> {
-                    if ("suffix".equals(name)) {
-                        return;
-                    }
-                    Tool.string(sourceProperties.getProperty(name + s)).ifPresent(v -> sourceProperties.setProperty(name, v));
-                });
-            });
+            // Optional<String> suffix = Tool.string(sourceProperties.getProperty("Sys.Db.suffix"));
+            // suffix.ifPresent(s -> {
+            // Reflector.fields(Sys.Db.class).forEach((name, field) -> {
+            // if ("suffix".equals(name)) {
+            // return;
+            // }
+            // Tool.string(sourceProperties.getProperty(name + s)).ifPresent(v -> sourceProperties.setProperty(name, v));
+            // });
+            // });
 
             /* resolve variables */
             for (;;) {

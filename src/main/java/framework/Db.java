@@ -233,7 +233,7 @@ public class Db implements AutoCloseable {
      * @return db
      */
     public static Db connect() {
-        return connect("");
+        return connect(Sys.Db.suffix);
     }
 
     /**
@@ -245,7 +245,7 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty("Sys.db" + suffix));
+            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty("Sys.Db." + suffix));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -390,9 +390,9 @@ public class Db implements AutoCloseable {
     public static synchronized DataSource getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
             Properties p = Config.Injector.getSource(Sys.class, Session.currentLocale());
-            String url = p.getProperty("Sys.db" + key);
+            String url = p.getProperty("Sys.Db." + key);
             Type type = Type.fromUrl(url);
-            String name = Tool.string(p.getProperty("Sys.Db.datasource_class" + key)).orElse(type.dataSource);
+            String name = Tool.string(p.getProperty("Sys.Db.datasource_class." + key)).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
             if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
@@ -815,6 +815,14 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * Enum to column name
+     */
+    public static final Function<Enum<?>, String> toColumn = e -> {
+        Class<?> clazz = Reflector.getGenericParameter(e.getClass().getDeclaringClass(), 0);
+        return Reflector.mappingFieldName(Reflector.field(clazz, e.name()).get());
+    };
+
+    /**
      * SELECT clause(add field with multiple call)
      *
      * @param fields fields
@@ -822,10 +830,7 @@ public class Db implements AutoCloseable {
      */
     public Query select(Enum<?>... fields) {
         Query q = new Query(this);
-        q.fields = Stream.of(fields).map(field -> {
-            Class<?> clazz = Reflector.getGenericParameter(field.getClass().getDeclaringClass(), 0);
-            return Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
-        }).collect(Collectors.toList());
+        q.fields = Stream.of(fields).map(toColumn).collect(Collectors.toList());
         return q;
     }
 
@@ -1101,8 +1106,20 @@ public class Db implements AutoCloseable {
          * @param value value
          * @return escaped value
          */
-        @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(Object value) {
+            return escape("", value, "");
+        }
+
+        /**
+         * escape value
+         *
+         * @param prefix Prefix
+         * @param value Value
+         * @param suffix Suffix
+         * @return Escaped value
+         */
+        @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
+        public String escape(String prefix, Object value, String suffix) {
             if (value == null) {
                 return "NULL";
             }
@@ -1118,7 +1135,7 @@ public class Db implements AutoCloseable {
             if (value instanceof Number) {
                 return String.valueOf(value);
             }
-            return "'" + value.toString().replace("'", "''") + "'";
+            return "'" + prefix + value.toString().replace("'", "''") + suffix + "'";
         }
 
         /**
@@ -1719,68 +1736,6 @@ public class Db implements AutoCloseable {
         }
 
         /**
-         * grouping
-         *
-         * @param fields fields
-         * @return preparedQuery
-         */
-        public Query groupBy(String... fields) {
-            if (groups == null) {
-                groups = new ArrayList<>();
-            }
-            for (String field : fields) {
-                groups.add(field);
-            }
-            return this;
-        }
-
-        /**
-         * orders(ascending)
-         *
-         * @param fields fields
-         * @return preparedQuery
-         */
-        public Query orderBy(String... fields) {
-            if (orders == null) {
-                orders = new ArrayList<>();
-            }
-            for (String field : fields) {
-                orders.add(field);
-            }
-            return this;
-        }
-
-        /**
-         * condition after grouping
-         *
-         * @param condition condition
-         * @return preparedQuery
-         */
-        public Query having(String condition) {
-            if (havings == null) {
-                havings = new ArrayList<>();
-            }
-            havings.add(condition);
-            return this;
-        }
-
-        /**
-         * orders(descending)
-         *
-         * @param fields fields
-         * @return preparedQuery
-         */
-        public Query orderByDesc(String... fields) {
-            if (orders == null) {
-                orders = new ArrayList<>();
-            }
-            for (String field : fields) {
-                orders.add(field + " DESC");
-            }
-            return this;
-        }
-
-        /**
          * condition
          *
          * @param condition condition
@@ -1816,12 +1771,7 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query where(Enum<?> field, Object value) {
-            Class<?> clazz = Reflector.getGenericParameter(field.getClass().getDeclaringClass(), 0);
-            String name = Reflector.mappingFieldName(Reflector.field(clazz, field.name()).get());
-            if (value == null) {
-                return where(name + " IS NULL");
-            }
-            return where(name + " = " + db.builder.escape(value));
+            return where(toColumn.apply(field), value);
         }
 
         /**
@@ -1837,6 +1787,49 @@ public class Db implements AutoCloseable {
                 return where(field + " IS NULL");
             }
             return where(field + ' ' + operator + ' ' + db.builder.escape(value));
+        }
+
+        /**
+         * condition(binary operation)
+         *
+         * @param field field
+         * @param operator operator
+         * @param value value
+         * @return preparedQuery
+         */
+        public Query where(Enum<?> field, String operator, Object value) {
+            return where(toColumn.apply(field), operator, value);
+        }
+
+        /**
+         * condition(binary operation)
+         *
+         * @param field Field
+         * @param operator Operator
+         * @param prefix prefix
+         * @param value Value
+         * @param suffix Suffix
+         * @return Query
+         */
+        public Query where(String field, String operator, String prefix, Object value, String suffix) {
+            if (value == null) {
+                return where(field + " IS NULL");
+            }
+            return where(field + ' ' + operator + ' ' + db.builder.escape(prefix, value, suffix));
+        }
+
+        /**
+         * condition(binary operation)
+         *
+         * @param field Field
+         * @param operator Operator
+         * @param prefix prefix
+         * @param value Value
+         * @param suffix Suffix
+         * @return Query
+         */
+        public Query where(Enum<?> field, String operator, String prefix, Object value, String suffix) {
+            return where(toColumn.apply(field), operator, prefix, value, suffix);
         }
 
         /**
@@ -1858,6 +1851,98 @@ public class Db implements AutoCloseable {
          */
         public Query limit(long limit) {
             this.limit = limit;
+            return this;
+        }
+
+        /**
+         * Ascending orders
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query orderBy(String... fields) {
+            if (orders == null) {
+                orders = new ArrayList<>();
+            }
+            for (String field : fields) {
+                orders.add(field);
+            }
+            return this;
+        }
+
+        /**
+         * Ascending orders
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query orderBy(Enum<?>... fields) {
+            return orderBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+        }
+
+        /**
+         * Descending orders
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query orderByDesc(String... fields) {
+            if (orders == null) {
+                orders = new ArrayList<>();
+            }
+            for (String field : fields) {
+                orders.add(field + " DESC");
+            }
+            return this;
+        }
+
+        /**
+         * Descending orders
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query orderByDesc(Enum<?>... fields) {
+            return orderBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+        }
+
+        /**
+         * grouping
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query groupBy(String... fields) {
+            if (groups == null) {
+                groups = new ArrayList<>();
+            }
+            for (String field : fields) {
+                groups.add(field);
+            }
+            return this;
+        }
+
+        /**
+         * grouping
+         *
+         * @param fields fields
+         * @return preparedQuery
+         */
+        public Query groupBy(Enum<?>... fields) {
+            return groupBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+        }
+
+        /**
+         * condition after grouping
+         *
+         * @param condition condition
+         * @return preparedQuery
+         */
+        public Query having(String condition) {
+            if (havings == null) {
+                havings = new ArrayList<>();
+            }
+            havings.add(condition);
             return this;
         }
 

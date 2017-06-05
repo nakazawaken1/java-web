@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -72,7 +71,6 @@ import com.sun.net.httpserver.HttpsServer;
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
-import framework.annotation.Config;
 import framework.annotation.Route.Method;
 
 /**
@@ -89,12 +87,13 @@ public class Standalone {
 
         // setup
         String contextPath = Sys.context_path;
-        new ApplicationImpl(contextPath).setup(ResponseImpl::new);
+        Application application = new ApplicationImpl(contextPath);
+        application.setup(ResponseImpl::new);
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
             try (Defer<RequestImpl> request = new Defer<>(Tool.peek(new RequestImpl(exchange), Request.CURRENT::set), r -> Request.CURRENT.remove());
                     Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(exchange), Session.CURRENT::set), s -> Session.CURRENT.remove())) {
-                Application.current().get().handle(request.get(), session.get());
+                application.handle(request.get(), session.get());
             } catch (Exception e) {
                 Log.warning(e, () -> "500");
                 exchange.sendResponseHeaders(500, -1);
@@ -132,34 +131,7 @@ public class Standalone {
             }
         });
 
-        // start H2 DB console
-        Sys.h2_port.ifPresent(port -> {
-            try {
-                File config = new File(Tool.suffix(System.getProperty("java.io.tmpdir"), File.separator) + ".h2.server.properties");
-                List<String> lines = new ArrayList<>();
-                lines.add("webAllowOthers=" + Sys.h2_allow_remote);
-                lines.add("webPort=" + port);
-                lines.add("webSSL=" + Sys.h2_ssl);
-                AtomicInteger index = new AtomicInteger(-1);
-                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
-                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
-                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
-                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
-                        .forEach(lines::add);
-                Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
-                config.deleteOnExit();
-                Object db = Reflector.invoke("org.h2.tools.Server.createWebServer", Tool.array(String[].class),
-                        new Object[] { Tool.array("-properties", config.getParent()) });
-                Reflector.invoke(db, "start", Tool.array());
-                Runtime.getRuntime()
-                        .addShutdownHook(new Thread(Try.r(() -> Reflector.invoke(db, "stop", Tool.array()), e -> Log.warning(e, () -> "h2 stop error"))));
-                Log.info("h2 console started on port " + port);
-            } catch (Exception e) {
-                Log.warning(e, () -> "h2 error");
-            }
-        });
-
-        Runtime.getRuntime().addShutdownHook(new Thread(Application.current().get()::shutdown));
+        Runtime.getRuntime().addShutdownHook(new Thread(application::shutdown));
     }
 
     /**

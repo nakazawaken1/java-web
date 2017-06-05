@@ -82,7 +82,7 @@ public class Admin {
      */
     @Route("db")
     Object db() {
-        return Sys.h2_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
+        return Sys.h2_web_port.map(port -> Response.redirect("http://localhost:" + port)).orElseGet(() -> Response.error(Status.Not_Found));
     }
 
     /**

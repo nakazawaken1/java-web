@@ -78,12 +78,9 @@ public class Sys {
         public static boolean debug = true;
     }
 
-    @Help("database connection string(inclucde id and password)")
-    public static String db = "jdbc:h2:~/test";
-
     public static class Db {
         @Help("default database suffix")
-        public static String suffix = "";
+        public static String suffix = "h2";
 
         @Help("datasource generator class")
         public static String datasource_class = "";
@@ -92,7 +89,25 @@ public class Sys {
         public static Setup setup = Setup.UPDATE;
 
         @Help("session store db suffix")
-        public static String session_suffix = "";
+        public static String session_suffix = suffix;
+
+        @Help("h2 database connection string(inclucde id and password)")
+        public static String h2 = "jdbc:h2:~/test";
+
+        @Help("h2 tcp database connection string(inclucde id and password)")
+        public static String h2tcp = "jdbc:h2:tcp://localhost/~/test";
+
+        @Help("Oracle tcp database connection string(inclucde id and password)")
+        public static String oracle = "jdbc:oracle:thin:system/manager@localhost:1521:orcl";
+
+        @Help("MySQL tcp database connection string(inclucde id and password)")
+        public static String mysql = "jdbc:mysql://localhost/test?user=root&password=&characterEncoding=utf8";
+
+        @Help("Postgres tcp database connection string(inclucde id and password)")
+        public static String postgres = "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=";
+
+        @Help("SQLServer tcp database connection string(inclucde id and password)")
+        public static String sqlserver = "jdbc:sqlserver://localhost:1433;user=sa;password=";
     }
 
     @Help("session cookie name")
@@ -158,14 +173,23 @@ public class Sys {
     @Help("context path")
     public static String context_path = "/";
 
-    @Help("h2 web console port(disabled if empty)")
-    public static Optional<Integer> h2_port = Tool.of();
+    @Help("h2 web interface port(disabled if empty)")
+    public static Optional<Integer> h2_web_port = Tool.of();
 
-    @Help("h2 web console access allowed remote client")
-    public static boolean h2_allow_remote = false;
+    @Help("h2 web interface access allowed remote client")
+    public static boolean h2_web_allow_remote = false;
 
-    @Help("h2 web console using https")
-    public static boolean h2_ssl = false;
+    @Help("h2 web interface using https")
+    public static boolean h2_web_ssl = false;
+
+    @Help("h2 tcp server port(disabled if empty)")
+    public static Optional<Integer> h2_tcp_port = Tool.of();
+
+    @Help("h2 tcp server access allowed remote client")
+    public static boolean h2_tcp_allow_remote = false;
+
+    @Help("h2 tcp server using https")
+    public static boolean h2_tcp_ssl = false;
 
     @Help("cluster node name suffix(for session cookie, It must be the same length in each cluster)")
     public static String cluster_suffix = "";
@@ -202,7 +226,7 @@ public class Sys {
 
     @Help("Aliases if key file is not exists")
     public static Map<String, String> aliases = Tool.map("/", "/index.html", "/index.html", "/admin/index.html");
-    
+
     @Help("Default avator")
     public static String default_avator = "&#9924;";
 
@@ -248,8 +272,7 @@ public class Sys {
         no,
         @Mapping("OK")
         ok,
-        route,
-        ;
+        route,;
 
         @Override
         public String toString() {
@@ -275,8 +298,7 @@ public class Sys {
         @Mapping("Value is out of range")
         range,
         @Mapping("Time is out of range")
-        time,
-        ;
+        time,;
 
         @Override
         public String toString() {
@@ -286,20 +308,17 @@ public class Sys {
 
     public enum Prompt implements Message {
         @Mapping("Please input user ID and password and press the login button.")
-        login,
-        ;
+        login,;
 
         @Override
         public String toString() {
             return message();
         }
     }
-    
 
     public enum Confirm implements Message {
         @Mapping("Do you want to log out?")
-        logout,
-        ;
+        logout,;
 
         @Override
         public String toString() {
