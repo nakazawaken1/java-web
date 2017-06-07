@@ -2331,6 +2331,11 @@ public class Tool {
     public static final byte[] BOM = { (byte) 0xef, (byte) 0xbb, (byte) 0xbf };
 
     /**
+     * year4, month2, day2, hour2, minute2, second2
+     */
+    public static final DateTimeFormatter uuuuMMddHHmmss = DateTimeFormatter.ofPattern("uuuuMMddHHmmss");
+
+    /**
      * @param pattern Pattern
      * @param locale Locale
      * @return DateTimeFormatter

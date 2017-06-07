@@ -140,7 +140,7 @@ public class Sys {
     public static Pattern format_include_regex = Pattern.compile(".*\\.(html?|js|css)");
 
     @Help("exclude file pattern to apply format")
-    public static Pattern format_exclude_regex = Pattern.compile(".*jquery.*\\.js");
+    public static Pattern format_exclude_regex = Pattern.compile(".*[.]min[.](html?|js|css)");
 
     @Help("scheduled job thread count")
     public static int job_threads = 1;

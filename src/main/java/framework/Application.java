@@ -112,9 +112,6 @@ public abstract class Application implements Attributes<Object> {
             configClasses = cs.peek(Config.Injector::inject).peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c)).collect(Collectors.toList());
         }
         Log.startup();
-        Log.info(() -> "---- setting ----" + Letters.CRLF
-                + configClasses.stream().map(c -> String.join(Letters.CRLF, Config.Injector.dumpConfig(c, true))).collect(Collectors.joining(Letters.CRLF)));
-        Log.info(() -> "---- message ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dumpMessage()));
 
         Log.info(Application.current().get()::toString);
 
@@ -210,6 +207,14 @@ public abstract class Application implements Attributes<Object> {
 
         /* database setup */
         Db.setup(Sys.Db.setup);
+        
+        /* load database config */
+        Config.Injector.loadDb();
+
+        Log.info(() -> "---- setting ----" + Letters.CRLF
+                + configClasses.stream().map(c -> String.join(Letters.CRLF, Config.Injector.dumpConfig(c, true))).collect(Collectors.joining(Letters.CRLF)));
+
+        Log.info(() -> "---- message ----" + Letters.CRLF + String.join(Letters.CRLF, Config.Injector.dumpMessage()));
 
         /* job scheduler setup */
         List<Class<?>> cs = new ArrayList<>();

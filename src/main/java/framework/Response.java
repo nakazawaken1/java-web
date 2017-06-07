@@ -581,7 +581,8 @@ public abstract class Response {
                         String folder = Tool.suffix(file, "/");
                         for (String page : Sys.default_pages) {
                             if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
-                                load.accept(page, p);
+                                response.status(Status.Moved_Permamently).addHeader("Location", page);
+                                out.get();
                             }, () -> {
                             })) {
                                 return;
