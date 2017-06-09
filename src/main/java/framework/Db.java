@@ -51,11 +51,12 @@ import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.annotation.Config;
+import framework.annotation.Factory;
 import framework.annotation.Help;
 import framework.annotation.Id;
 import framework.annotation.Join;
-import framework.annotation.Factory;
 import framework.annotation.Persist;
+import framework.annotation.Required;
 import framework.annotation.Size;
 import framework.annotation.Stringer;
 
@@ -1501,7 +1502,7 @@ public class Db implements AutoCloseable {
          * @param value default value
          * @return column
          */
-        public Column value(String value) {
+        public Column value(Object value) {
             this.value = value;
             return this;
         }
@@ -2295,6 +2296,7 @@ public class Db implements AutoCloseable {
             Tool.of(field.getAnnotation(Help.class)).ifPresent(help -> c.display(String.join(" ", help.value())));
             Tool.of(field.getAnnotation(Size.class)).ifPresent(size -> c.length(size.value()));
             Tool.of(field.getAnnotation(Id.class)).map(id -> primary).orElse(columns).add(c);
+            Tool.of(field.getAnnotation(Required.class)).filter(required -> required.value().length > 0).ifPresent(required -> c.value(required.value()[0]));
         });
         return createSql(Reflector.mappingClassName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream()).toArray(Column[]::new));
     }

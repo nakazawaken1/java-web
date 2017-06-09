@@ -16,7 +16,12 @@ public @interface Required {
     /**
      * @return apply groups
      */
-    Class<? extends Valid.All>[] value() default Valid.All.class;
+    Class<? extends Valid.All>[] groups() default Valid.All.class;
+
+    /**
+     * @return Default value(empty if non default value)
+     */
+    String[] value() default {};
 
     /**
      * @return Error message
