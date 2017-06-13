@@ -311,7 +311,7 @@ public class ServletImpl implements javax.servlet.Servlet {
             this.response = response;
             String uri = request.getRequestURI();
             int rootLength = request.getContextPath().length() + 1;
-            path = rootLength > uri.length() ? null : Tool.string(uri.substring(rootLength)).orElse("/");
+            path = rootLength > uri.length() ? null : Tool.prefix(Tool.string(uri.substring(rootLength)).orElse("/"), "/");
             method = Try.<String, Method>f(m -> Method.valueOf(m.toUpperCase()), (e, m) -> {
                 Log.info(e, () -> "Invalid method: " + m);
                 return null;
