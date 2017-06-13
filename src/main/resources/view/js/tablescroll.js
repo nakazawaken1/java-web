@@ -41,22 +41,47 @@ $.fn.extend({
         space = Number(space) || 0;
         return this.each(function() {
             var $this = $(this);
-            var heads = $this.find('thead tr:last th,thead tr:last td');
+            var heads = $this.find('thead tr:first th,thead tr:first td');
             var bodys = $this.find('tbody tr:first th, tbody tr:first td');
             var foots = $this.find('tfoot tr:first th,tfoot tr:first td');
+            var caption = $this.find('caption');
             if($this.parent().attr('data-id') == 'inner') {
-                $this.unwrap().unwrap();
+                $this.unwrap();
+                var outer = $this.parent();
+                $this.css({'margin-top': outer.css('margin-top'), 'margin-right': outer.css('margin-right'), 'margin-bottom': outer.css('margin-bottom'), 'margin-left': outer.css('margin-left')});
+                outer.unwrap();
                 heads.width('');
                 bodys.width('');
                 foots.width('');
                 $this.find('thead').css({position: '', top: '', display: ''});
                 $this.find('tbody').css({display: ''});
                 $this.find('tfoot').css({position: '', bottom: '', display: ''});
+                caption.css({bottom: '', width: '', position: ''});
             }
+            if(height === false) {
+                return;
+            }
+            var margin = 'margin-top:' + $this.css('margin-top') + ';margin-right:' + $this.css('margin-right') + ';margin-bottom:' + $this.css('margin-bottom') + ';margin-left:' + $this.css('margin-left');
+            $this.css({'margin-top': 0, 'margin-right': 0, 'margin-bottom': 0, 'margin-left': 0});
+            var captionHeight = caption.outerHeight();
             var fixedHeight = $this.outerHeight() - $this.find('tbody').outerHeight();
-            var headHeight = fixedHeight - $this.find('tfoot').outerHeight();
-            var footHeight = fixedHeight - $this.find('thead').outerHeight();
-            $this.wrap('<div style="position:relative;padding-top:' + headHeight + 'px;padding-bottom:' + footHeight + 'px"></div>')
+            var headHeight = fixedHeight - $this.find('tfoot').outerHeight() - captionHeight;
+            var footHeight = fixedHeight - $this.find('thead').outerHeight() - captionHeight;
+            var top = 0;
+            var bottom = 0;
+            if(caption.length > 0) {
+                if(caption.css('caption-side') == 'bottom') {
+                    bottom = captionHeight + 'px';
+                    caption.css('bottom', 0);
+                    footHeight += captionHeight;
+                } else {
+                    top = captionHeight + 'px';
+                    caption.css('top', 0);
+                    headHeight += captionHeight;
+                }
+                caption.css({width: '100%', position: 'absolute'});
+            }
+            $this.wrap('<div style="position:relative;padding-top:' + headHeight + 'px;padding-bottom:' + footHeight + 'px;' + margin + '"></div>')
                 .wrap('<div data-id="inner" style="overflow:auto;height:' + ((height || $this.attr('data-scroll')) - fixedHeight) + 'px"></div>');
             var widths = bodys.map(function() {
                 return $(this).outerWidth() + space;
@@ -75,9 +100,9 @@ $.fn.extend({
                     return this - n;
                 });
             }
-            $this.find('thead').css({position: 'absolute', top: 0, display: 'block'});
+            $this.find('thead').css({position: 'absolute', top: top, display: 'block'});
             $this.find('tbody').css({display: 'block'});
-            $this.find('tfoot').css({position: 'absolute', bottom: 0, display: 'block'});
+            $this.find('tfoot').css({position: 'absolute', bottom: bottom, display: 'block'});
             heads.widths(widths, space);
             bodys.widths(widths, space);
             foots.widths(widths, space);
@@ -85,17 +110,16 @@ $.fn.extend({
         });
     }
 });
-$(function() {
-    var resize = function() {
-        $('table[data-scroll]').tableScroll();
-    };
+var resize = function() {
+    $('table[data-scroll]').tableScroll();
+};
+var timer;
+$(window).on('resize', function() {
+    if (timer != null) {
+        clearTimeout(timer);
+    }
+    timer = setTimeout(resize, 100);
+}).on('load', function() {
     resize();
-    var timer;
-    $(window).on('resize', function() {
-        if (timer != null) {
-            clearTimeout(timer);
-        }
-        timer = setTimeout(resize, 100);
-    });
 });
 })(jQuery);
