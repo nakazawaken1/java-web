@@ -49,7 +49,7 @@ $.fn.extend({
                 $this.unwrap();
                 var outer = $this.parent();
                 $this.css({'margin-top': outer.css('margin-top'), 'margin-right': outer.css('margin-right'), 'margin-bottom': outer.css('margin-bottom'), 'margin-left': outer.css('margin-left')});
-                outer.unwrap();
+                $this.unwrap();
                 heads.width('');
                 bodys.width('');
                 foots.width('');
