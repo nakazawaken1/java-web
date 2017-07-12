@@ -71,6 +71,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -1199,7 +1202,7 @@ public class Tool {
      * @param replacer replacer(writer, expression, prefix)
      * @param closures closures
      */
-    public static void printFormat(PrintWriter writer, String text, TryTriConsumer<PrintWriter, String, String> replacer, String... closures) {
+    public static void printReplace(PrintWriter writer, String text, TryTriConsumer<PrintWriter, String, String> replacer, String... closures) {
         for (boolean loop = true; loop;) {
             loop = false;
             for (int i = 0; i < closures.length; i += 2) {
@@ -1225,6 +1228,26 @@ public class Tool {
         if (!text.isEmpty()) {
             writer.print(text);
         }
+    }
+
+    /**
+     * @param text Target text
+     * @param regex Regex(match pattern)
+     * @param replacer MatchResult to String
+     * @return Replaced text
+     */
+    public static String replaceAll(CharSequence text, String regex, Function<MatchResult, String> replacer) {
+        Matcher matcher = Pattern.compile(regex).matcher(text);
+        if (!matcher.find()) {
+            return text.toString();
+        }
+        StringBuilder s = new StringBuilder();
+        int index = 0;
+        do {
+            s.append(text.subSequence(index, matcher.start())).append(replacer.apply(matcher.toMatchResult()));
+            index = matcher.end();
+        } while (matcher.find());
+        return s.append(text.subSequence(index, text.length())).toString();
     }
 
     /**

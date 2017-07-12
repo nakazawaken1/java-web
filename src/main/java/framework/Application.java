@@ -132,7 +132,7 @@ public abstract class Application implements Attributes<Object> {
                             Map<String, String> renameMap = new HashMap<>();
                             ByteArrayOutputStream out = new ByteArrayOutputStream();
                             PrintWriter writer = new PrintWriter(out);
-                            Tool.printFormat(writer, path, (w, to, prefix) -> {
+                            Tool.printReplace(writer, path, (w, to, prefix) -> {
                                 String from;
                                 if (!to.chars().allMatch(i -> (Letters.ALPHABETS + Letters.DIGITS).indexOf(i) >= 0)) {
                                     from = String.format("HasH%08x", to.hashCode());
@@ -188,10 +188,10 @@ public abstract class Application implements Attributes<Object> {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_web_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
-                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
-                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
-                        .map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
+                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()),
+                        properties -> properties.stringPropertyNames().stream().sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
+                                .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:")).<String>map(t -> index.incrementAndGet() + "=" + t.l + "|"
+                                        + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
@@ -207,7 +207,7 @@ public abstract class Application implements Attributes<Object> {
 
         /* database setup */
         Db.setup(Sys.Db.setup);
-        
+
         /* load database config */
         Config.Injector.loadDb();
 

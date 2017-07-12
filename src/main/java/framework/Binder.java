@@ -4,6 +4,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Type;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,11 +110,11 @@ public class Binder implements ErrorAppender {
         if (clazz == double.class || clazz == Double.class) {
             return toNumber.apply(Double::valueOf);
         }
-        if(clazz == LocalDate.class) {
+        if (clazz == LocalDate.class) {
             return LocalDate.parse(text);
         }
-        if(Enum.class.isAssignableFrom((Class<?>)clazz)) {
-            return Reflector.invoke(((Class<?>)clazz).getName() + ".valueOf", Tool.array(String.class), text);
+        if (Enum.class.isAssignableFrom((Class<?>) clazz)) {
+            return Reflector.invoke(((Class<?>) clazz).getName() + ".valueOf", Tool.array(String.class), text);
         }
         return text;
     }
@@ -145,7 +146,7 @@ public class Binder implements ErrorAppender {
         // Array
         Class<?> component = clazz.getComponentType();
         if (component != null) {
-            Stream<Object> stream = values.stream().map(value -> convert(value, component, null));
+            Stream<Object> stream = values == null ? Stream.empty() : values.stream().map(value -> convert(value, component, null));
             if (clazz == int[].class) {
                 return stream.mapToInt(Integer.class::cast).toArray();
             }
@@ -199,19 +200,19 @@ public class Binder implements ErrorAppender {
         }
 
         if (clazz == List.class) {
-            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values == null ? Collections.emptyList() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toList());
         }
 
         if (clazz == Set.class) {
-            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values == null ? Collections.emptySet() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toSet());
         }
 
         if (clazz == Map.class) {
             String prefix = name + ".";
-            return parameters.entrySet()
-                    .stream().filter(
+            return parameters
+                    .entrySet().stream().filter(
                             e -> e.getKey().startsWith(prefix))
                     .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey().substring(prefix.length()),
                             bind(nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1] : Object.class)), Map::putAll);
@@ -221,12 +222,19 @@ public class Binder implements ErrorAppender {
             return Tool.of(bind(nest + 1, name, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class));
         }
 
-        if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz) && !Tool.val(clazz.getName(), i -> Stream.of("java.", "com.sun.").anyMatch(i::startsWith))) {
+        if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz)
+                && !Tool.val(clazz.getName(), i -> Stream.of("java.", "com.sun.").anyMatch(i::startsWith))) {
             Constructor<?> constructor = clazz.getDeclaredConstructors()[0];
             constructor.setAccessible(true);
-            Object[] args = Stream.of(constructor.getParameters())
-                    .map(p -> bind(name + "." + p.getName(), p.getType(), Reflector.getGenericParameters(p))).toArray();
-            return Try.s(() -> constructor.newInstance(args)).get();
+            if (constructor.getParameterCount() > 0) {
+                Object[] args = Stream.of(constructor.getParameters()).map(p -> bind(name + "." + p.getName(), p.getType(), Reflector.getGenericParameters(p)))
+                        .toArray();
+                return Try.s(() -> constructor.newInstance(args)).get();
+            }
+            Object o = Try.s(constructor::newInstance).get();
+            Reflector.fields(o.getClass())
+                    .forEach(Try.biC((fieldName, field) -> field.set(o, bind(name + "." + fieldName, field.getType(), Reflector.getGenericParameters(field)))));
+            return o;
         }
 
         return convert(first, clazz, nest == 0 ? null : e -> null);

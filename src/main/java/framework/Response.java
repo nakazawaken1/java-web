@@ -618,7 +618,7 @@ public abstract class Response {
                         Stream<String> lines = Tool.lines(url.openStream());
                         Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
                     lines.map(formatter::format).forEach(line -> {
-                        Tool.printFormat(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
+                        Tool.printReplace(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                         writer.println();
                     });
                 }

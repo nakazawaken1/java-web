@@ -222,7 +222,16 @@ public class Reflector {
      * @return Generic type
      */
     public static Class<?> getGenericParameter(Field field, int index) {
-        return (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[index];
+        return (Class<?>) getGenericParameters(field)[index];
+    }
+
+    /**
+     * @param field Field
+     * @return Generic type
+     */
+    public static Type[] getGenericParameters(Field field) {
+        Type type = field.getGenericType();
+        return type instanceof ParameterizedType ? ((ParameterizedType) type).getActualTypeArguments() : Tool.array();
     }
 
     /**
@@ -233,7 +242,26 @@ public class Reflector {
      */
     @SuppressWarnings("unchecked")
     public static <T> Class<T> getGenericParameter(Class<?> clazz, int index) {
-        return (Class<T>) ((ParameterizedType) clazz.getGenericSuperclass()).getActualTypeArguments()[index];
+        return (Class<T>) getGenericParameters(clazz)[index];
+    }
+
+    /**
+     * @param <T> Return type
+     * @param clazz Class
+     * @return Generic type
+     */
+    public static <T> Type[] getGenericParameters(Class<?> clazz) {
+        Type type = clazz.getGenericSuperclass();
+        return type instanceof ParameterizedType ? ((ParameterizedType) type).getActualTypeArguments() : Tool.array();
+    }
+
+    /**
+     * @param parameter Parameter
+     * @return Generic parameters
+     */
+    public static Type[] getGenericParameters(Parameter parameter) {
+        return Tool.of(parameter.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
+                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
     }
 
     /**
@@ -368,14 +396,5 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static void chagneAnnotation(Executable executable, Class<? extends Annotation> annotation, Annotation value) {
         method(Executable.class, "declaredAnnotations").map(Try.f(m -> Map.class.cast(m.invoke(executable)))).ifPresent(map -> map.put(annotation, value));
-    }
-
-    /**
-     * @param parameter Parameter
-     * @return Generic parameters
-     */
-    public static Type[] getGenericParameters(Parameter parameter) {
-        return Tool.of(parameter.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
-                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
     }
 }

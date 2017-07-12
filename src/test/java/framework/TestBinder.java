@@ -93,6 +93,22 @@ public class TestBinder extends Tester {
         }
     }
 
+    @SuppressWarnings("javadoc")
+    static class User2 {
+        String name;
+        int age;
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof User2 && hashCode() == obj.hashCode();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, age);
+        }
+    }
+
     {
         expect("null", n -> binder(null).bind(null, null)).toNull();
         expect("empty", n -> binder("").bind("", null)).toNull();
@@ -160,8 +176,12 @@ public class TestBinder extends Tester {
         expect("Map<int>", n -> binder("m.a=1&m.b=2").bind("m", Map.class, String.class, Integer.class)).toEqual(Tool.map("a", 1, "b", 2));
 
         expect("LocalDate", n -> binder("a=2017-01-11").bind("a", LocalDate.class)).toEqual(LocalDate.of(2017, 1, 11));
-        expect("Class", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
+        expect("ClassFullArgsConstructor", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
                 .toEqual(new User.Factory().set(id, 1, name, "abc", birthday, LocalDate.of(2001, 2, 3), gender, User.Gender.FEMALE).get());
+//        expect("ClassNoConstructor", n -> binder("c.name=abc&c.age=22").bind("c", User2.class)).toEqual(Tool.peek(new User2(), u -> {
+//            u.name = "abc";
+//            u.age = 22;
+//        }));
         // expect("List<Class>", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", List.class, User.class)).toEqual(
         // Tool.list(new User.Factory().set(id, 1).set(name, "abc").set(birthday, LocalDate.of(2001, 2, 3)).set(gender, User.Gender.FEMALE).get()));
     }
