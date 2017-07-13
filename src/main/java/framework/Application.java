@@ -330,7 +330,7 @@ public abstract class Application implements Attributes<Object> {
                             }
                         }).flush();
                     } else {
-                        Tool.peek(Response.of(response), r -> setContentType.accept(r)).flush();
+                        Tool.peek(Response.of(response), setContentType::accept).flush();
                     }
                     return;
                 } catch (InvocationTargetException e) {
