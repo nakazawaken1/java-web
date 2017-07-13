@@ -1,26 +1,38 @@
+Number.prototype.pad = function(padding) {
+    var text = padding + this;
+    return text.substr(text.length - padding.length);
+};
+Date.prototype.format = function(format) {
+    return this.getFullYear() + '-' + (this.getMonth() + 1).pad('00') + '-' + this.getDate().pad('00') + 'T' + this.getHours().pad('00') + ':' + this.getMinutes().pad('00') + ':' + this.getSeconds().pad('00');
+};
 jQuery(function($) {
     $.extend({
         dialog: function(message, action, title, buttons, setup) {
-            $shade = $('<div style="position:absolute;top:0;right:0;bottom:0;left:0;opacity:0.5;background-color:#000000;z-index:1998" class="trans"></div>');
-            $dialog = $('<div style="position:absolute;top:0;right:0;bottom:0;left:0;z-index:1999" class="trans"><form class="round" style="opacity:1;width:600px;margin:50px auto;padding:30px"><div class="padding margin-bottom-huge">' + message + '</div><div class="text-right"></div></form></div>');
+            var $shade = $('<div style="position:absolute;top:0;right:0;bottom:0;left:0;opacity:0.5;background-color:#000000;z-index:1998" class="trans"></div>');
+            var $dialog = $('<div style="position:absolute;top:0;right:0;bottom:0;left:0;z-index:1999" class="trans"><form class="round" style="opacity:1;width:600px;margin:50px auto;padding:30px"><div class="padding margin-bottom-huge">' + message + '</div><div class="text-right"></div></form></div>');
             $dialog.find('form div:last').append($.map(buttons, function(button) {
                 return $('<a class="button margin">' + button + '</a>');
             }));
-            $dialog.find('.button').on('click', function() {
+            $dialog.find('form div:last .button').on('click', function() {
                 if($.isFunction(action)) {
-                    action($(this).text());
+                    action.call($dialog.get(0), $(this).text());
                 }
                 $dialog.remove();
                 $shade.remove();
             });
             $('body').append($shade, $dialog);
+            if($.isFunction(setup)) {
+                setup.call($dialog.get(0));
+            }
         },
         alert: function(message, action, title, buttons, setup) {
             $.dialog(message, action, title, [(buttons && buttons[0]) || "{Sys.Item.ok}"], setup);
         },
         confirm: function(message, action, title, buttons, setup) {
             $.dialog(message, function(button) {
-                action(button == (buttons[0] || "{Sys.Item.yes}"));
+                if($.isFunction(action)) {
+                    action.call(this, button == (buttons && buttons[0] || "{Sys.Item.yes}"));
+                }
             }, title, [(buttons && buttons[0]) || "{Sys.Item.yes}", (buttons && buttons[1]) || "{Sys.Item.no}"], setup);
         },
         fatal: function(response, error) {
@@ -164,5 +176,34 @@ jQuery(function($) {
     }).on('reset', function() {
         $(this).clearError();
         $('.focus:first').focus();
+    });
+    $('label.file>input[type=file]').on('change', function() {
+        $(this).closest('label').find('span:first').text(/[^\\/\\\\]+$/.exec($(this).val())[0]);
+    });
+    $('.date').pickadate({});
+    $('input[id]:not([name]),textarea[id]:not([name]),select[id]:not([name])').attr('name', function() {
+        return $(this).attr('id');
+    });
+    $(document).on('click', 'table.calendar button[data-ym]', function() {
+        $(this).closest('table.calendar').parent().load('calendar/' + $(this).attr('data-ym'));
+    });
+    $(document).on('focus', 'input[type=text]', function() {
+        $(this).select();
+    });
+    $(document).on('click', 'a[target=_blank]', function() {
+        window.open($(this).attr('href'), '_blank', ($(this).attr('data-option') || 'width=800,height=600') + ',centerscreen=yes,resizable=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no');
+        return false;
+    });
+    $(document).on('click', '.tabs a[href]', function() {
+        var self = this;
+        $('.tabs a[href]').each(function() {
+            var isSelf = self === this;
+            $(this)[isSelf ? 'addClass' : 'removeClass']('active');
+            $($(this).attr('href')).css('display', isSelf ? '' : 'none');
+        });
+        return false;
+    });
+    $('.tabs').each(function() {
+        $(this).find('a[href]:first').trigger('click');
     });
 });

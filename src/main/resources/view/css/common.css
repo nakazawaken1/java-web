@@ -2,6 +2,9 @@
   font-family: MS Gothic, Monospace;
   font-size: 11pt;
   line-height: 15pt;
+  word-break: break-all;
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 h1 {
@@ -12,6 +15,20 @@ h1 {
 h2 {
   font-size: 13pt;
   padding: 0 13pt;
+}
+
+nav>h2 {
+  padding: 0;
+}
+
+nav>h2 img {
+  vertical-align: middle;
+}
+
+nav>h2 span {
+  padding-left: 6em;
+  font-size: 18pt;
+  vertical-align: middle;
 }
 
 h3 {
@@ -86,6 +103,7 @@ label.checkbox, label.radio, select, .button, label.file:after {
   border-radius: 6px;
   -moz-border-radius: 6px;
   -webkit-border-radius: 6px;
+  padding: 10px;
 }
 
 label.checkbox, label.radio {
@@ -95,11 +113,12 @@ label.checkbox, label.radio {
 
 select {
   cursor: pointer;
-  padding: 2pt 6pt;
+  padding: 3pt 6pt;
+  margin-bottom: -4pt;
 }
 
 label.file:after {
-  content: "ファイル選択...";
+  content: "${Sys.Item.file}";
   display: inline-block;
 }
 
@@ -172,14 +191,14 @@ a.button, label {
 
 label.file>span {
   width: 120pt;
-  height: 15pt;
+  height: 19pt;
   white-space: nowrap;
   overflow: hidden;
   vertical-align: bottom;
 }
 
 nav {
-  background-color: #23282d;
+  background: /*{Sys.background}*/;
   display: table;
   width: 100%;
   position: fixed;
@@ -221,21 +240,22 @@ table {
   border-collapse: collapse;
 }
 
+thead, tfoot {
+  background-color: #e1e1e1;
+}
+
 th, td {
   border: 1px solid black;
   padding: 4px;
 }
 
-table.noborder th, table.noborder td {
+table.noborder>tr>th, table.noborder>thead>tr>th, table.noborder>tbody>tr>th, table.noborder>tfoot>tr>th, table.noborder>tr>td, table.noborder>thead>tr>td,
+  table.noborder>tbody>tr>td, table.noborder>tfoot>tr>td {
   border: none;
 }
 
-[data-load="/alert"] {
+[data-load="/alert"], .red {
   color: red;
-}
-
-.padding {
-  padding: 5px;
 }
 
 .text-left {
@@ -276,19 +296,39 @@ label.input-error {
   text-align: right;
   position: fixed;
   bottom: 0;
-  background-color: #23282d;
+  background: /*{Sys.background}*/;
   width: 100%;
   color: #ffffff;
   z-index: -1;
 }
 
+.footer img {
+  vertical-align: bottom;
+}
+
 .footer div {
-  padding: 10px;
+  padding: 0 10px;
   font-size: 12px;
+}
+
+.padding {
+  padding: 5px;
+}
+
+.padding-huge {
+  padding: 30px;
 }
 
 .margin {
   margin: 5px;
+}
+
+.margin-large {
+  margin: 15px;
+}
+
+.margin-huge {
+  margin: 30px;
 }
 
 .margin-top {
@@ -296,7 +336,7 @@ label.input-error {
 }
 
 .margin-top-huge {
-  margin-top: 50px;
+  margin-top: 30px;
 }
 
 .margin-bottom {
@@ -304,7 +344,7 @@ label.input-error {
 }
 
 .margin-bottom-huge {
-  margin-bottom: 50px;
+  margin-bottom: 30px;
 }
 
 .left {
@@ -354,4 +394,150 @@ label.input-error {
 }
 li a {
   display: block;
+}
+
+i.check, i.lend, i.back {
+  background-color: #ffd280;
+  border-radius: 3px;
+  -moz-border-radius: 3px;
+  -webkit-border-radius: 3px;
+  font-style: normal;
+  padding: 3px;
+}
+
+i.lend {
+  background-color: #d2ff80;
+}
+
+i.back {
+  background-color: #80d2ff;
+}
+
+.w1 {
+  width: 1em;
+}
+
+.w2 {
+  width: 2em;
+}
+
+.w3 {
+  width: 3em;
+}
+
+.w4 {
+  width: 4em;
+}
+
+.w5 {
+  width: 5em;
+}
+
+.w6 {
+  width: 6em;
+}
+
+.w7 {
+  width: 7em;
+}
+
+.w8 {
+  width: 8em;
+}
+
+.w9 {
+  width: 9em;
+}
+
+.w10 {
+  width: 10em;
+}
+
+.w11 {
+  width: 11em;
+}
+
+.w12 {
+  width: 12em;
+}
+
+.w13 {
+  width: 13em;
+}
+
+.w14 {
+  width: 14em;
+}
+
+.w15 {
+  width: 15em;
+}
+
+.w16 {
+  width: 16em;
+}
+
+.w17 {
+  width: 17em;
+}
+
+.w18 {
+  width: 18em;
+}
+
+.w19 {
+  width: 19em;
+}
+
+.w20 {
+  width: 20em;
+}
+
+.w99 {
+  width: 99%;
+}
+
+.top {
+  vertical-align: top;
+}
+
+.middle {
+  vertical-align: middle;
+}
+
+.bottom {
+  vertical-align: bottom;
+}
+
+table.calendar td {
+  text-align: right;
+}
+
+table.calendar td.out {
+  color: gray;
+}
+
+table.calendar .yobi0 {
+  color: red;
+}
+
+table.calendar .yobi6 {
+  color: blue;
+}
+
+.nopadding, .nopadding th, .nopadding td {
+  padding: 0;
+}
+
+input[readonly] {
+  background-color: #eeeeee;
+}
+
+.table {
+  display: table;
+}
+
+tbody[data-id]:hover,tr[data-id]:hover {
+  background-color: #00aeff;
+  cursor: pointer;
 }

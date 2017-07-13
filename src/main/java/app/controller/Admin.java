@@ -24,7 +24,6 @@ import framework.Try;
 import framework.Xml;
 import framework.annotation.Accept;
 import framework.annotation.Config;
-import framework.annotation.Content;
 import framework.annotation.Letters;
 import framework.annotation.Only;
 import framework.annotation.Only.Administrator;
@@ -94,7 +93,7 @@ public class Admin {
     Object config() {
         return diff(Session.current().get(), Request.current().get(), Optional.of(Config.Injector.getDefault(Sys.class)),
                 Optional.of(String.join(Letters.CRLF, Config.Injector.dumpConfig(Sys.class, true)))).bind("before", "初期設定").bind("after", "現在の設定")
-                        .bind("breadcrumb", Tool.list(Sys.Item.adminTitle, Sys.Item.config));
+                        .bind("breadcrumb", Tool.list("<a href=\"index.html\">" + Sys.Item.adminTitle + "</a>", Sys.Item.config));
     }
 
     /**
@@ -104,8 +103,12 @@ public class Admin {
      */
     @Route("route")
     Object route() {
-        return Response.of(Xml.of("table").child("tr").child("th", Stream.of("Method", "Path", "Action")).parent().get()
-                .child(Xml.of("tr").repeat(Application.routes(), (xml, a) -> xml.child("td", Stream.of(a))))).contentType(Content.HTML);
+        return Response
+                .of(Response.Template.of("admin/table.html",
+                        (out, name,
+                                prefix) -> out.println(Xml.of(null).child("tr").child("th", Stream.of("Method", "Path", "Action", "Parameter map")).parent()
+                                        .get().child(Xml.of("tr").repeat(Application.routes(), (xml, a) -> xml.child("td", Stream.of(a)))))))
+                .bind("breadcrumb", Tool.list("<a href=\"index.html\">" + Sys.Item.adminTitle + "</a>", Sys.Item.route));
     }
 
     /**

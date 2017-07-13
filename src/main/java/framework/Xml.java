@@ -432,11 +432,15 @@ public class Xml {
                 }
                 String render = self.attributes.get(attribute);
                 if (render != null) {
+                    Function<Xml, Xml> r = renders.get(render);
+                    if (r == null) {
+                        r = Function.identity();
+                    }
                     self.attributes.remove(attribute);
                     int i = xml.children.indexOf(self);
                     Xml x = xml.children.get(i);
                     xml.children.remove(i);
-                    xml.children.add(i, Tool.peek(renders.get(render).apply(x), j -> j.parent = xml));
+                    xml.children.add(i, Tool.peek(r.apply(x), j -> j.parent = xml));
                 }
             }
         });

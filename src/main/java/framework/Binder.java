@@ -1,10 +1,13 @@
 package framework;
 
+import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
 import java.time.LocalDate;
-import java.util.Collections;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +30,11 @@ public class Binder implements ErrorAppender {
     Map<String, List<String>> parameters;
 
     /**
+     * Files
+     */
+    Map<String, Tuple<byte[], File>> files;
+
+    /**
      * Validator(validatee, errors)
      */
     Consumer<String> validator;
@@ -41,6 +49,15 @@ public class Binder implements ErrorAppender {
      */
     public Binder(Map<String, List<String>> parameters) {
         this.parameters = parameters;
+    }
+
+    /**
+     * @param files Files
+     * @return Self
+     */
+    public Binder files(Map<String, Tuple<byte[], File>> files) {
+        this.files = files;
+        return this;
     }
 
     /**
@@ -111,10 +128,16 @@ public class Binder implements ErrorAppender {
             return toNumber.apply(Double::valueOf);
         }
         if (clazz == LocalDate.class) {
-            return LocalDate.parse(text);
+            return Try.<String, LocalDate>f(LocalDate::parse, (e, s) -> (LocalDate) error.apply(null)).apply(text);
+        }
+        if (clazz == LocalDateTime.class) {
+            return Try.<String, LocalDateTime>f(LocalDateTime::parse, (e, s) -> (LocalDateTime) error.apply(null)).apply(text);
+        }
+        if (clazz == LocalTime.class) {
+            return Try.<String, LocalTime>f(LocalTime::parse, (e, s) -> (LocalTime) error.apply(null)).apply(text);
         }
         if (Enum.class.isAssignableFrom((Class<?>) clazz)) {
-            return Reflector.invoke(((Class<?>) clazz).getName() + ".valueOf", Tool.array(String.class), text);
+            return text != null ? Reflector.invoke(((Class<?>) clazz).getName() + ".valueOf", Tool.array(String.class), text) : error == null ? ((Class<?>)clazz).getEnumConstants()[0] : error.apply(null);
         }
         return text;
     }
@@ -140,12 +163,15 @@ public class Binder implements ErrorAppender {
         if (clazz == null) {
             return null;
         }
-        List<String> values = parameters.get(name);
+        List<String> values = Tool.or(parameters.get(name), () -> parameters.get(name + "[]")).orElse(null);
         String first = values == null || values.isEmpty() ? null : values.get(0);
 
         // Array
         Class<?> component = clazz.getComponentType();
         if (component != null) {
+            if((values == null || values.size() == 1 && "".equals(first)) && nest > 0) {
+                return null;
+            }
             Stream<Object> stream = values == null ? Stream.empty() : values.stream().map(value -> convert(value, component, null));
             if (clazz == int[].class) {
                 return stream.mapToInt(Integer.class::cast).toArray();
@@ -165,6 +191,9 @@ public class Binder implements ErrorAppender {
                 return to;
             }
             if (clazz == byte[].class) {
+                if(values.size() == 1 && files.containsKey(first)) {
+                    return Tool.val(files.get(first), t -> t.l == null ? Try.f(Files::readAllBytes).apply(t.r.toPath()) : t.l);
+                }
                 Object[] from = stream.toArray();
                 byte[] to = new byte[from.length];
                 for (int i = 0, end = from.length; i < end; i++) {
@@ -200,19 +229,19 @@ public class Binder implements ErrorAppender {
         }
 
         if (clazz == List.class) {
-            return values == null ? Collections.emptyList() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toList());
         }
 
         if (clazz == Set.class) {
-            return values == null ? Collections.emptySet() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toSet());
         }
 
         if (clazz == Map.class) {
             String prefix = name + ".";
-            return parameters
-                    .entrySet().stream().filter(
+            return parameters.entrySet()
+                    .stream().filter(
                             e -> e.getKey().startsWith(prefix))
                     .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey().substring(prefix.length()),
                             bind(nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1] : Object.class)), Map::putAll);

@@ -120,7 +120,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @return result
      */
     public static Result excludeForStyle(Formatter formatter) {
-        if (formatter.eat("/*")) {
+        if (formatter.eat("/*") && formatter.charAt(formatter.index) != '{') {
             formatter.index = formatter.indexOf("*/");
             if (formatter.index < 0) {
                 return Result.EXIT;

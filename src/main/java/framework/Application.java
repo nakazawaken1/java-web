@@ -188,10 +188,10 @@ public abstract class Application implements Attributes<Object> {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_web_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()),
-                        properties -> properties.stringPropertyNames().stream().sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
-                                .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:")).<String>map(t -> index.incrementAndGet() + "=" + t.l + "|"
-                                        + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
+                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
+                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
+                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
+                        .<String>map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
@@ -255,7 +255,8 @@ public abstract class Application implements Attributes<Object> {
         final Optional<String> mime = Tool.string(Tool.getExtension(path)).map(Tool::getContentType);
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
         final Tuple<Class<?>, Method> pair = routing.entrySet().stream().filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))
-                .map(e -> Tuple.of(e.getKey().r.l.matcher(path), e.getKey().r.r, e.getValue())).filter(p -> p.l.matches()).findAny().map(p -> {
+                .map(e -> Tuple.of(e.getKey().r.l.matcher(path), e.getKey().r.r, e.getValue())).filter(p -> p.l.matches())
+                .sorted(Comparator.comparing(c -> c.getValue().getValue().getValue().getAnnotation(Route.class).priority(), Comparator.reverseOrder())).findFirst().map(p -> {
                     Reflector.<Map<String, Integer>>invoke(p.l.pattern(), "namedGroups", Tool.array())
                             .forEach((k, v) -> Tool.setValue(parameters, p.r.l.getOrDefault(k, k), p.l.group(v)));
                     return p.r.r;
@@ -284,7 +285,7 @@ public abstract class Application implements Attributes<Object> {
 
                 try (Lazy<Db> db = new Lazy<>(Db::connect)) {
                     Log.config("[invoke method] " + method.getDeclaringClass().getName() + "." + method.getName());
-                    Binder binder = new Binder(parameters);
+                    Binder binder = new Binder(parameters).files(request.getFiles());
                     Object[] args = Stream.of(method.getParameters()).map(p -> {
                         Class<?> type = p.getType();
                         if (Request.class.isAssignableFrom(type)) {

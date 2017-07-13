@@ -38,4 +38,6 @@ INSERT INTO t_config(id, name, value, locale) VALUES(37,'Sys.Item.title','タイ
 INSERT INTO t_config(id, name, value, locale) VALUES(38,'Sys.Item.update','変更','ja');
 INSERT INTO t_config(id, name, value, locale) VALUES(39,'Sys.Item.yes','はい','ja');
 INSERT INTO t_config(id, name, value, locale) VALUES(40,'Sys.Item.route','ルート情報','ja');
-INSERT INTO t_config(id, name, value, locale) VALUES(41,'Sys.Prompt.login','ログインID・パスワードを入力して、\nログインボタンを押して下さい。','ja');
+INSERT INTO t_config(id, name, value, locale) VALUES(41,'Sys.Item.file','ファイル選択...','ja');
+INSERT INTO t_config(id, name, value, locale) VALUES(42,'Sys.Prompt.login','ログインID・パスワードを入力して、\nログインボタンを押して下さい。','ja');
+INSERT INTO t_config(id, name, value, locale) VALUES(38,'Sys.Item.copyright','©2017, All Rights Reserved.','ja');

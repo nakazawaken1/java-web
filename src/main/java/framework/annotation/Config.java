@@ -462,7 +462,7 @@ public @interface Config {
                 } catch (IOException e) {
                     Log.warning(e, () -> "load error");
                 }
-            }, () -> Log.info("config scan: " + Tool.toURL("").get() + path));
+            }, () -> Log.info("config scan: " + path));
             return p;
         }
 

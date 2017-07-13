@@ -1,5 +1,5 @@
-#{F:includeV('template/header.html', [Sys.Item.adminTitle, Sys.Item.dbSettings])}
-<table>
+#{F:includeV('template/header.html', empty breadcrumb ? ['<a href="index.html">' += Sys.Item.adminTitle += '</a>', Sys.Item.dbSettings] : breadcrumb)}
+<table style="margin:1em">
 <!--{}-->
 </table>
 #{F:include('template/footer.html')}

@@ -660,4 +660,35 @@ public class Try {
          */
         R apply(T t, U u, V v, W w);
     }
+
+    /**
+     * R(T, int) function
+     * 
+     * @param <T> first argument type
+     * @param <R> return type
+     */
+    @FunctionalInterface
+    public interface ObjIntFunction<T, R> {
+        /**
+         * @param t first argument
+         * @param i second argument
+         * @return value
+         */
+        R apply(T t, int i);
+    }
+
+    /**
+     * R(int, int) function
+     * 
+     * @param <R> return type
+     */
+    @FunctionalInterface
+    public interface BiIntFunction<R> {
+        /**
+         * @param i first argument
+         * @param j second argument
+         * @return value
+         */
+        R apply(int i, int j);
+    }
 }

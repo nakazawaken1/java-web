@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -102,7 +101,7 @@ public class Reflector {
      * @return instance
      */
     public static <T> T instance(String clazz) {
-        return instance(Reflector.<T>clazz(clazz).orElseThrow(RuntimeException::new));
+        return instance(Reflector.<T>clazz(clazz).<RuntimeException>orElseThrow(RuntimeException::new));
     }
 
     /**
@@ -201,11 +200,12 @@ public class Reflector {
 
     /**
      * @param <T> Annotation type
+     * @param enumValue Enum value
      * @param annotationClass annotation class
-     * @return field to annotation function
+     * @return annotation
      */
-    public static <T extends Annotation> Function<Field, Optional<T>> annotation(Class<T> annotationClass) {
-        return field -> Tool.of(field.getAnnotation(annotationClass));
+    public static <T extends Annotation> Optional<T> annotation(Enum<?> enumValue, Class<T> annotationClass) {
+        return field(enumValue.getDeclaringClass(), enumValue.name()).map(f -> f.getAnnotation(annotationClass));
     }
 
     /**
@@ -396,5 +396,14 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static void chagneAnnotation(Executable executable, Class<? extends Annotation> annotation, Annotation value) {
         method(Executable.class, "declaredAnnotations").map(Try.f(m -> Map.class.cast(m.invoke(executable)))).ifPresent(map -> map.put(annotation, value));
+    }
+
+    /**
+     * @param parameter Parameter
+     * @return Generic parameters
+     */
+    public static Type[] getGenericParameters(Parameter parameter) {
+        return Tool.of(parameter.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
+                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
     }
 }

@@ -320,10 +320,27 @@ public abstract class Response {
 
     /**
      * @param contentType content type
+     * @param charset charset
+     * @return self
+     */
+    public Response contentTypeIfEmpty(String contentType, Charset charset) {
+        return headers != null && headers.containsKey("Content-Type") ? this : setHeader("Content-Type", setCharset(contentType, charset));
+    }
+
+    /**
+     * @param contentType content type
      * @return self
      */
     public Response contentType(String contentType) {
         return setHeader("Content-Type", contentType);
+    }
+
+    /**
+     * @param contentType content type
+     * @return self
+     */
+    public Response contentTypeIfEmpty(String contentType) {
+        return headers.containsKey("Content-Type") ? this : setHeader("Content-Type", contentType);
     }
 
     /**
@@ -471,22 +488,14 @@ public abstract class Response {
      * writer
      */
     @FunctionalInterface
-    public interface Writer {
-        /**
-         * @param writer writer
-         */
-        void write(PrintWriter writer);
+    public interface Writer extends Consumer<PrintWriter> {
     }
 
     /**
      * output
      */
     @FunctionalInterface
-    public interface Output {
-        /**
-         * @param out OputputStream
-         */
-        void output(OutputStream out);
+    public interface Output extends Consumer<OutputStream> {
     }
 
     /**
@@ -524,21 +533,21 @@ public abstract class Response {
      */
     public static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Tool.list(//
             Tuple.of(String.class, (response, out, cancel) -> {
-                response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
+                response.contentTypeIfEmpty(Content.TEXT, response.charset());
                 out.get().write(((String) response.content).getBytes(response.charset()));
             }), //
             Tuple.of(Writer.class, (response, out, cancel) -> {
-                response.contentType(Content.TEXT, response.charset.orElse(StandardCharsets.UTF_8));
+                response.contentTypeIfEmpty(Content.TEXT, response.charset());
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                    ((Writer) response.content).write(writer);
+                    ((Writer) response.content).accept(writer);
                 }
             }), //
-            Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).output(out.get())), //
+            Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).accept(out.get())), //
             Tuple.of(Path.class, (response, out, cancel) -> {
                 BiConsumer<String, URL> load = (file, url) -> {
                     Log.config("[static load] " + url);
                     try (InputStream in = url.openStream()) {
-                        response.contentType(Tool.getContentType(file),
+                        response.contentTypeIfEmpty(Tool.getContentType(file),
                                 response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
                         if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
                             try (Stream<String> lines = Tool.lines(in);
@@ -612,11 +621,11 @@ public abstract class Response {
             }), //
             Tuple.of(Template.class, (response, out, cancel) -> {
                 Template template = (Template) response.content;
-                response.contentType(Tool.getContentType(template.name), response.charset());
+                response.contentTypeIfEmpty(Tool.getContentType(template.name), response.charset());
                 URL url = (template.name.startsWith("/") ? Tool.toURL(template.name) : Tool.toURL(Sys.template_folder, template.name)).get();
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
                         Stream<String> lines = Tool.lines(url.openStream());
-                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
+                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
                     lines.map(formatter::format).forEach(line -> {
                         Tool.printReplace(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                         writer.println();
@@ -625,16 +634,16 @@ public abstract class Response {
             }), //
             Tuple.of(Render.class, (response, out, cancel) -> {
                 Render render = (Render) response.content;
-                response.contentType(Tool.getContentType(render.file), response.charset());
+                response.contentTypeIfEmpty(Tool.getContentType(render.file), response.charset());
                 URL url = (render.file.startsWith("/") ? Tool.toURL(render.file) : Tool.toURL(Sys.template_folder, render.file)).get();
                 try (InputStream in = url.openStream();
-                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), null)) {
+                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
                     out.get().write(Xml.parseMap(formatter.format(Tool.loadText(in)), render.renders).toString().getBytes(response.charset()));
                 }
             }), //
             Tuple.of(Object.class, (response, out, cancel) -> {
                 Runnable other = Try.r(() -> {
-                    response.contentType(Content.TEXT, response.charset());
+                    response.contentTypeIfEmpty(Content.TEXT, response.charset());
                     Tool.csv(response.content, out.get(), response.charset());
                 });
                 Tool.ifPresentOr(Tool.of(response.headers).flatMap(map -> map.getOrDefault("Content-Type", Tool.list()).stream().findFirst()),

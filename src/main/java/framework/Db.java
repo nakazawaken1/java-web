@@ -2,6 +2,7 @@ package framework;
 
 import java.io.FileNotFoundException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -15,7 +16,9 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.OffsetTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
@@ -1017,7 +1020,7 @@ public class Db implements AutoCloseable {
             Function<String, String> dataName = file -> file.substring(dataPrefix.length(), file.length() - suffix.length());
             datas.stream().filter(file -> reloadTables.contains(dataName.apply(file))).peek(file -> db.truncate(dataName.apply(file)))
                     .forEach(file -> db.executeFile(file, null));
-            modelDatas.stream().peek(t -> db.truncate(t.l)).forEach(t -> db.insert(t.l, t.r.field(), t.r.value()));
+            modelDatas.stream().peek(t -> db.truncate(t.l)).forEach(Try.c(t -> t.r.loader().newInstance().accept(db, t.l, t.r)));
         }
     }
 
@@ -1121,6 +1124,9 @@ public class Db implements AutoCloseable {
          */
         @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(String prefix, Object value, String suffix) {
+            if (value instanceof Optional) {
+                value = ((Optional<?>) value).orElse(null);
+            }
             if (value == null) {
                 return "NULL";
             }
@@ -1147,6 +1153,12 @@ public class Db implements AutoCloseable {
          */
         public Object type(Column column) {
             Class<?> type = column.type;
+            if (LocalDateTime.class.isAssignableFrom(type) || ZonedDateTime.class.isAssignableFrom(type) || OffsetDateTime.class.isAssignableFrom(type)) {
+                return "TIMESTAMP";
+            }
+            if (LocalTime.class.isAssignableFrom(type) || OffsetTime.class.isAssignableFrom(type)) {
+                return "TIME";
+            }
             if (Date.class.isAssignableFrom(type) || Temporal.class.isAssignableFrom(type)) {
                 return "DATE";
             }
@@ -1158,6 +1170,9 @@ public class Db implements AutoCloseable {
             }
             if (Enum.class.isAssignableFrom(type) && IntSupplier.class.isAssignableFrom(type)) {
                 return "INTEGER";
+            }
+            if (byte[].class.isAssignableFrom(type)) {
+                return "BLOB";
             }
             return "VARCHAR(" + (column.length > 0 ? column.length : 255) + ")";
         }
@@ -1758,8 +1773,25 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query where(String field, Object value) {
+            final String separator = ", ";
             if (value == null) {
                 return where(field + " IS NULL");
+            }
+            StringBuilder s = null;
+            if (value.getClass().isArray()) {
+                s = new StringBuilder();
+                for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
+                    s.append(separator).append(Array.get(value, i));
+                }
+            }
+            if (value instanceof Iterable) {
+                s = new StringBuilder();
+                for (Object i : (Iterable<?>) value) {
+                    s.append(separator).append(i);
+                }
+            }
+            if (s != null) {
+                return where(field + (s.length() > 0 ? " IN (" + s.substring(separator.length()) + ")" : " IS NULL"));
             }
             return where(field + " = " + db.builder.escape(value));
         }
@@ -2050,7 +2082,8 @@ public class Db implements AutoCloseable {
     public String preparedSQL(String sql, Object... values) {
         Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters);
         Function<Object, String> to = v -> v instanceof Collection
-                ? ((Collection<?>) v).stream().map(cut).map(builder::escape).collect(Collectors.joining(", ", "[", "]")) : builder.escape(v);
+                ? ((Collection<?>) v).stream().map(cut).map(builder::escape).collect(Collectors.joining(", ", "[", "]"))
+                : builder.escape(v);
         return Tool.trim(null, Tool.zip(Stream.of(sql.split("[?]")), Stream.concat(Stream.of(values).map(to), Stream.generate(() -> "?"))).map(t -> t.l + t.r)
                 .collect(Collectors.joining()), "?");
     }
@@ -2107,7 +2140,7 @@ public class Db implements AutoCloseable {
      * @return stream of target class instance
      */
     public <T> Stream<T> findAll(Class<T> clazz) {
-        return from(Reflector.mappingClassName(clazz)).stream().map(Try.f(toObject(clazz)));
+        return from(clazz).stream().map(Try.f(toObject(clazz)));
     }
 
     /**
@@ -2129,15 +2162,27 @@ public class Db implements AutoCloseable {
         }
         List<Field> instanceFields = fields.stream().filter(f -> !Modifier.isStatic(f.getModifiers())).collect(Collectors.toList());
         if (Reflector.constructor(clazz).isPresent()) {
-            return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream().map(rs -> instanceFields.stream()
-                    .collect(() -> Reflector.instance(clazz), Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
+            return select(targetColumns).from(clazz).stream().map(rs -> instanceFields.stream().collect(() -> Reflector.instance(clazz),
+                    Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                     }));
         } else {
-            return select(targetColumns).from(Reflector.mappingClassName(clazz)).stream()
+            return select(targetColumns).from(clazz).stream()
                     .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz),
                             Try.biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                             }).get());
         }
+    }
+
+    /**
+     * @param <T> Model class type
+     * @param clazz Model class
+     * @param key Key column name
+     * @param value Primary key
+     * @param columns Column to read
+     * @return Model
+     */
+    public <T> Stream<T> findBy(Class<T> clazz, String key, Object value, String... columns) {
+        return select(columns.length > 0 ? columns : Tool.array("*")).from(clazz).where(key, value).stream().map(Try.f(Db.toObject(clazz)));
     }
 
     /**
@@ -2146,14 +2191,14 @@ public class Db implements AutoCloseable {
      * @return object
      */
     public static <T> TryFunction<ResultSet, T> toObject(Class<T> clazz) {
-        Map<String, Field> map = Reflector.fields(clazz);
+        Map<String, Field> map = Reflector.mappingFields(clazz);
         return rs -> {
-            T object = Reflector.instance(clazz);
             ResultSetMetaData meta = rs.getMetaData();
-            IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName)).forEach(name -> {
-                Tool.of(map.get(name)).ifPresent(Try.c(field -> field.set(object, resultSetToObject(field, rs, name))));
-            });
-            return object;
+            return IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName))
+                    .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), (b, c) -> Tool.val(Tool.getIgnoreCase(map, c.toLowerCase()),
+                            Try.f(field -> b.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))), (a, b) -> {
+                            })
+                    .get();
         };
     }
 
@@ -2188,9 +2233,12 @@ public class Db implements AutoCloseable {
             } else {
                 optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
-        }
-        if (type == LocalDate.class) {
+        } else if (type == LocalDate.class) {
             optional = Tool.val(rs.getDate(name), v -> Tool.of(v).map(java.sql.Date::toLocalDate));
+        } else if (type == LocalTime.class) {
+            optional = Tool.val(rs.getTime(name), v -> Tool.of(v).map(java.sql.Time::toLocalTime));
+        } else if (type == LocalDateTime.class) {
+            optional = Tool.val(rs.getTimestamp(name), v -> Tool.of(v).map(java.sql.Timestamp::toLocalDateTime));
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
         return isOptional ? Tool.of(value) : value;
@@ -2266,8 +2314,11 @@ public class Db implements AutoCloseable {
                 if (keys.contains(mappingName)) {
                     continue;
                 }
+                Object value = Try.f(field::get).apply(model);
+                if (value != Optional.empty()) {
                 names.add(mappingName);
-                values.add(Try.s(() -> field.get(model)).get());
+                    values.add(value);
+                }
             }
         }
         return action.apply(Reflector.mappingClassName(model), names.toArray(new String[names.size()]), keys.size(), values.toArray());

@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import app.config.Sys;
 import app.model.Account;
+import framework.annotation.Only.Administrator;
 
 /**
  * session scoped object
@@ -62,6 +63,13 @@ public abstract class Session implements Attributes<Serializable> {
      */
     public boolean isLoggedIn() {
         return getAttr(sessionKey).isPresent();
+    }
+    
+    /**
+     * @return True if Administrator
+     */
+    public boolean isAdmin() {
+        return getAccount().hasAnyRole(Administrator.class);
     }
 
     /**

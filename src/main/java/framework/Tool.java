@@ -66,6 +66,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -74,6 +75,7 @@ import java.util.jar.JarFile;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.BaseStream;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -98,6 +100,8 @@ import javax.xml.bind.DatatypeConverter;
 
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.Try.BiIntFunction;
+import framework.Try.ObjIntFunction;
 import framework.Try.TryFunction;
 import framework.Try.TrySupplier;
 import framework.Try.TryTriConsumer;
@@ -1425,6 +1429,32 @@ public class Tool {
     }
 
     /**
+     * InputStream to bytes
+     *
+     * @param in input
+     * @return bytes
+     */
+    public static byte[] loadBytes(InputStream in) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        try {
+            for (;;) {
+                int n;
+                n = in.read(buffer);
+                if (n < 0) {
+                    break;
+                }
+                out.write(buffer, 0, n);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } finally {
+            Try.r(in::close).run();
+        }
+        return out.toByteArray();
+    }
+
+    /**
      * @param in input
      * @return lines
      */
@@ -2075,6 +2105,27 @@ public class Tool {
     }
 
     /**
+     * @param <T> Object type
+     * @param <R> Result type
+     * @param function ObjIntFunction
+     * @return Function
+     */
+    public static <T, R> Function<T, R> withIndexF(ObjIntFunction<T, R> function) {
+        AtomicInteger n = new AtomicInteger(-1);
+        return obj -> function.apply(obj, n.incrementAndGet());
+    }
+
+    /**
+     * @param <R> Result type
+     * @param function BiIntFunction
+     * @return IntFunction
+     */
+    public static <R> IntFunction<R> withIndexIntF(BiIntFunction<R> function) {
+        AtomicInteger n = new AtomicInteger(-1);
+        return obj -> function.apply(obj, n.incrementAndGet());
+    }
+
+    /**
      * @param <T> value type
      * @param <R> return type
      * @param value value
@@ -2641,6 +2692,80 @@ public class Tool {
     }
 
     /**
+     * Create option tags
+     * 
+     * @param value Initial value
+     * @param items Items(value: display)
+     * @return Option tags
+     */
+    public static String options(Object value, Object items) {
+        StringBuilder s = new StringBuilder();
+        String valueText = String.valueOf(value);
+        Iterator<?> iterator;
+        if(items instanceof BaseStream) {
+            iterator = ((BaseStream<?,?>)items).iterator();
+        } else if(items instanceof Iterable) {
+            iterator = ((Iterable<?>)items).iterator();
+        } else {
+            iterator = Reflector.invoke(items, "iterator", array());
+        }
+        iterator.forEachRemaining(i -> s.append("<option value=\"" + htmlEscape(((Map.Entry<?, ?>) i).getKey())
+                + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" selected=\"selected" : "") + "\">"
+                + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</option>"));
+        return s.toString();
+    }
+
+    /**
+     * Create check tags
+     * 
+     * @param name Name
+     * @param value Initial value
+     * @param items Items(value: display)
+     * @return check tags
+     */
+    public static String checks(String name, Object value, Object items) {
+        StringBuilder s = new StringBuilder();
+        String valueText = String.valueOf(value);
+        Iterator<?> iterator;
+        if(items instanceof BaseStream) {
+            iterator = ((BaseStream<?,?>)items).iterator();
+        } else if(items instanceof Iterable) {
+            iterator = ((Iterable<?>)items).iterator();
+        } else {
+            iterator = Reflector.invoke(items, "iterator", array());
+        }
+        iterator.forEachRemaining(i -> s.append("<label class=\"checkbox\"><input type=\"checkbox\" name=\"" + name + "\" value=\""
+                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" checked=\"checked" : "")
+                + "\">" + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</label>"));
+        return s.toString();
+    }
+
+    /**
+     * Create radio tags
+     * 
+     * @param name Name
+     * @param value Initial value
+     * @param items Items(value: display)
+     * @return radio tags
+     */
+    public static String radios(String name, Object value, Object items) {
+        StringBuilder s = new StringBuilder();
+        String valueText = String.valueOf(value);
+        Iterator<?> iterator;
+        if(items instanceof BaseStream) {
+            iterator = ((BaseStream<?,?>)items).iterator();
+        } else if(items instanceof Iterable) {
+            iterator = ((Iterable<?>)items).iterator();
+        } else {
+            iterator = Reflector.invoke(items, "iterator", array());
+        }
+        iterator.forEachRemaining(i -> s.append("<label class=\"radio\"><input type=\"radio\" name=\"" + name + "\" value=\""
+                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" checked=\"checked" : "")
+                + "\">" + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</label>"));
+        return s.toString();
+    }
+
+    /**
      * test
      *
      * @param args text
@@ -2674,5 +2799,15 @@ public class Tool {
         // Log.info(Session.currentLocale().toString());
         // Log.info(camelToSnake("LoginURL"));
         System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
+    }
+
+    /**
+     * @param <T> Value type
+     * @param map Map
+     * @param key Key
+     * @return Value
+     */
+    public static <T> T getIgnoreCase(Map<String, T> map, String key) {
+        return map.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(key)).findFirst().map(Map.Entry::getValue).orElse(null);
     }
 }

@@ -233,6 +233,9 @@ public class Sys {
     @Help("Request method change parameter key")
     public static String request_method_key = "_method";
 
+    @Help("Background css")
+    public static String background = "#23282d";
+
     public enum Item implements Message {
         title,
         login,
@@ -272,7 +275,8 @@ public class Sys {
         no,
         @Mapping("OK")
         ok,
-        route,;
+        route,
+        file;
 
         @Override
         public String toString() {

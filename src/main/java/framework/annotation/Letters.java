@@ -107,7 +107,7 @@ public @interface Letters {
 
         @Override
         protected void validate(String name, String value, framework.AbstractValidator.ErrorAppender appender) {
-            if (value.chars().anyMatch(c -> annotation.value().indexOf(c) < 0)) {
+            if (value != null && value.chars().anyMatch(c -> annotation.value().indexOf(c) < 0)) {
                 appender.addError(name, value, annotation.message(), "value", annotation.value(), "deny", annotation.deny());
             }
         }

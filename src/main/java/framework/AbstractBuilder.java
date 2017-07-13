@@ -95,7 +95,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
             Meta<VALUE, NAMES> m = new Meta<>();
             m.clazz = (Class<VALUE>) types[0];
             m.names = ((Class<NAMES>) types[2]).getEnumConstants();
-            m.fields = Stream.of(m.names).map(name -> Reflector.field(m.clazz, name.name()).orElseThrow(IllegalArgumentException::new)).toArray(Field[]::new);
+            m.fields = Stream.of(m.names).map(name -> Reflector.field(m.clazz, name.name()).<IllegalArgumentException>orElseThrow(IllegalArgumentException::new)).toArray(Field[]::new);
             m.constructor = (Constructor<VALUE>) Reflector.constructor(m.clazz, Stream.of(m.fields).map(Field::getType).toArray(Class[]::new))
                     .orElseThrow(IllegalArgumentException::new);
             return (Meta<?, Enum<?>>) m;
@@ -217,7 +217,7 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
             if (validator != null) {
                 validator.run();
             }
-            IntFunction<Object> convert = i -> converters[i] == null ? values[i] : converters[i].apply(values[i]);
+            IntFunction<Object> convert = i -> converters[i] == null ? (values[i] == null && meta.fields[i].getType() == int.class ? 0 : values[i]) : converters[i].apply(values[i]);
             return meta.constructor.newInstance(IntStream.range(0, values.length).mapToObj(convert).toArray());
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | SecurityException e) {
             throw new RuntimeException(e);

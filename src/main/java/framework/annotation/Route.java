@@ -18,6 +18,11 @@ public @interface Route {
     String value() default "";
 
     /**
+     * @return Priority
+     */
+    int priority() default 0;
+
+    /**
      * @return Allowed method(not check if empty)
      */
     Method[] method() default {};

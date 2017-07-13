@@ -3,10 +3,17 @@
 <head>
   <meta charset="utf-8">
   <title>{Sys.Item.title}${V.stream().reduce('', (l, r) -> l += ' > ' += r)}</title>
+  <link rel="stylesheet" href="${P}css/default.min.css" type="text/css" media="all"/>
+  <link rel="stylesheet" href="${P}css/default.date.min.css" type="text/css" media="all"/>
+  <link rel="stylesheet" href="${P}css/default.time.min.css" type="text/css" media="all"/>
   <link rel="stylesheet" href="${P}css/common.css" type="text/css" media="all"/>
   <link rel="stylesheet" href="${P}css/${R.name}.css" type="text/css" media="all"/>
   <script src="${P}js/jquery.min.js"></script>
-  <script src="${P}js/tablescroll.js"></script>
+  <script src="${P}js/picker.min.js"></script>
+  <script src="${P}js/picker.date.min.js"></script>
+  <script src="${P}js/picker.time.min.js"></script>
+  <script src="${P}js/legacy.min.js"></script>
+  <script src="${P}js/tablescroll.min.js"></script>
   <script src="${P}js/common.js"></script>
   <script src="${P}js/${R.name}.js"></script>
 </head>
