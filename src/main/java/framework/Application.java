@@ -244,7 +244,19 @@ public abstract class Application implements Attributes<Object> {
      * shutdown
      */
     void shutdown() {
-        Job.Scheduler.eventMap.get(Job.OnApplicationEnd).forEach(Reflector::invoke);
+        try (Lazy<Db> db = new Lazy<>(Db::connect)) {
+            Job.Scheduler.eventMap.get(Job.OnApplicationEnd).forEach(method -> {
+                Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
+                    if (Application.class.isAssignableFrom(type)) {
+                        return this;
+                    }
+                    if (Db.class.isAssignableFrom(type)) {
+                        return db.get();
+                    }
+                    return null;
+                }).toArray());
+            });
+        }
         Collections.reverse(shutdowns);
         shutdowns.forEach(action -> action.run());
     }
