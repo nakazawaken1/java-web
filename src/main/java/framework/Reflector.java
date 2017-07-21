@@ -6,6 +6,7 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -337,6 +338,17 @@ public class Reflector {
         }
         return orElse.get();
     }
+    
+    /**
+     * @param <T> Return type
+     * @param method Method
+     * @param args Arguments
+     * @return Return value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(Method method, Object... args) {
+        return (T)Try.s(() -> method.invoke(Modifier.isStatic(method.getModifiers()) ? null : method.getDeclaringClass().newInstance(), args)).get();
+    }
 
     /**
      * Static method invoke
@@ -345,7 +357,7 @@ public class Reflector {
      * @param methodFullName Full method name
      * @param argClasses Argument classes
      * @param args Arguments
-     * @return return Value
+     * @return Return value
      */
     @SuppressWarnings("unchecked")
     public static <T> T invoke(String methodFullName, Class<?>[] argClasses, Object... args) {
@@ -361,7 +373,7 @@ public class Reflector {
      * @param name Method name
      * @param argClasses Argument classes
      * @param args Arguments
-     * @return return Value
+     * @return Return value
      */
     @SuppressWarnings("unchecked")
     public static <T> T invoke(Object instance, String name, Class<?>[] argClasses, Object... args) {
@@ -396,14 +408,5 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static void chagneAnnotation(Executable executable, Class<? extends Annotation> annotation, Annotation value) {
         method(Executable.class, "declaredAnnotations").map(Try.f(m -> Map.class.cast(m.invoke(executable)))).ifPresent(map -> map.put(annotation, value));
-    }
-
-    /**
-     * @param parameter Parameter
-     * @return Generic parameters
-     */
-    public static Type[] getGenericParameters(Parameter parameter) {
-        return Tool.of(parameter.getParameterizedType()).filter(i -> i instanceof ParameterizedType).map(i -> (ParameterizedType) i)
-                .map(ParameterizedType::getActualTypeArguments).orElseGet(Tool::array);
     }
 }

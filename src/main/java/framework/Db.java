@@ -395,6 +395,7 @@ public class Db implements AutoCloseable {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
             Properties p = Config.Injector.getSource(Sys.class, Session.currentLocale());
             String url = p.getProperty("Sys.Db." + key);
+            Log.info("Database connect to " + url);
             Type type = Type.fromUrl(url);
             String name = Tool.string(p.getProperty("Sys.Db.datasource_class." + key)).orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
@@ -1397,7 +1398,7 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String replace(String sql) {
-            return sql;
+            return sql.replace("BIGINT", "NUMBER(19, 0)").replace("VARCHAR(", "VARCHAR2(").replace(" DEFAULT '' NOT NULL", "");
         }
     }
 

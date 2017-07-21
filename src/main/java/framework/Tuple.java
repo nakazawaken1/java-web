@@ -1,5 +1,6 @@
 package framework;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -79,6 +80,19 @@ public class Tuple<L, R> implements Map.Entry<L, R> {
     @Override
     public String toString() {
         return Objects.toString(l) + (r == null ? "" : ", " + Objects.toString(r));
+    }
+
+    /**
+     * @return List
+     */
+    public List<Object> toList() {
+        List<Object> list = Tool.list(l);
+        if (r instanceof Tuple) {
+            list.addAll(((Tuple<?, ?>) r).toList());
+        } else if (r != null) {
+            list.add(r);
+        }
+        return list;
     }
 
     /**

@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.DriverManager;
@@ -188,10 +189,10 @@ public abstract class Application implements Attributes<Object> {
                 lines.add("webPort=" + port);
                 lines.add("webSSL=" + Sys.h2_web_ssl);
                 AtomicInteger index = new AtomicInteger(-1);
-                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()), properties -> properties.stringPropertyNames().stream()
-                        .sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
-                        .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:"))
-                        .<String>map(t -> index.incrementAndGet() + "=" + t.l + "|" + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
+                Tool.val(Config.Injector.getSource(Sys.class, Session.currentLocale()),
+                        properties -> properties.stringPropertyNames().stream().sorted(String::compareTo).map(p -> Tuple.of(p, properties.getProperty(p)))
+                                .filter(t -> t.l.startsWith("Sys.Db") && t.r.startsWith("jdbc:")).<String>map(t -> index.incrementAndGet() + "=" + t.l + "|"
+                                        + Db.Type.fromUrl(t.r).driver + "|" + t.r.replace(":", "\\:").replace("=", "\\=")))
                         .forEach(lines::add);
                 Files.write(config.toPath(), lines, StandardCharsets.UTF_8);
                 config.deleteOnExit();
@@ -224,12 +225,26 @@ public abstract class Application implements Attributes<Object> {
             }
         });
         Job.Scheduler.setup(cs.toArray(new Class<?>[cs.size()]));
+        try (Lazy<Db> db = new Lazy<>(Db::connect)) {
+            Job.Scheduler.eventMap.get(Job.OnApplicationStart).forEach(method -> {
+                Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
+                    if (Application.class.isAssignableFrom(type)) {
+                        return this;
+                    }
+                    if (Db.class.isAssignableFrom(type)) {
+                        return db.get();
+                    }
+                    return null;
+                }).toArray());
+            });
+        }
     }
 
     /**
      * shutdown
      */
     void shutdown() {
+        Job.Scheduler.eventMap.get(Job.OnApplicationEnd).forEach(Reflector::invoke);
         Collections.reverse(shutdowns);
         shutdowns.forEach(action -> action.run());
     }
@@ -256,7 +271,8 @@ public abstract class Application implements Attributes<Object> {
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
         final Tuple<Class<?>, Method> pair = routing.entrySet().stream().filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))
                 .map(e -> Tuple.of(e.getKey().r.l.matcher(path), e.getKey().r.r, e.getValue())).filter(p -> p.l.matches())
-                .sorted(Comparator.comparing(c -> c.getValue().getValue().getValue().getAnnotation(Route.class).priority(), Comparator.reverseOrder())).findFirst().map(p -> {
+                .sorted(Comparator.comparing(c -> c.getValue().getValue().getValue().getAnnotation(Route.class).priority(), Comparator.reverseOrder()))
+                .findFirst().map(p -> {
                     Reflector.<Map<String, Integer>>invoke(p.l.pattern(), "namedGroups", Tool.array())
                             .forEach((k, v) -> Tool.setValue(parameters, p.r.l.getOrDefault(k, k), p.l.group(v)));
                     return p.r.r;
@@ -349,5 +365,26 @@ public abstract class Application implements Attributes<Object> {
 
         /* static file */
         Response.file(path).flush();
+    }
+
+    /**
+     * @param seirekiYear Seireki year
+     * @return wareki year
+     */
+    @SuppressWarnings("unchecked")
+    public int toWareki(int seirekiYear) {
+        for (Tuple3<Integer, String, String> i : (List<Tuple3<Integer, String, String>>) computeIfAbsent("gengoList", k -> {
+            try (Db db = Db.connect()) {
+                return db.select("G.START_AT", "C.VALUE", "G.ALPHABET").from("M_GENGO G INNER JOIN M_CODE C ON C.CODE_ID = G.GENGO_CODE")
+                        .orderByDesc("G.START_AT").stream()
+                        .map(Try.f(rs -> Tuple.of(rs.getInt("START_AT") / 10000 - 1, rs.getString("VALUE"), rs.getString("ALPHABET"))))
+                        .collect(Collectors.toList());
+            }
+        })) {
+            if (seirekiYear > i.l) {
+                return seirekiYear - i.l;
+            }
+        }
+        return seirekiYear;
     }
 }

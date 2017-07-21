@@ -38,6 +38,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoField;
@@ -392,6 +394,10 @@ public class Tool {
             }
             final Set<Object> cache = first ? new HashSet<>() : hashes[0];
             Class<?> c = o.getClass();
+            if (o instanceof Tuple) {
+                traverse(((Tuple<?, ?>) o).toList(), traverser, cache);
+                break;
+            }
             if (o instanceof Iterable) {
                 traverser.start(c);
                 for (Object i : (Iterable<?>) o) {
@@ -2702,10 +2708,10 @@ public class Tool {
         StringBuilder s = new StringBuilder();
         String valueText = String.valueOf(value);
         Iterator<?> iterator;
-        if(items instanceof BaseStream) {
-            iterator = ((BaseStream<?,?>)items).iterator();
-        } else if(items instanceof Iterable) {
-            iterator = ((Iterable<?>)items).iterator();
+        if (items instanceof BaseStream) {
+            iterator = ((BaseStream<?, ?>) items).iterator();
+        } else if (items instanceof Iterable) {
+            iterator = ((Iterable<?>) items).iterator();
         } else {
             iterator = Reflector.invoke(items, "iterator", array());
         }
@@ -2727,10 +2733,10 @@ public class Tool {
         StringBuilder s = new StringBuilder();
         String valueText = String.valueOf(value);
         Iterator<?> iterator;
-        if(items instanceof BaseStream) {
-            iterator = ((BaseStream<?,?>)items).iterator();
-        } else if(items instanceof Iterable) {
-            iterator = ((Iterable<?>)items).iterator();
+        if (items instanceof BaseStream) {
+            iterator = ((BaseStream<?, ?>) items).iterator();
+        } else if (items instanceof Iterable) {
+            iterator = ((Iterable<?>) items).iterator();
         } else {
             iterator = Reflector.invoke(items, "iterator", array());
         }
@@ -2752,10 +2758,10 @@ public class Tool {
         StringBuilder s = new StringBuilder();
         String valueText = String.valueOf(value);
         Iterator<?> iterator;
-        if(items instanceof BaseStream) {
-            iterator = ((BaseStream<?,?>)items).iterator();
-        } else if(items instanceof Iterable) {
-            iterator = ((Iterable<?>)items).iterator();
+        if (items instanceof BaseStream) {
+            iterator = ((BaseStream<?, ?>) items).iterator();
+        } else if (items instanceof Iterable) {
+            iterator = ((Iterable<?>) items).iterator();
         } else {
             iterator = Reflector.invoke(items, "iterator", array());
         }
@@ -2809,5 +2815,29 @@ public class Tool {
      */
     public static <T> T getIgnoreCase(Map<String, T> map, String key) {
         return map.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(key)).findFirst().map(Map.Entry::getValue).orElse(null);
+    }
+
+    /**
+     * @return Current datetime
+     */
+    public static String now() {
+        return uuuuMMddHHmmss.format(LocalDateTime.now());
+    }
+
+    /**
+     * @return Current nendo
+     */
+    public static int nendo() {
+        LocalDate d = LocalDate.now();
+        return d.getMonthValue() < Sys.nendo_start_month ? d.getYear() - 1 : d.getYear();
+    }
+
+    /**
+     * @param year Year
+     * @param month Month
+     * @return Nendo
+     */
+    public static int nendo(int year, int month) {
+        return month < Sys.nendo_start_month ? year - 1 : year;
     }
 }

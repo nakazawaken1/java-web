@@ -13,6 +13,9 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -50,15 +53,35 @@ public @interface Job {
      * @return schedule
      */
     String value();
+    
+    /**
+     * Job on application start
+     */
+    static String OnApplicationStart = "OnApplicationStart";
+    
+    /**
+     * Job on application end
+     */
+    static String OnApplicationEnd = "OnApplicationEnd";
+    
+    /**
+     * Events
+     */
+    static List<String> events = Tool.list(OnApplicationStart, OnApplicationEnd);
 
     /**
-     * job scheduler
+     * Job scheduler
      */
     public static class Scheduler {
         /**
-         * scheduler
+         * Scheduler
          */
         static final AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>();
+        
+        /**
+         * Event map
+         */
+        public static final Map<String, List<Method>> eventMap = new HashMap<>();
 
         /**
          * setup
@@ -71,7 +94,12 @@ public @interface Job {
                 Stream.of(c.getDeclaredMethods()).map(method -> Tuple.of(method, method.getAnnotation(Job.class))).filter(pair -> pair.r != null)
                         .forEach(pair -> {
                             Method method = pair.l;
-                            Stream.of(pair.r.value().split("\\s*,\\s*")).filter(Tool.notEmpty)
+                            String value = pair.r.value();
+                            if(events.contains(value)) {
+                                eventMap.computeIfAbsent(value, k -> Tool.list()).add(method);
+                                return;
+                            }
+                            Stream.of(value.split("\\s*,\\s*")).filter(Tool.notEmpty)
                                     .<String>map(
                                             j -> j.startsWith("job.") ? Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty(j, "") : j)
                                     .filter(Tool.notEmpty).forEach(text -> {

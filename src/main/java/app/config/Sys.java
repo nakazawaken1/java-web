@@ -236,6 +236,9 @@ public class Sys {
     @Help("Background css")
     public static String background = "#23282d";
 
+    @Help("Nendo start month")
+    public static int nendo_start_month = 4;
+
     public enum Item implements Message {
         title,
         login,
