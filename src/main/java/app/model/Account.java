@@ -32,7 +32,7 @@ public class Account implements Serializable {
     /**
      * user for not login
      */
-    public static final Account GUEST = new Account("guest", "guest", Tool.array(), null);
+    public static final Account GUEST = new Account("guest", "所属 職員番号 氏名", Tool.array(), null);
 
     /**
      * id

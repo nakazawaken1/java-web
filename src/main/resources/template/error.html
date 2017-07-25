@@ -1,4 +1,4 @@
-#{F:includeV('template/simple_header.html', V)}
-#{F:includeV('template/' += (S.isLoggedIn ? 'logged_in.html' : 'not_logged_in.html'), V)} 
+#{F:includeV('template/admin/simple_header.html', V)}
+#{F:includeV('template/admin/' += (S.isLoggedIn ? 'logged_in.html' : 'not_logged_in.html'), V)} 
 <div class="margin-top-huge text-center" data-load="${P}alert"></div>
-#{F:include('template/footer.html')}
+#{F:include('template/admin/footer.html')}

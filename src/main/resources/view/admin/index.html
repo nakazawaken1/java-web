@@ -1,4 +1,4 @@
-#{F:includeV('template/header.html', [Sys.Item.adminTitle])}
+#{F:includeV('template/admin/header.html', [Sys.Item.adminTitle])}
 <style type="text/css">
 #menu {
   margin: 20px auto;
@@ -21,4 +21,4 @@
 <!--{Sys.h2_port.map(i -> '<li><a href="db" target="_blank">' += Sys.Item.dbConsole += '</a></li>').orElse('')}-->
 <li>{Sys.Item.accountList}(<a href="accounts.txt">Text</a>, <a href="accounts.csv">CSV</a>, <a href="accounts.xml">XML</a>, <a href="accounts.json">JSON</a>, <a href="accounts.tsv">TSV</a>)</li>
 </ul>
-#{F:include('template/footer.html')}
+#{F:include('template/admin/footer.html')}
