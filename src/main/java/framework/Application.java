@@ -6,7 +6,6 @@ import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.DriverManager;
@@ -225,38 +224,14 @@ public abstract class Application implements Attributes<Object> {
             }
         });
         Job.Scheduler.setup(cs.toArray(new Class<?>[cs.size()]));
-        try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-            Job.Scheduler.eventMap.get(Job.OnApplicationStart).forEach(method -> {
-                Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
-                    if (Application.class.isAssignableFrom(type)) {
-                        return this;
-                    }
-                    if (Db.class.isAssignableFrom(type)) {
-                        return db.get();
-                    }
-                    return null;
-                }).toArray());
-            });
-        }
+        Job.Scheduler.trigger(Job.OnApplicationStart);
     }
 
     /**
      * shutdown
      */
     void shutdown() {
-        try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-            Job.Scheduler.eventMap.get(Job.OnApplicationEnd).forEach(method -> {
-                Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
-                    if (Application.class.isAssignableFrom(type)) {
-                        return this;
-                    }
-                    if (Db.class.isAssignableFrom(type)) {
-                        return db.get();
-                    }
-                    return null;
-                }).toArray());
-            });
-        }
+        Job.Scheduler.trigger(Job.OnApplicationEnd);
         Collections.reverse(shutdowns);
         shutdowns.forEach(action -> action.run());
     }

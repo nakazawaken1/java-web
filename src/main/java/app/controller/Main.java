@@ -10,7 +10,6 @@ import framework.Tool;
 import framework.annotation.Letters;
 import framework.annotation.Required;
 import framework.annotation.Route;
-import framework.annotation.Route.Method;
 import framework.annotation.Size;
 
 /**
@@ -26,7 +25,7 @@ public class Main {
      * @param password Password
      * @return Response
      */
-    @Route(value = "login(?<extension>\\.json|)", method = Method.POST)
+    @Route(value = "login(?<extension>\\.json|)")
     Object login(Application application, Session session, String extension,
             @Required @Size(min = 4, value = 20) @Letters(Letters.ASCII) Optional<String> loginId, @Letters(Letters.ASCII) Optional<String> password) {
         boolean isJson = ".json".equals(extension);

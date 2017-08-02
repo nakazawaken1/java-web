@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import app.config.Sys;
 import app.model.Account;
+import framework.annotation.Job;
 import framework.annotation.Only.Administrator;
 
 /**
@@ -85,6 +86,7 @@ public abstract class Session implements Attributes<Serializable> {
                 }).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
+            Job.Scheduler.trigger(Job.OnLoggedIn);
             Log.info("logged in : " + loginId + Arrays.toString(i.roles));
         }, () -> Log.info("login failed: " + loginId));
     }
@@ -94,7 +96,9 @@ public abstract class Session implements Attributes<Serializable> {
      */
     public String logout() {
         String result = getAccount().id;
+        Job.Scheduler.trigger(Job.OnLoggedOut);
         clear();
+        Log.info("logged out : " + result);
         return result;
     }
 }

@@ -7,11 +7,13 @@ import java.lang.annotation.Target;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -23,10 +25,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import app.config.Sys;
+import framework.Application;
 import framework.Db;
 import framework.Lazy;
 import framework.Log;
 import framework.Reflector;
+import framework.Request;
 import framework.Session;
 import framework.Tool;
 import framework.Tuple;
@@ -53,21 +57,31 @@ public @interface Job {
      * @return schedule
      */
     String value();
-    
+
     /**
      * Job on application start
      */
     static String OnApplicationStart = "OnApplicationStart";
-    
+
     /**
      * Job on application end
      */
     static String OnApplicationEnd = "OnApplicationEnd";
-    
+
+    /**
+     * Job on logged in
+     */
+    static String OnLoggedIn = "OnLoggedIn";
+
+    /**
+     * Job on logged out
+     */
+    static String OnLoggedOut = "OnLoggedOut";
+
     /**
      * Events
      */
-    static List<String> events = Tool.list(OnApplicationStart, OnApplicationEnd);
+    static List<String> events = Tool.list(OnApplicationStart, OnApplicationEnd, OnLoggedIn, OnLoggedOut);
 
     /**
      * Job scheduler
@@ -77,7 +91,7 @@ public @interface Job {
          * Scheduler
          */
         static final AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>();
-        
+
         /**
          * Event map
          */
@@ -164,6 +178,31 @@ public @interface Job {
          */
         public static void shutdown() {
             Tool.of(scheduler.get()).ifPresent(ScheduledExecutorService::shutdown);
+        }
+
+        /**
+         * @param event Event
+         */
+        public static void trigger(String event) {
+            try (Lazy<Db> db = new Lazy<>(Db::connect)) {
+                eventMap.getOrDefault(event, Collections.emptyList()).forEach(method -> {
+                    Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
+                        if (Application.class.isAssignableFrom(type)) {
+                            return Application.current().orElse(null);
+                        }
+                        if (Session.class.isAssignableFrom(type)) {
+                            return Session.current().orElse(null);
+                        }
+                        if (Request.class.isAssignableFrom(type)) {
+                            return Request.current().orElse(null);
+                        }
+                        if (Db.class.isAssignableFrom(type)) {
+                            return db.get();
+                        }
+                        return null;
+                    }).toArray());
+                });
+            }
         }
     }
 }
