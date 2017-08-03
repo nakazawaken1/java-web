@@ -362,9 +362,9 @@ public abstract class Application implements Attributes<Object> {
     public int toWareki(int seirekiYear) {
         for (Tuple3<Integer, String, String> i : (List<Tuple3<Integer, String, String>>) computeIfAbsent("gengoList", k -> {
             try (Db db = Db.connect()) {
-                return db.select("G.START_AT", "C.VALUE", "G.ALPHABET").from("M_GENGO G INNER JOIN M_CODE C ON C.CODE_ID = G.GENGO_CODE")
-                        .orderByDesc("G.START_AT").stream()
-                        .map(Try.f(rs -> Tuple.of(rs.getInt("START_AT") / 10000 - 1, rs.getString("VALUE"), rs.getString("ALPHABET"))))
+                return db.select("JOHO2", "VALUE", "JOHO1").from("M_CODE").where("PARENT_ID IN(SELECT CODE_ID FROM M_CODE WHERE PARENT_ID = 0 AND NAME = 'GENGO')")
+                        .orderByDesc("JOHO2").stream()
+                        .map(Try.f(rs -> Tuple.of(Tool.integer(rs.getString("JOHO2")).orElse(0) / 10000 - 1, rs.getString("VALUE"), rs.getString("JOHO1"))))
                         .collect(Collectors.toList());
             }
         })) {
