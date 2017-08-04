@@ -134,8 +134,12 @@ public class Tool {
      * @return url
      */
     public static Optional<URL> toURL(String... relativePath) {
-        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
-        return Tool.of(Thread.currentThread().getContextClassLoader().getResource(path));
+        String path = Stream.of(relativePath)
+            .map(i -> Tool.trim("/", i.replace('\\', '/'), "/"))
+            .collect(Collectors.joining("/"));
+        return Tool.of(Thread.currentThread()
+            .getContextClassLoader()
+            .getResource(path));
     }
 
     /**
@@ -143,8 +147,12 @@ public class Tool {
      * @return url
      */
     public static Stream<URL> toURLs(String... relativePath) {
-        String path = Stream.of(relativePath).map(i -> Tool.trim("/", i.replace('\\', '/'), "/")).collect(Collectors.joining("/"));
-        return Tool.stream(Try.f(Thread.currentThread().getContextClassLoader()::getResources).apply(path));
+        String path = Stream.of(relativePath)
+            .map(i -> Tool.trim("/", i.replace('\\', '/'), "/"))
+            .collect(Collectors.joining("/"));
+        return Tool.stream(Try.f(Thread.currentThread()
+            .getContextClassLoader()::getResources)
+            .apply(path));
     }
 
     /**
@@ -158,7 +166,8 @@ public class Tool {
         try {
             if ("jar".equals(url.getProtocol())) {
                 JarURLConnection c = (JarURLConnection) url.openConnection();
-                return using(() -> c.getJarFile().getInputStream(c.getJarEntry()), in -> in == null);
+                return using(() -> c.getJarFile()
+                    .getInputStream(c.getJarEntry()), in -> in == null);
             } else {
                 return new File(url.toURI()).isDirectory();
             }
@@ -174,7 +183,8 @@ public class Tool {
      * @return wrote text
      */
     public static String print(Consumer<PrintStream> action) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream(); PrintStream ps = new PrintStream(out, false, StandardCharsets.UTF_8.name())) {
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+             PrintStream ps = new PrintStream(out, false, StandardCharsets.UTF_8.name())) {
             action.accept(ps);
             return out.toString(StandardCharsets.UTF_8.name());
         } catch (IOException e) {
@@ -429,7 +439,10 @@ public class Tool {
                 traverser.end(c);
                 break;
             }
-            if (Reflector.method(c, "toString").map(Method::getDeclaringClass).filter(i -> i != Object.class).isPresent()) {
+            if (Reflector.method(c, "toString")
+                .map(Method::getDeclaringClass)
+                .filter(i -> i != Object.class)
+                .isPresent()) {
                 traverser.value(o.toString(), c, isString(o));
                 break;
             }
@@ -439,38 +452,44 @@ public class Tool {
             }
             traverser.start(c);
             Object object = o;
-            Stream.of(c.getDeclaredFields()).filter(f -> Tool.val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m))).forEach(field -> {
-                try {
-                    field.setAccessible(true);
-                    Object value = field.get(object);
-                    boolean isOptional = value instanceof Optional;
-                    if (isOptional && value == Optional.empty() && traverser.isCompact()) {
-                        return;
-                    }
-                    traverser.key(Tool.of(field.getAnnotation(Help.class)).map(help -> help.value()[0]).orElse(field.getName()));
-                    if (value != null) {
-                        Stringer stringer = field.getAnnotation(Stringer.class);
-                        if (stringer != null) {
-                            Stringer.FromTo<Object> ft = (Stringer.FromTo<Object>) Reflector.instance(stringer.value());
-                            ft.toString(value, traverser);
-                        } else if (!isOptional
-                                && Reflector.method(value.getClass(), "toString").map(Method::getDeclaringClass).filter(i -> i != Object.class).isPresent()) {
-                            traverser.value(value.toString(), c, isString(value));
+            Stream.of(c.getDeclaredFields())
+                .filter(f -> Tool.val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m)))
+                .forEach(field -> {
+                    try {
+                        field.setAccessible(true);
+                        Object value = field.get(object);
+                        boolean isOptional = value instanceof Optional;
+                        if (isOptional && value == Optional.empty() && traverser.isCompact()) {
                             return;
-                        } else {
-                            if (isOptional) {
-                                value = ((Optional<Object>) value).orElse("");
-                            }
-                            traverse(value, traverser, cache);
-                            cache.add(value);
                         }
-                    } else {
-                        traverser.value(null, c, false);
+                        traverser.key(Tool.of(field.getAnnotation(Help.class))
+                            .map(help -> help.value()[0])
+                            .orElse(field.getName()));
+                        if (value != null) {
+                            Stringer stringer = field.getAnnotation(Stringer.class);
+                            if (stringer != null) {
+                                Stringer.FromTo<Object> ft = (Stringer.FromTo<Object>) Reflector.instance(stringer.value());
+                                ft.toString(value, traverser);
+                            } else if (!isOptional && Reflector.method(value.getClass(), "toString")
+                                .map(Method::getDeclaringClass)
+                                .filter(i -> i != Object.class)
+                                .isPresent()) {
+                                traverser.value(value.toString(), c, isString(value));
+                                return;
+                            } else {
+                                if (isOptional) {
+                                    value = ((Optional<Object>) value).orElse("");
+                                }
+                                traverse(value, traverser, cache);
+                                cache.add(value);
+                            }
+                        } else {
+                            traverser.value(null, c, false);
+                        }
+                    } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
+                        throw new InternalError(e);
                     }
-                } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
-                    throw new InternalError(e);
-                }
-            });
+                });
             traverser.end(c);
         } while (false);
         return first ? traverser.get() : null;
@@ -579,7 +598,9 @@ public class Tool {
          */
         void trim() {
             int length = buffer.length();
-            if (buffer.subSequence(length - suffixLength, length).toString().equals(suffix)) {
+            if (buffer.subSequence(length - suffixLength, length)
+                .toString()
+                .equals(suffix)) {
                 buffer.setLength(length - suffixLength);
             }
         }
@@ -589,7 +610,8 @@ public class Tool {
          */
         void prefix() {
             if (done) {
-                buffer.append(newline).append(currentIndent);
+                buffer.append(newline)
+                    .append(currentIndent);
             } else {
                 done = true;
             }
@@ -600,7 +622,9 @@ public class Tool {
          */
         void smartPrefix() {
             int length = buffer.length();
-            if (buffer.length() <= separatorLength || !buffer.subSequence(length - separatorLength, length).toString().equals(separator)) {
+            if (buffer.length() <= separatorLength || !buffer.subSequence(length - separatorLength, length)
+                .toString()
+                .equals(separator)) {
                 prefix();
             } else {
                 done = true;
@@ -612,7 +636,8 @@ public class Tool {
          */
         void flush() {
             try {
-                out.write(buffer.toString().getBytes(charset));
+                out.write(buffer.toString()
+                    .getBytes(charset));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -653,7 +678,10 @@ public class Tool {
         @Override
         public void key(String key) {
             prefix();
-            buffer.append(closure).append(scriptEscape(key)).append(closure).append(separator);
+            buffer.append(closure)
+                .append(scriptEscape(key))
+                .append(closure)
+                .append(separator);
         }
 
         /*
@@ -669,9 +697,13 @@ public class Tool {
                 done = true;
             }
             if (isString) {
-                buffer.append(closure).append(scriptEscape(value)).append(closure).append(suffix);
+                buffer.append(closure)
+                    .append(scriptEscape(value))
+                    .append(closure)
+                    .append(suffix);
             } else {
-                buffer.append(value).append(suffix);
+                buffer.append(value)
+                    .append(suffix);
             }
         }
 
@@ -685,7 +717,8 @@ public class Tool {
             currentIndent.setLength(currentIndent.length() - indent.length());
             trim();
             prefix();
-            buffer.append(isSequence(clazz) ? endArray : endObject).append(suffix);
+            buffer.append(isSequence(clazz) ? endArray : endObject)
+                .append(suffix);
         }
 
         /*
@@ -777,8 +810,9 @@ public class Tool {
         /**
          * Class to tag name
          */
-        public Function<Class<?>, String> classToTag = clazz -> Tool
-                .val(Tool.of(clazz.getAnnotation(Help.class)).map(help -> help.value()[0]).orElseGet(clazz::getSimpleName), i -> classMap.getOrDefault(i, i));
+        public Function<Class<?>, String> classToTag = clazz -> Tool.val(Tool.of(clazz.getAnnotation(Help.class))
+            .map(help -> help.value()[0])
+            .orElseGet(clazz::getSimpleName), i -> classMap.getOrDefault(i, i));
         /**
          * Output(return string if null)
          */
@@ -806,7 +840,8 @@ public class Tool {
          */
         void flush() {
             try {
-                out.write(buffer.toString().getBytes(charset));
+                out.write(buffer.toString()
+                    .getBytes(charset));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -820,9 +855,14 @@ public class Tool {
         @Override
         public void prepare() {
             if (hasHeader) {
-                buffer.append("<?xml version=\"1.0\" encoding=\"").append(charset.name()).append("\"?>").append(newline);
+                buffer.append("<?xml version=\"1.0\" encoding=\"")
+                    .append(charset.name())
+                    .append("\"?>")
+                    .append(newline);
             }
-            buffer.append(prefix).append(classToTag.apply(Object.class)).append(suffix);
+            buffer.append(prefix)
+                .append(classToTag.apply(Object.class))
+                .append(suffix);
             currentIndent.append(indent);
         }
 
@@ -834,7 +874,11 @@ public class Tool {
         @Override
         public void start(Class<?> clazz) {
             if (!isSequence(clazz)) {
-                buffer.append(newline).append(currentIndent).append(prefix).append(classToTag.apply(clazz)).append(suffix);
+                buffer.append(newline)
+                    .append(currentIndent)
+                    .append(prefix)
+                    .append(classToTag.apply(clazz))
+                    .append(suffix);
                 currentIndent.append(indent);
             }
             if (out != null && buffer.length() > bufferSize) {
@@ -861,14 +905,20 @@ public class Tool {
         @Override
         public void value(String value, Class<?> clazz, boolean isString) {
             String tag = tags.peek();
-            buffer.append(newline).append(currentIndent);
+            buffer.append(newline)
+                .append(currentIndent);
             if (tag != null) {
-                buffer.append(prefix).append(tag).append(suffix);
+                buffer.append(prefix)
+                    .append(tag)
+                    .append(suffix);
 
             }
             buffer.append(value == null ? "" : value);
             if (tag != null) {
-                buffer.append(prefix).append(endPrefix).append(tag).append(suffix);
+                buffer.append(prefix)
+                    .append(endPrefix)
+                    .append(tag)
+                    .append(suffix);
             }
         }
 
@@ -881,7 +931,12 @@ public class Tool {
         public void end(Class<?> clazz) {
             if (!isSequence(clazz)) {
                 currentIndent.setLength(currentIndent.length() - indent.length());
-                buffer.append(newline).append(currentIndent).append(prefix).append(endPrefix).append(classToTag.apply(clazz)).append(suffix);
+                buffer.append(newline)
+                    .append(currentIndent)
+                    .append(prefix)
+                    .append(endPrefix)
+                    .append(classToTag.apply(clazz))
+                    .append(suffix);
             }
         }
 
@@ -892,7 +947,11 @@ public class Tool {
          */
         @Override
         public String get() {
-            buffer.append(newline).append(prefix).append(endPrefix).append(classToTag.apply(Object.class)).append(suffix);
+            buffer.append(newline)
+                .append(prefix)
+                .append(endPrefix)
+                .append(classToTag.apply(Object.class))
+                .append(suffix);
             if (out != null) {
                 flush();
                 return null;
@@ -1025,7 +1084,8 @@ public class Tool {
          */
         void flush() {
             try {
-                out.write(buffer.toString().getBytes(charset));
+                out.write(buffer.toString()
+                    .getBytes(charset));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -1061,7 +1121,9 @@ public class Tool {
                 buffer.append(separator);
             }
             if (clouser != '\0') {
-                buffer.append(clouser).append(key).append(clouser);
+                buffer.append(clouser)
+                    .append(key)
+                    .append(clouser);
             } else {
                 buffer.append(key);
             }
@@ -1095,7 +1157,9 @@ public class Tool {
                     buffer.append(separator);
                 }
                 if (clouser != '\0') {
-                    buffer.append(clouser).append(value).append(clouser);
+                    buffer.append(clouser)
+                        .append(value)
+                        .append(clouser);
                 } else {
                     buffer.append(value);
                 }
@@ -1117,7 +1181,9 @@ public class Tool {
                     String c = String.valueOf(clouser);
                     Collector<CharSequence, ?, String> collector = clouser != '\0' ? Collectors.joining(c + separator + c, c, c)
                             : Collectors.joining(String.valueOf(separator));
-                    buffer.append(values.stream().collect(collector)).append(newline);
+                    buffer.append(values.stream()
+                        .collect(collector))
+                        .append(newline);
                     values = null;
                 }
                 if (out != null && buffer.length() > bufferSize) {
@@ -1125,7 +1191,8 @@ public class Tool {
                     buffer.setLength(0);
                 }
             } else if (level > 2) {
-                String line = nested.stream().collect(Collectors.joining(innerSeparator));
+                String line = nested.stream()
+                    .collect(Collectors.joining(innerSeparator));
                 if (values != null) {
                     values.add(line);
                 } else {
@@ -1133,7 +1200,9 @@ public class Tool {
                         buffer.append(separator);
                     }
                     if (clouser != '\0') {
-                        buffer.append(clouser).append(line).append(clouser);
+                        buffer.append(clouser)
+                            .append(line)
+                            .append(clouser);
                     } else {
                         buffer.append(line);
                     }
@@ -1228,8 +1297,10 @@ public class Tool {
                 }
                 writer.print(text.substring(0, begin));
                 if (replacer != null) {
-                    String tag = text.substring(begin + prefix.length(), end).trim();
-                    Try.triC(replacer).accept(writer, tag, prefix);
+                    String tag = text.substring(begin + prefix.length(), end)
+                        .trim();
+                    Try.triC(replacer)
+                        .accept(writer, tag, prefix);
                 }
                 text = text.substring(end + suffix.length());
                 loop = true;
@@ -1247,17 +1318,20 @@ public class Tool {
      * @return Replaced text
      */
     public static String replaceAll(CharSequence text, String regex, Function<MatchResult, String> replacer) {
-        Matcher matcher = Pattern.compile(regex).matcher(text);
+        Matcher matcher = Pattern.compile(regex)
+            .matcher(text);
         if (!matcher.find()) {
             return text.toString();
         }
         StringBuilder s = new StringBuilder();
         int index = 0;
         do {
-            s.append(text.subSequence(index, matcher.start())).append(replacer.apply(matcher.toMatchResult()));
+            s.append(text.subSequence(index, matcher.start()))
+                .append(replacer.apply(matcher.toMatchResult()));
             index = matcher.end();
         } while (matcher.find());
-        return s.append(text.subSequence(index, text.length())).toString();
+        return s.append(text.subSequence(index, text.length()))
+            .toString();
     }
 
     /**
@@ -1298,7 +1372,8 @@ public class Tool {
      * @return MIME type
      */
     public static String getContentType(String file) {
-        return MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(file);
+        return MimetypesFileTypeMap.getDefaultFileTypeMap()
+            .getContentType(file);
     }
 
     /**
@@ -1307,7 +1382,8 @@ public class Tool {
      */
     public static boolean isTextContent(String file) {
         String lower = file.toLowerCase(Locale.ENGLISH);
-        return Sys.text_extensions.stream().anyMatch(lower::endsWith);
+        return Sys.text_extensions.stream()
+            .anyMatch(lower::endsWith);
     }
 
     /**
@@ -1347,9 +1423,12 @@ public class Tool {
      * @return class stream(must to close)
      */
     public static Stream<Class<?>> getClasses(String packageName) {
-        String prefix = Tool.string(packageName).map(i -> i + '.').orElse("");
-        return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class")).map(f -> prefix + f.substring(0, f.length() - ".class".length()))
-                .<Class<?>>map(Try.f(Class::forName));
+        String prefix = Tool.string(packageName)
+            .map(i -> i + '.')
+            .orElse("");
+        return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class"))
+            .map(f -> prefix + f.substring(0, f.length() - ".class".length()))
+            .<Class<?>>map(Try.f(Class::forName));
     }
 
     /**
@@ -1359,24 +1438,37 @@ public class Tool {
      * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
-        if (!Tool.string(location).isPresent()) {
-            Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString().contains(".jar!"));
-            return Tool.toURLs("app").collect(collector).entrySet().stream()
-                    .flatMap(e -> e.getValue().stream()
-                            .flatMap(url -> (e.getKey()
-                                    ? getResourcesFromJar(location, Try.s(() -> ((JarURLConnection) url.openConnection()).getJarFile()).get())
-                                    : getResourcesFromFolder(new File(url.getFile()).getParentFile()))));
+        if (!Tool.string(location)
+            .isPresent()) {
+            Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString()
+                .contains(".jar!"));
+            return Tool.toURLs("app")
+                .collect(collector)
+                .entrySet()
+                .stream()
+                .flatMap(e -> e.getValue()
+                    .stream()
+                    .flatMap(url -> (e.getKey() ? getResourcesFromJar(location, Try.s(() -> ((JarURLConnection) url.openConnection()).getJarFile())
+                        .get())
+                            : getResourcesFromFolder(new File(Try.s(url::toURI)
+                                .get()).getParentFile()))));
         }
-        return Tool.toURLs(location).flatMap(Try.f(i -> {
-            boolean isDirectory = Try.<URL>p(j -> new File(j.getFile()).isDirectory(), (e, j) -> false).test(i);
-            if ("jar".equals(i.getProtocol())) {
-                return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
-            } else if (isDirectory) {
-                return getResourcesFromFolder(new File(i.getFile()));
-            } else {
-                return getResourcesFromJar("", new JarFile(i.getFile()));
-            }
-        }));
+        return Tool.toURLs(location)
+            .flatMap(Try.f(i -> {
+                boolean isDirectory = Try.<URL>p(j -> new File(Try.s(j::toURI)
+                    .get()).isDirectory(), (e, j) -> false)
+                    .test(i);
+                if ("jar".equals(i.getProtocol())) {
+                    return getResourcesFromJar(location, ((JarURLConnection) i.openConnection()).getJarFile());
+                } else if (isDirectory) {
+                    return getResourcesFromFolder(new File(Try.s(i::toURI)
+                        .get()));
+                } else {
+                    return getResourcesFromJar("", new JarFile(Try.s(i::toURI)
+                        .get()
+                        .getPath()));
+                }
+            }));
     }
 
     /**
@@ -1388,14 +1480,18 @@ public class Tool {
      */
     private static Stream<String> getResourcesFromJar(String location, JarFile jar) {
         String l = trim("/", location, null);
-        return jar.stream().map(JarEntry::getName).filter(i -> i.startsWith(l)).map(i -> trim("/", i.substring(l.length()), null));
+        return jar.stream()
+            .map(JarEntry::getName)
+            .filter(i -> i.startsWith(l))
+            .map(i -> trim("/", i.substring(l.length()), null));
     }
 
     /**
      * utf8 decoder
      */
-    static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder().onUnmappableCharacter(CodingErrorAction.REPLACE)
-            .onMalformedInput(CodingErrorAction.REPLACE);
+    static final CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder()
+        .onUnmappableCharacter(CodingErrorAction.REPLACE)
+        .onMalformedInput(CodingErrorAction.REPLACE);
 
     /**
      * list files in folder
@@ -1405,7 +1501,9 @@ public class Tool {
      */
     private static Stream<String> getResourcesFromFolder(File folder) {
         try {
-            return Files.list(folder.toPath()).map(Path::getFileName).map(Object::toString);
+            return Files.list(folder.toPath())
+                .map(Path::getFileName)
+                .map(Object::toString);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -1455,7 +1553,8 @@ public class Tool {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } finally {
-            Try.r(in::close).run();
+            Try.r(in::close)
+                .run();
         }
         return out.toByteArray();
     }
@@ -1496,7 +1595,8 @@ public class Tool {
                 return NONNULL | ORDERED;
             }
 
-        }, false).onClose(Try.r(reader::close));
+        }, false)
+            .onClose(Try.r(reader::close));
     }
 
     /**
@@ -1582,8 +1682,10 @@ public class Tool {
      * @return Map
      */
     public static Map<String, String> parseMap(String text, String separator, String pairSeparator) {
-        return string(text).map(s -> Stream.of(s.split(separator)).collect(() -> (Map<String, String>) new LinkedHashMap<String, String>(),
-                (map, ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), Map::putAll)).orElseGet(Collections::emptyMap);
+        return string(text).map(s -> Stream.of(s.split(separator))
+            .collect(() -> (Map<String, String>) new LinkedHashMap<String, String>(), (map,
+                    ss) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), Map::putAll))
+            .orElseGet(Collections::emptyMap);
     }
 
     /**
@@ -1592,8 +1694,8 @@ public class Tool {
      * @return Map
      */
     public static Map<String, String> parseMap(String[] texts, String pairSeparator) {
-        return Stream.of(texts).collect(() -> new LinkedHashMap<String, String>(), (map, s) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])),
-                Map::putAll);
+        return Stream.of(texts)
+            .collect(() -> new LinkedHashMap<String, String>(), (map, s) -> peek(s.split(pairSeparator, 2), a -> map.put(a[0], a[1])), Map::putAll);
     }
 
     /**
@@ -1655,10 +1757,12 @@ public class Tool {
      */
     public static long nextMillis(final String text, final ZonedDateTime from) {
         Objects.requireNonNull(from);
-        if (Objects.requireNonNull(text).length() <= 0) {
+        if (Objects.requireNonNull(text)
+            .length() <= 0) {
             return 0;
         }
-        String value = text.trim().toUpperCase(Locale.ENGLISH);
+        String value = text.trim()
+            .toUpperCase(Locale.ENGLISH);
         if ("DHMS".indexOf(value.charAt(value.length() - 1)) >= 0) {
             Duration interval = Duration.parse(value.endsWith("D") ? "P" + value : "PT" + value);
             return interval.toMillis();
@@ -1676,20 +1780,26 @@ public class Tool {
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
                 ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
                 ChronoField[] field = { null, null };
-                next = Tool
-                        .zip(fields.stream(),
-                                Stream.of(value.substring(timeIndex).trim().split("[^0-9]")).map(s -> Tool.string(s).map(Long::valueOf).orElse(-1L)))
-                        .peek(i -> {
-                            if (i.r < 0) {
-                                field[0] = i.l;
-                            } else {
-                                field[1] = i.l;
-                            }
-                        }).reduce(next, (i, pair) -> pair.r < 0 ? i : i.with(pair.l, pair.r), (i, j) -> i).truncatedTo(units[fields.indexOf(field[1]) + 1]);
+                next = Tool.zip(fields.stream(), Stream.of(value.substring(timeIndex)
+                    .trim()
+                    .split("[^0-9]"))
+                    .map(s -> Tool.string(s)
+                        .map(Long::valueOf)
+                        .orElse(-1L)))
+                    .peek(i -> {
+                        if (i.r < 0) {
+                            field[0] = i.l;
+                        } else {
+                            field[1] = i.l;
+                        }
+                    })
+                    .reduce(next, (i, pair) -> pair.r < 0 ? i : i.with(pair.l, pair.r), (i, j) -> i)
+                    .truncatedTo(units[fields.indexOf(field[1]) + 1]);
                 if (from.isAfter(next)) {
                     next = next.plus(1, units[fields.indexOf(field[0]) + 1]);
                 }
-                value = value.substring(0, timeIndex).trim();
+                value = value.substring(0, timeIndex)
+                    .trim();
             } else {
                 next = next.truncatedTo(ChronoUnit.DAYS);
             }
@@ -1697,7 +1807,8 @@ public class Tool {
                 final ZonedDateTime start = next;
                 boolean until = true;
                 for (DayOfWeek i : DayOfWeek.values()) {
-                    if (i.name().startsWith(value)) {
+                    if (i.name()
+                        .startsWith(value)) {
                         next = next.with(ChronoField.DAY_OF_WEEK, i.getValue());
                         if (start.isAfter(next)) {
                             next = next.plus(7, ChronoUnit.DAYS);
@@ -1712,8 +1823,10 @@ public class Tool {
                     ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
                     List<String> values = Arrays.asList(value.split("[^0-9]"));
                     Collections.reverse(values);
-                    next = Tool.zip(fields.stream(), values.stream().map(Long::valueOf)).peek(i -> field[0] = i.l).reduce(next,
-                            (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
+                    next = Tool.zip(fields.stream(), values.stream()
+                        .map(Long::valueOf))
+                        .peek(i -> field[0] = i.l)
+                        .reduce(next, (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
                     if (from.isAfter(next)) {
                         next = next.plus(1, units[fields.indexOf(field[0])]);
                     }
@@ -1780,7 +1893,8 @@ public class Tool {
      * @return digest
      */
     public static byte[] digest(byte[] bytes, String algorithm) {
-        MessageDigest digest = Try.s(() -> MessageDigest.getInstance(algorithm)).get();
+        MessageDigest digest = Try.s(() -> MessageDigest.getInstance(algorithm))
+            .get();
         digest.update(bytes);
         return digest.digest();
     }
@@ -1834,8 +1948,8 @@ public class Tool {
     public static OutputStream withEncrypt(OutputStream out, String key, String... iv) {
         try {
             Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
-                    new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(digest(key
+                .getBytes(StandardCharsets.UTF_8), "MD5"), "AES"), new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
             return new CipherOutputStream(out, cipher);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             throw new RuntimeException(e);
@@ -1869,8 +1983,8 @@ public class Tool {
     public static InputStream withDecrypt(InputStream in, String key, String... iv) {
         try {
             Cipher cipher = Cipher.getInstance("AES/PCBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(digest(key.getBytes(StandardCharsets.UTF_8), "MD5"), "AES"),
-                    new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(digest(key
+                .getBytes(StandardCharsets.UTF_8), "MD5"), "AES"), new IvParameterSpec((iv.length > 0 ? iv[0] : Sys.IV).getBytes(StandardCharsets.UTF_8)));
             return new CipherInputStream(in, cipher);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             throw new RuntimeException(e);
@@ -1928,7 +2042,8 @@ public class Tool {
      * @return Base64 encoded text
      */
     public static String base64Encode(String text) {
-        return Base64.getUrlEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
+        return Base64.getUrlEncoder()
+            .encodeToString(text.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1937,7 +2052,8 @@ public class Tool {
      */
     public static String base64Decode(String text) {
         try {
-            return new String(Base64.getUrlDecoder().decode(text), StandardCharsets.UTF_8);
+            return new String(Base64.getUrlDecoder()
+                .decode(text), StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
             return text;
         }
@@ -1947,9 +2063,9 @@ public class Tool {
      * base 128 characters
      */
     static final byte[] base128 = Try
-            .s(() -> "ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ!#$%&()*+-/0123456789:;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz{}"
-                    .getBytes("MS932"))
-            .get();
+        .s(() -> "ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ!#$%&()*+-/0123456789:;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz{}"
+            .getBytes("MS932"))
+        .get();
 
     /**
      * @param out output
@@ -2043,8 +2159,8 @@ public class Tool {
                     for (int i = 0; i < max; i++) {
                         int b = Arrays.binarySearch(base128, buffer[i]);
                         if (b == -1) {
-                            throw new IllegalArgumentException(
-                                    "Invalid base128 character: " + new String(buffer, i, i + 1, "MS932") + String.format(" (0x%02X)", buffer[i]));
+                            throw new IllegalArgumentException("Invalid base128 character: " + new String(buffer, i, i + 1, "MS932")
+                                    + String.format(" (0x%02X)", buffer[i]));
                         }
                         buffer[i] = (byte) b;
                     }
@@ -2210,7 +2326,10 @@ public class Tool {
      * @return First value
      */
     public static <T, U> Optional<U> getFirst(Map<T, List<U>> map, T name) {
-        return Tool.of(map).map(m -> m.get(name)).filter(a -> !a.isEmpty()).map(a -> a.get(0));
+        return Tool.of(map)
+            .map(m -> m.get(name))
+            .filter(a -> !a.isEmpty())
+            .map(a -> a.get(0));
     }
 
     /**
@@ -2219,27 +2338,29 @@ public class Tool {
      * @return cut text
      */
     public static String cut(String text, int max) {
-        return Tool.of(text).map(i -> {
-            boolean suffix = false;
-            int index = i.indexOf('\r');
-            if (index < 0) {
-                index = i.indexOf('\n');
-            } else {
-                int index2 = i.indexOf('\n');
-                if (index2 > 0 && index2 < index) {
-                    index = index2;
+        return Tool.of(text)
+            .map(i -> {
+                boolean suffix = false;
+                int index = i.indexOf('\r');
+                if (index < 0) {
+                    index = i.indexOf('\n');
+                } else {
+                    int index2 = i.indexOf('\n');
+                    if (index2 > 0 && index2 < index) {
+                        index = index2;
+                    }
                 }
-            }
-            if (index >= 0) {
-                i = i.substring(0, index);
-                suffix = true;
-            }
-            if (i.length() > max) {
-                i = i.substring(0, max);
-                suffix = true;
-            }
-            return i + (suffix ? " ..." : "");
-        }).orElse(null);
+                if (index >= 0) {
+                    i = i.substring(0, index);
+                    suffix = true;
+                }
+                if (i.length() > max) {
+                    i = i.substring(0, max);
+                    suffix = true;
+                }
+                return i + (suffix ? " ..." : "");
+            })
+            .orElse(null);
     }
 
     /**
@@ -2252,7 +2373,9 @@ public class Tool {
     public static Function<String, String> path(String first, String... parts) {
         return separator -> {
             StringBuilder s = new StringBuilder();
-            String[] normalized = Stream.concat(Stream.of(first), Stream.of(parts)).filter(part -> part != null && !part.isEmpty()).toArray(String[]::new);
+            String[] normalized = Stream.concat(Stream.of(first), Stream.of(parts))
+                .filter(part -> part != null && !part.isEmpty())
+                .toArray(String[]::new);
             int end = normalized.length - 1;
             if (end > 0) {
                 s.append(trim(null, normalized[0], separator));
@@ -2333,28 +2456,29 @@ public class Tool {
             return null;
         }
         StringBuilder s = new StringBuilder();
-        string.chars().forEach(c -> {
-            switch (c) {
-            case '&':
-                s.append("&amp;");
-                break;
-            case '"':
-                s.append("&quot;");
-                break;
-            case '<':
-                s.append("&lt;");
-                break;
-            case '>':
-                s.append("&gt;");
-                break;
-            case '\'':
-                s.append("&#39;");
-                break;
-            default:
-                s.append((char) c);
-                break;
-            }
-        });
+        string.chars()
+            .forEach(c -> {
+                switch (c) {
+                case '&':
+                    s.append("&amp;");
+                    break;
+                case '"':
+                    s.append("&quot;");
+                    break;
+                case '<':
+                    s.append("&lt;");
+                    break;
+                case '>':
+                    s.append("&gt;");
+                    break;
+                case '\'':
+                    s.append("&#39;");
+                    break;
+                default:
+                    s.append((char) c);
+                    break;
+                }
+            });
         return s.toString();
     }
 
@@ -2369,25 +2493,27 @@ public class Tool {
             return null;
         }
         StringBuilder s = new StringBuilder();
-        text.toString().chars().forEach(c -> {
-            switch (c) {
-            case '"':
-                s.append("\\\"");
-                break;
-            case '\r':
-                s.append("\\r");
-                break;
-            case '\n':
-                s.append("\\n");
-                break;
-            case '\t':
-                s.append("\\t");
-                break;
-            default:
-                s.append((char) c);
-                break;
-            }
-        });
+        text.toString()
+            .chars()
+            .forEach(c -> {
+                switch (c) {
+                case '"':
+                    s.append("\\\"");
+                    break;
+                case '\r':
+                    s.append("\\r");
+                    break;
+                case '\n':
+                    s.append("\\n");
+                    break;
+                case '\t':
+                    s.append("\\t");
+                    break;
+                default:
+                    s.append((char) c);
+                    break;
+                }
+            });
         return s.toString();
     }
 
@@ -2396,7 +2522,9 @@ public class Tool {
      * @return Character array
      */
     public static Character[] toCharacterArray(String text) {
-        return text.chars().mapToObj(j -> Character.valueOf((char) j)).toArray(Character[]::new);
+        return text.chars()
+            .mapToObj(j -> Character.valueOf((char) j))
+            .toArray(Character[]::new);
     }
 
     /**
@@ -2484,7 +2612,9 @@ public class Tool {
          * @return Self
          */
         public Mail address(RecipientType type, String... addresses) {
-            users.put(type, Stream.of(addresses).map(Try.f(InternetAddress::new)).toArray(InternetAddress[]::new));
+            users.put(type, Stream.of(addresses)
+                .map(Try.f(InternetAddress::new))
+                .toArray(InternetAddress[]::new));
             return this;
         }
 
@@ -2503,9 +2633,10 @@ public class Tool {
          * @return Array of InternetAddress
          */
         static InternetAddress[] parse(String... addressNames) {
-            return IntStream.range(0, addressNames.length / 2).map(i -> i * 2)
-                    .<InternetAddress>mapToObj(Try.intF(i -> new InternetAddress(addressNames[i], addressNames[i + 1], Sys.Mail.charset)))
-                    .toArray(InternetAddress[]::new);
+            return IntStream.range(0, addressNames.length / 2)
+                .map(i -> i * 2)
+                .<InternetAddress>mapToObj(Try.intF(i -> new InternetAddress(addressNames[i], addressNames[i + 1], Sys.Mail.charset)))
+                .toArray(InternetAddress[]::new);
         }
 
         /**
@@ -2523,7 +2654,8 @@ public class Tool {
          * @return Self
          */
         public Mail from(String from, String name) {
-            this.from = Try.s(() -> new InternetAddress(from, name, Sys.Mail.charset)).get();
+            this.from = Try.s(() -> new InternetAddress(from, name, Sys.Mail.charset))
+                .get();
             return this;
         }
 
@@ -2603,7 +2735,8 @@ public class Tool {
         Mail mail = new Mail();
         set.accept(mail);
         MimeMessage message = new MimeMessage(javax.mail.Session.getInstance(mail.properties, mail.authenticator));
-        InternetAddress from = Tool.of(mail.from).orElseGet(Try.s(() -> new InternetAddress(Sys.Mail.user)));
+        InternetAddress from = Tool.of(mail.from)
+            .orElseGet(Try.s(() -> new InternetAddress(Sys.Mail.user)));
         try {
             message.setFrom(from);
             message.setReplyTo(mail.replyTo == null ? Tool.array(from) : mail.replyTo);
@@ -2655,7 +2788,8 @@ public class Tool {
      * @return object
      */
     public static Serializable deserialize(byte[] bytes) {
-        try (InputStream in = new ByteArrayInputStream(bytes); ObjectInputStream i = new ObjectInputStream(in)) {
+        try (InputStream in = new ByteArrayInputStream(bytes);
+             ObjectInputStream i = new ObjectInputStream(in)) {
             return (Serializable) i.readObject();
         } catch (Exception e) {
             Try.catcher.accept(e);
@@ -2694,7 +2828,10 @@ public class Tool {
      * @return Full name
      */
     public static String fullName(Class<?> clazz) {
-        return Tool.trim(".", clazz.getCanonicalName().substring(clazz.getPackage().getName().length()), null);
+        return Tool.trim(".", clazz.getCanonicalName()
+            .substring(clazz.getPackage()
+                .getName()
+                .length()), null);
     }
 
     /**
@@ -2715,9 +2852,9 @@ public class Tool {
         } else {
             iterator = Reflector.invoke(items, "iterator", array());
         }
-        iterator.forEachRemaining(i -> s.append("<option value=\"" + htmlEscape(((Map.Entry<?, ?>) i).getKey())
-                + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" selected=\"selected" : "") + "\">"
-                + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</option>"));
+        iterator
+            .forEachRemaining(i -> s.append("<option value=\"" + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey())
+                .equals(valueText) ? "\" selected=\"selected" : "") + "\">" + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</option>"));
         return s.toString();
     }
 
@@ -2741,7 +2878,8 @@ public class Tool {
             iterator = Reflector.invoke(items, "iterator", array());
         }
         iterator.forEachRemaining(i -> s.append("<label class=\"checkbox\"><input type=\"checkbox\" name=\"" + name + "\" value=\""
-                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" checked=\"checked" : "")
+                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey())
+                    .equals(valueText) ? "\" checked=\"checked" : "")
                 + "\">" + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</label>"));
         return s.toString();
     }
@@ -2766,7 +2904,8 @@ public class Tool {
             iterator = Reflector.invoke(items, "iterator", array());
         }
         iterator.forEachRemaining(i -> s.append("<label class=\"radio\"><input type=\"radio\" name=\"" + name + "\" value=\""
-                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey()).equals(valueText) ? "\" checked=\"checked" : "")
+                + htmlEscape(((Map.Entry<?, ?>) i).getKey()) + (String.valueOf(((Map.Entry<?, ?>) i).getKey())
+                    .equals(valueText) ? "\" checked=\"checked" : "")
                 + "\">" + htmlEscape(((Map.Entry<?, ?>) i).getValue()) + "</label>"));
         return s.toString();
     }
@@ -2804,7 +2943,8 @@ public class Tool {
         // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
         // Log.info(Session.currentLocale().toString());
         // Log.info(camelToSnake("LoginURL"));
-        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN).format(java.time.chrono.JapaneseDate.now()));
+        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
+            .format(java.time.chrono.JapaneseDate.now()));
     }
 
     /**
@@ -2814,7 +2954,13 @@ public class Tool {
      * @return Value
      */
     public static <T> T getIgnoreCase(Map<String, T> map, String key) {
-        return map.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(key)).findFirst().map(Map.Entry::getValue).orElse(null);
+        return map.entrySet()
+            .stream()
+            .filter(e -> e.getKey()
+                .equalsIgnoreCase(key))
+            .findFirst()
+            .map(Map.Entry::getValue)
+            .orElse(null);
     }
 
     /**
