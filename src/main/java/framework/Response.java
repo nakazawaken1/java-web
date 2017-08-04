@@ -545,7 +545,7 @@ public abstract class Response {
             Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).accept(out.get())), //
             Tuple.of(Path.class, (response, out, cancel) -> {
                 BiConsumer<String, URL> load = (file, url) -> {
-                    Log.config("[static load] " + Try.s(url::toURI).get().getPath());
+                    Log.config("[static load] " + Tool.or(Try.s(url::toURI).get().getPath(), () -> url).get());
                     try (InputStream in = url.openStream()) {
                         response.contentTypeIfEmpty(Tool.getContentType(file),
                                 response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
@@ -611,7 +611,7 @@ public abstract class Response {
                     String aliase = Sys.aliases.get(path);
                     if (aliase != null) {
                         Log.info("aliase redirect: " + path + " -> " + aliase);
-                        response.status(Status.Moved_Permamently).addHeader("Location", aliase.startsWith("http") ? aliase :Application.CURRENT.getContextPath() + aliase);
+                        response.status(Status.Moved_Permamently).addHeader("Location", aliase.startsWith("http") ? aliase : Tool.path(Application.CURRENT.getContextPath(), aliase).apply("/"));
                     } else {
                         Log.info("not found: " + Tool.trim("/", file, null));
                         response.status(Status.Not_Found);
