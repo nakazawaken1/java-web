@@ -430,6 +430,11 @@ public class ServletImpl implements javax.servlet.Servlet {
                 }
             };
         }
+
+        @Override
+        protected String getRemoteAddr() {
+            return request.getRemoteAddr() + ":" + request.getRemotePort();
+        }
     }
 
     /**

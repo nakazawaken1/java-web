@@ -69,15 +69,25 @@ public class Log extends Handler {
         /*
          * (non-Javadoc)
          * 
-         * @see java.util.logging.Formatter#format(java.util.logging.LogRecord) 1: timestamp 2: method 3: logger name 4: level 5: message 6: exception 7:
-         * request id 8: session id 9: application id
+         * @see java.util.logging.Formatter#format(java.util.logging.LogRecord)
+         * <ol>
+         * <li>timestamp</li>
+         * <li>method<li>
+         * <li>logger name</li>
+         * <li>level</li>
+         * <li>message</li>
+         * <li>exception</li>
+         * <li>request id</li>
+         * <li>session id</li>
+         * <li>application id</li>
+         * <li>remote ip</li>
          */
         @Override
         public String format(LogRecord record) {
             return String.format(format, record.getMillis(), record.getSourceClassName() + '.' + record.getSourceMethodName(),
                     editor.apply(record.getLoggerName()), record.getLevel().getName(), formatMessage(record),
                     Tool.of(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""), Request.current().map(Object::hashCode).orElse(0),
-                    Session.current().map(Object::hashCode).orElse(0), Application.current().map(Object::hashCode).orElse(0));
+                    Session.current().map(Object::hashCode).orElse(0), Application.current().map(Object::hashCode).orElse(0), Request.current().map(Request::getRemoteIp).orElse("(local)"));
         }
 
         /**

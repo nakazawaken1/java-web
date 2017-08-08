@@ -1030,6 +1030,11 @@ public class Standalone {
         public Map<String, List<String>> getParameters() {
             return parameters;
         }
+
+        @Override
+        protected String getRemoteAddr() {
+            return Tool.trim("/", exchange.getRemoteAddress().toString(), null);
+        }
     }
 
     /**

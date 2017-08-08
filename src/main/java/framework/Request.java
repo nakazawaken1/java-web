@@ -85,10 +85,13 @@ public abstract class Request implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "<- " + getMethod() + " " + getPath()
-                + Tool.string(getParameters().entrySet().stream()
-                        .map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue().toString(), Sys.Log.parameter_max_letters))
-                        .collect(Collectors.joining("&"))).map(s -> '?' + s).orElse("");
+        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet()
+            .stream()
+            .map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue()
+                .toString(), Sys.Log.parameter_max_letters))
+            .collect(Collectors.joining("&")))
+            .map(s -> '?' + s)
+            .orElse("");
     }
 
     /**
@@ -148,6 +151,25 @@ public abstract class Request implements Attributes<Object> {
     public abstract Map<String, List<String>> getParameters();
 
     /**
+     * @return Remote IP address
+     */
+    protected abstract String getRemoteAddr();
+
+    /**
+     * @return Remote IP address
+     */
+    public String getRemoteIp() {
+        return Tool.val(getHeaders(), map -> Tool.or(Tool.getFirst(map, "X-FORWARDED-FOR")
+            .filter(i -> i.length() >= 4 && !"unknown".equalsIgnoreCase(i)), () -> Tool.getFirst(map, "INTEL_SOURCE_IP")
+                .filter(i -> !"unknown".equalsIgnoreCase(i)), () -> Tool.getFirst(map, "PROXY-CLIENT-IP")
+                    .filter(i -> !"unknown".equalsIgnoreCase(i)), () -> Tool.getFirst(map, "WL-PROXY-CLIENT-IP")
+                        .filter(i -> !"unknown".equalsIgnoreCase(i)), () -> Tool.getFirst(map, "HTTP_CLIENT_IP")
+                            .filter(i -> !"unknown".equalsIgnoreCase(i)), () -> Tool.getFirst(map, "HTTP_X_FORWARDED_FOR")
+                                .filter(i -> !"unknown".equalsIgnoreCase(i)), () -> Tool.of(getRemoteAddr()))
+            .orElse("unknwon"));
+    }
+
+    /**
      * @return parameters
      */
     public Map<String, String> getFirstParameters() {
@@ -171,12 +193,14 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public boolean containsValue(Object value) {
-                return Stream.of(map.values()).anyMatch(i -> Objects.equals(i, value));
+                return Stream.of(map.values())
+                    .anyMatch(i -> Objects.equals(i, value));
             }
 
             @Override
             public String get(Object key) {
-                return Tool.getFirst(map, (String) key).orElse(null);
+                return Tool.getFirst(map, (String) key)
+                    .orElse(null);
             }
 
             @Override
@@ -186,7 +210,8 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public String remove(Object key) {
-                return map.remove(key).get(0);
+                return map.remove(key)
+                    .get(0);
             }
 
             @Override
@@ -206,15 +231,21 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public Collection<String> values() {
-                return map.values().stream().flatMap(List::stream).collect(Collectors.toList());
+                return map.values()
+                    .stream()
+                    .flatMap(List::stream)
+                    .collect(Collectors.toList());
             }
 
             @Override
             public Set<java.util.Map.Entry<String, String>> entrySet() {
-                return map.entrySet().stream()
-                        .map(entry -> Tuple.of(entry.getKey(),
-                                Tool.of(entry.getValue()).filter(list -> !list.isEmpty()).map(list -> list.get(0)).orElse(null)))
-                        .collect(Collectors.toSet());
+                return map.entrySet()
+                    .stream()
+                    .map(entry -> Tuple.of(entry.getKey(), Tool.of(entry.getValue())
+                        .filter(list -> !list.isEmpty())
+                        .map(list -> list.get(0))
+                        .orElse(null)))
+                    .collect(Collectors.toSet());
             }
         };
     }
