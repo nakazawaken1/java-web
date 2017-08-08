@@ -320,7 +320,7 @@ public class Tool {
 
     /**
      * @param o object
-     * @return is primitive
+     * @return is string
      */
     public static boolean isString(Object o) {
         if (o instanceof Optional) {
@@ -331,7 +331,7 @@ public class Tool {
         }
         Class<?> c = o.getClass();
         return !((c.isPrimitive() && c != char.class) || o instanceof BigDecimal || o instanceof BigInteger || o instanceof Boolean || o instanceof Byte
-                || o instanceof Double || o instanceof Float || o instanceof Integer || o instanceof Long || o instanceof Short);
+                || o instanceof Double || o instanceof Float || o instanceof Integer || o instanceof Long || o instanceof Short || o instanceof Map || c.isArray() || o instanceof Iterable);
     }
 
     /**
@@ -470,7 +470,7 @@ public class Tool {
                             if (stringer != null) {
                                 Stringer.FromTo<Object> ft = (Stringer.FromTo<Object>) Reflector.instance(stringer.value());
                                 ft.toString(value, traverser);
-                            } else if (!isOptional && Reflector.method(value.getClass(), "toString")
+                            } else if (!isOptional && !isSequence(value.getClass()) && !(value instanceof Map) && Reflector.method(value.getClass(), "toString")
                                 .map(Method::getDeclaringClass)
                                 .filter(i -> i != Object.class)
                                 .isPresent()) {
