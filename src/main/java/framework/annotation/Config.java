@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -43,6 +45,7 @@ import framework.Message;
 import framework.Reflector;
 import framework.Session;
 import framework.Tool;
+import framework.Try;
 import framework.Tuple;
 
 /**
@@ -514,6 +517,10 @@ public @interface Config {
                 return Pattern.compile(raw == null ? ".*" : raw);
             } else if (type == Level.class) {
                 return raw == null ? Level.INFO : Level.parse(raw);
+            } else if (type == Charset.class) {
+                return raw == null ? Charset.defaultCharset() : Charset.forName(raw);
+            } else if (type == URL.class) {
+                return raw == null ? null : Try.<String, URL>f(URL::new).apply(raw);
             } else {
                 return raw;
             }
