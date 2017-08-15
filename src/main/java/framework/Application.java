@@ -316,7 +316,7 @@ public abstract class Application implements Attributes<Object> {
                     }
                     Consumer<Response> setContentType = r -> {
                         Content content = method.getAnnotation(Content.class);
-                        String[] accept = request.getHeaders().get("accept").stream()
+                        String[] accept = request.getHeaders().getOrDefault("accept", Collections.emptyList()).stream()
                                 .flatMap(i -> Stream.of(i.split("\\s*,\\s*")).map(j -> j.replaceAll(";.*$", "").trim().toLowerCase(Locale.ENGLISH)))
                                 .toArray(String[]::new);
                         Tool.ifPresentOr(
