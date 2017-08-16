@@ -1685,7 +1685,7 @@ public class Db implements AutoCloseable {
         /**
          * connection
          */
-        private Db db;
+        public final Db db;
         /**
          * orders
          */
@@ -2028,6 +2028,19 @@ public class Db implements AutoCloseable {
         public <T> Optional<T> one(TryFunction<ResultSet, T> fetcher) {
             try (Stream<ResultSet> rows = stream()) {
                 return rows.findFirst().map(Try.f(fetcher));
+            }
+        }
+
+        /**
+         * get one value
+         *
+         * @param <T> value type
+         * @param fetcher function that ResultSet to value
+         * @return value
+         */
+        public <T> Optional<T> one(Function<ResultSet, T> fetcher) {
+            try (Stream<ResultSet> rows = stream()) {
+                return rows.findFirst().map(fetcher);
             }
         }
 
