@@ -163,7 +163,7 @@ public class TestBinder extends Tester {
             expect(prefix + ":empty", n -> binder("s=").bind("s", String.class)).toEqual("");
             expect(prefix + ":null", n -> binder("a=def").bind("s", String.class)).toEqual("");
             expect(prefix + ":Optional", n -> binder("s=abc").bind("s", Optional.class, String.class)).toEqual(Optional.of("abc"));
-            expect(prefix + ":Optional:empty", n -> binder("s=").bind("s", Optional.class, String.class)).toEqual(Optional.of(""));
+            expect(prefix + ":Optional:empty", n -> binder("s=").bind("s", Optional.class, String.class)).toEqual(Optional.empty());
             expect(prefix + ":Optional:null", n -> binder("a=def").bind("s", Optional.class, String.class)).toEqual(Optional.empty());
         });
 
