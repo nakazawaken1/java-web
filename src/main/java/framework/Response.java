@@ -532,10 +532,6 @@ public abstract class Response {
      * body writer
      */
     public static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Tool.list(//
-            Tuple.of(String.class, (response, out, cancel) -> {
-                response.contentTypeIfEmpty(Content.TEXT, response.charset());
-                out.get().write(((String) response.content).getBytes(response.charset()));
-            }), //
             Tuple.of(Writer.class, (response, out, cancel) -> {
                 response.contentTypeIfEmpty(Content.TEXT, response.charset());
                 try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {

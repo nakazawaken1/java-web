@@ -88,7 +88,7 @@ public abstract class Request implements Attributes<Object> {
         return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet()
             .stream()
             .map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue()
-                .toString(), Sys.Log.parameter_max_letters))
+                .toString(), Sys.Log.parameter_max_letters, " ..."))
             .collect(Collectors.joining("&")))
             .map(s -> '?' + s)
             .orElse("");

@@ -248,7 +248,8 @@ public class Binder implements ErrorAppender {
         }
 
         if (clazz == Optional.class) {
-            return Tool.of(bind(nest + 1, name, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class));
+            Class<?> c = parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class;
+            return c == String.class ? Tool.string(bind(nest + 1, name, c)) : Tool.of(bind(nest + 1, name, c));
         }
 
         if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz)

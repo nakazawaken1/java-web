@@ -599,6 +599,37 @@ public class Db implements AutoCloseable {
 
     /**
      * update if exists row, else insert
+     * @param update Prepare for update
+     * @param insert Prepare for insert
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return true: inserted、 false: updated
+     */
+    public boolean save(Consumer<Map<String, Object>> update, Consumer<Map<String, Object>> insert, String table, String[] names, int primary, Object... values) {
+        Query q = from(table);
+        boolean empty = false;
+        for (int i = 0; i < primary; i++) {
+            if (values[i] == null) {
+                empty = true;
+                break;
+            }
+            q.where(names[i], values[i]);
+        }
+        if (!empty) {
+            empty = !q.forUpdate().exists();
+        }
+        if (empty) {
+            insert(insert, table, names, primary, values);
+        } else if (names.length > primary) {
+            update(update, table, names, primary, values);
+        }
+        return empty;
+    }
+
+    /**
+     * update if exists row, else insert
      *
      * @param table table name
      * @param names row names(arrange primary key in left)
@@ -637,12 +668,32 @@ public class Db implements AutoCloseable {
      * @return updated rows
      */
     public int update(String table, String[] names, int primary, Object... values) {
+        return update(null, table, names, primary, values);
+    }
+
+    /**
+     * update row
+     * @param prepare Prepare(ex. set common column info)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return updated rows
+     */
+    public int update(Consumer<Map<String, Object>> prepare, String table, String[] names, int primary, Object... values) {
         StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(table);
         String pad = " SET ";
         for (int i = primary; i < values.length; i++) {
             sql.append(pad).append(names[i]).append(" = ").append(builder.escape(values[i]));
             pad = ", ";
+        }
+        if(prepare != null) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            prepare.accept(map);
+            map.forEach((name, value) -> {
+                sql.append(", ").append(name).append(" = ").append(builder.escape(value));
+            });
         }
         pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
@@ -662,6 +713,19 @@ public class Db implements AutoCloseable {
      * @return inserted rows
      */
     public int insert(String table, String[] names, int primary, Object... values) {
+        return insert(null, table, names, primary, values);
+    }
+
+    /**
+     * insert row
+     * @param prepare Prepare(ex. set common column info)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int insert(Consumer<Map<String, Object>> prepare, String table, String[] names, int primary, Object... values) {
         Map<String, Object> unique = new LinkedHashMap<>();
         for (int i = 0; i < names.length; i++) {
             unique.put(names[i], values[i]);
@@ -671,6 +735,14 @@ public class Db implements AutoCloseable {
         for (Map.Entry<String, Object> i : unique.entrySet()) {
             nameList.add(i.getKey());
             valueList.add(i.getValue());
+        }
+        if(prepare != null) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            prepare.accept(map);
+            map.forEach((name, value) -> {
+                nameList.add(name);
+                valueList.add(value);
+            });
         }
         StringBuilder sql = new StringBuilder("INSERT INTO ");
         sql.append(table).append(join("(", nameList, ", "));
@@ -2094,7 +2166,7 @@ public class Db implements AutoCloseable {
      * @return executable SQL
      */
     public String preparedSQL(String sql, Object... values) {
-        Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters);
+        Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters, " ...");
         Function<Object, String> to = v -> v instanceof Collection
                 ? ((Collection<?>) v).stream().map(cut).map(builder::escape).collect(Collectors.joining(", ", "[", "]"))
                 : builder.escape(v);

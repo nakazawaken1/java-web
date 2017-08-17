@@ -2333,14 +2333,15 @@ public class Tool {
     }
 
     /**
-     * @param text text
-     * @param max max length
-     * @return cut text
+     * @param text Text
+     * @param max Max length
+     * @param suffix Suffix
+     * @return Cut text
      */
-    public static String cut(String text, int max) {
+    public static String cut(String text, int max, String suffix) {
         return Tool.of(text)
             .map(i -> {
-                boolean suffix = false;
+                boolean isSuffix = false;
                 int index = i.indexOf('\r');
                 if (index < 0) {
                     index = i.indexOf('\n');
@@ -2352,13 +2353,14 @@ public class Tool {
                 }
                 if (index >= 0) {
                     i = i.substring(0, index);
-                    suffix = true;
+                    isSuffix = true;
                 }
-                if (i.length() > max) {
-                    i = i.substring(0, max);
-                    suffix = true;
+                int m = max - suffix.length();
+                if (i.length() > m) {
+                    i = i.substring(0, m);
+                    isSuffix = true;
                 }
-                return i + (suffix ? " ..." : "");
+                return i + (isSuffix ? suffix : "");
             })
             .orElse(null);
     }

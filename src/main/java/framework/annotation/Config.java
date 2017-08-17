@@ -326,7 +326,7 @@ public @interface Config {
                         } catch (IllegalArgumentException | IllegalAccessException e) {
                             throw new InternalError(e);
                         }
-                        if (properties.containsKey(key) || value == null) {
+                        if (!Modifier.isFinal(f.getModifiers()) && (properties.containsKey(key) || value == null)) {
                             set(f, key, raw);
                         } else {
                             configKeys.add(key);

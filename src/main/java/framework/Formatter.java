@@ -461,7 +461,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 if (value != null && !isEl) {
                     value = value.replaceAll("\n", "<br/>\n");
                 }
-                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.Log.eval_max_letters));
+                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.Log.eval_max_letters, " ..."));
                 return value;
             };
             String key = s.substring(prefix, s.length() - suffix);
