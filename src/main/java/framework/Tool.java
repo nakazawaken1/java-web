@@ -331,7 +331,8 @@ public class Tool {
         }
         Class<?> c = o.getClass();
         return !((c.isPrimitive() && c != char.class) || o instanceof BigDecimal || o instanceof BigInteger || o instanceof Boolean || o instanceof Byte
-                || o instanceof Double || o instanceof Float || o instanceof Integer || o instanceof Long || o instanceof Short || o instanceof Map || c.isArray() || o instanceof Iterable);
+                || o instanceof Double || o instanceof Float || o instanceof Integer || o instanceof Long || o instanceof Short || o instanceof Map
+                || c.isArray() || o instanceof Iterable);
     }
 
     /**
@@ -2541,9 +2542,9 @@ public class Tool {
     public static final byte[] BOM = { (byte) 0xef, (byte) 0xbb, (byte) 0xbf };
 
     /**
-     * year4, month2, day2, hour2, minute2, second2
+     * year4, month2, day2, hour2, minute2, second2, millisecond3
      */
-    public static final DateTimeFormatter uuuuMMddHHmmss = DateTimeFormatter.ofPattern("uuuuMMddHHmmss");
+    public static final DateTimeFormatter uuuuMMddHHmmssSSS = DateTimeFormatter.ofPattern("uuuuMMddHHmmssSSS");
 
     /**
      * @param pattern Pattern
@@ -2966,10 +2967,12 @@ public class Tool {
     }
 
     /**
-     * @return Current datetime
+     * @param size Character count
+     * @return Current time
      */
-    public static String now() {
-        return uuuuMMddHHmmss.format(LocalDateTime.now());
+    public static String now(int size) {
+        return uuuuMMddHHmmssSSS.format(LocalDateTime.now())
+            .substring(0, size);
     }
 
     /**

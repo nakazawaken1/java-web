@@ -128,7 +128,7 @@ public @interface Config {
          */
         public static void loadDb() {
             try (Db db = Db.connect()) {
-                String now = LocalDateTime.now().format(Tool.uuuuMMddHHmmss);
+                String now = Tool.now(14);
                 db.from("t_config").where("start_at", "<=", now).where("end_at", ">", now).rows(rs -> {
                     String name = rs.getString("name");
                     String value = Tool.of(rs.getString("value")).orElse("").replace("\\n", "\n").replace("\\r", "\r");
