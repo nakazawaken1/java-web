@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.ErrorManager;
@@ -69,25 +70,24 @@ public class Log extends Handler {
         /*
          * (non-Javadoc)
          * 
-         * @see java.util.logging.Formatter#format(java.util.logging.LogRecord)
-         * <ol>
-         * <li>timestamp</li>
-         * <li>method<li>
-         * <li>logger name</li>
-         * <li>level</li>
-         * <li>message</li>
-         * <li>exception</li>
-         * <li>request id</li>
-         * <li>session id</li>
-         * <li>application id</li>
-         * <li>remote ip</li>
+         * @see java.util.logging.Formatter#format(java.util.logging.LogRecord) <ol> <li>timestamp</li> <li>method<li> <li>logger name</li> <li>level</li>
+         * <li>message</li> <li>exception</li> <li>request id</li> <li>session id</li> <li>application id</li> <li>remote ip</li>
          */
         @Override
         public String format(LogRecord record) {
-            return String.format(format, record.getMillis(), record.getSourceClassName() + '.' + record.getSourceMethodName(),
-                    editor.apply(record.getLoggerName()), record.getLevel().getName(), formatMessage(record),
-                    Tool.of(record.getThrown()).map(t -> Tool.print(t::printStackTrace)).orElse(""), Request.current().map(Object::hashCode).orElse(0),
-                    Session.current().map(Object::hashCode).orElse(0), Application.current().map(Object::hashCode).orElse(0), Request.current().map(Request::getRemoteIp).orElse("(local)"));
+            return String.format(format, record.getMillis(), record.getSourceClassName() + '.' + record.getSourceMethodName(), editor
+                .apply(record.getLoggerName()), record.getLevel()
+                    .getName(), formatMessage(record), Tool.of(record.getThrown())
+                        .map(t -> Tool.print(t::printStackTrace))
+                        .orElse(""), Request.current()
+                            .map(Object::hashCode)
+                            .orElse(0), Session.current()
+                                .map(Object::hashCode)
+                                .orElse(0), Application.current()
+                                    .map(Object::hashCode)
+                                    .orElse(0), Request.current()
+                                        .map(Request::getRemoteIp)
+                                        .orElse("(local)"));
         }
 
         /**
@@ -166,10 +166,13 @@ public class Log extends Handler {
                 realFile = file;
             } else {
                 level = record.getLevel();
-                realFile = file.replace("ll", level.getName().toLowerCase(Locale.ENGLISH));
+                realFile = file.replace("ll", level.getName()
+                    .toLowerCase(Locale.ENGLISH));
             }
             String message = getFormatter().format(record);
-            Charset encoding = Tool.of(getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset());
+            Charset encoding = Tool.of(getEncoding())
+                .map(Charset::forName)
+                .orElse(Charset.defaultCharset());
             FileChannel channel = outMap.computeIfAbsent(level, i -> {
                 FileChannel c = null;
                 try {
@@ -186,7 +189,8 @@ public class Log extends Handler {
                     return c;
                 } catch (Exception e) {
                     if (c != null) {
-                        Try.r(c::close, ee -> Log.warning(ee, () -> "close error")).run();
+                        Try.r(c::close, ee -> Log.warning(ee, () -> "close error"))
+                            .run();
                     }
                     reportError(null, e, ErrorManager.OPEN_FAILURE);
                     return null;
@@ -219,9 +223,12 @@ public class Log extends Handler {
      */
     @Override
     public void close() throws SecurityException {
-        for (Iterator<Map.Entry<Level, FileChannel>> i = outMap.entrySet().iterator(); i.hasNext();) {
+        for (Iterator<Map.Entry<Level, FileChannel>> i = outMap.entrySet()
+            .iterator(); i.hasNext();) {
             try {
-                Tool.peek(i.next().getValue(), c -> System.err.println("log close #" + c.hashCode())).close();
+                Tool.peek(i.next()
+                    .getValue(), c -> System.err.println("log close #" + c.hashCode()))
+                    .close();
                 i.remove();
             } catch (Exception e) {
                 reportError(null, e, ErrorManager.CLOSE_FAILURE);
@@ -240,6 +247,11 @@ public class Log extends Handler {
     private static volatile Handler handler;
 
     /**
+     * class name matcher for skip stack trace
+     */
+    private static Predicate<String> matcher = s -> true;
+
+    /**
      * For access to stack trace
      */
     static final JavaLangAccess access = SharedSecrets.getJavaLangAccess();
@@ -250,9 +262,10 @@ public class Log extends Handler {
     public static void startup() {
         Consumer<Handler> setup = handler -> {
             handler.setLevel(Sys.Log.level);
-            handler.setFormatter(new Formatter(Sys.Log.format, Formatter::compact));
+            handler.setFormatter(new Formatter(Sys.Log.format, Sys.Log.compact_package ? Formatter::compact : Function.identity()));
             if (!Sys.Log.ignore_prefixes.isEmpty()) {
-                handler.setFilter(r -> Sys.Log.ignore_prefixes.stream().noneMatch(r.getLoggerName()::startsWith));
+                handler.setFilter(r -> Sys.Log.ignore_prefixes.stream()
+                    .noneMatch(r.getLoggerName()::startsWith));
             }
         };
         try {
@@ -270,13 +283,16 @@ public class Log extends Handler {
             if (noEntry) {
                 if (first.compareAndSet(true, false)) {
                     handler = new Log(Sys.Log.folder, Sys.Log.file_pattern);
+                    matcher = Sys.Log.trace_skip_regex.asPredicate().negate();
                     setup.accept(handler);
                 }
                 root.addHandler(handler);
-                Logger.getLogger(Log.class.getCanonicalName()).config("addHandler: " + handler);
+                Logger.getLogger(Log.class.getCanonicalName())
+                    .config("addHandler: " + handler);
             }
         } catch (Throwable e) {
-            Logger.getGlobal().log(Level.WARNING, e.getMessage(), e);
+            Logger.getGlobal()
+                .log(Level.WARNING, e.getMessage(), e);
         }
     }
 
@@ -287,7 +303,8 @@ public class Log extends Handler {
         Logger root = Logger.getLogger("");
         for (Handler i : root.getHandlers()) {
             if (i instanceof Log) {
-                Logger.getGlobal().config("removeHandler: " + i);
+                Logger.getGlobal()
+                    .config("removeHandler: " + i);
                 i.close();
                 root.removeHandler(i);
             }
@@ -454,6 +471,16 @@ public class Log extends Handler {
      * @param message message The string message (or a key in the message catalog)
      */
     public static void log(Level level, Throwable thrown, Supplier<String> message) {
+        log(0, level, thrown, message);
+    }
+
+    /**
+     * @param skip Skips of stack trace
+     * @param level Log level
+     * @param thrown Throwable associated with log message.
+     * @param message message The string message (or a key in the message catalog)
+     */
+    public static void log(int skip, Level level, Throwable thrown, Supplier<String> message) {
         int levelValue = level.intValue();
         if (level == Level.OFF) {
             return;
@@ -467,7 +494,10 @@ public class Log extends Handler {
         for (int i = 0; i < depth; i++) {
             StackTraceElement frame = access.getStackTraceElement(throwable, i);
             String className = frame.getClassName();
-            if (!Log.class.getName().equals(className)) {
+            if (matcher.test(className)) {
+                if (skip != 0 && i + skip < depth) {
+                    frame = access.getStackTraceElement(throwable, i + skip);
+                }
                 String methodName = frame.getMethodName();
                 record.setSourceClassName(className);
                 record.setSourceMethodName(methodName);
@@ -477,7 +507,10 @@ public class Log extends Handler {
         }
         for (Logger logger = Logger.getGlobal(); logger != null; logger = logger.getParent()) {
             for (Handler handler : logger.getHandlers()) {
-                if (levelValue >= handler.getLevel().intValue() && Tool.of(handler.getFilter()).map(f -> f.isLoggable(record)).orElse(true)) {
+                if (levelValue >= handler.getLevel()
+                    .intValue() && Tool.of(handler.getFilter())
+                        .map(f -> f.isLoggable(record))
+                        .orElse(true)) {
                     handler.publish(record);
                 }
             }

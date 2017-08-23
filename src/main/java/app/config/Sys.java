@@ -51,6 +51,12 @@ public class Sys {
 
         @Help("request parameter max output letters")
         public static int parameter_max_letters = 50;
+
+        @Help("regular expression for skip stack trace classes")
+        public static Pattern trace_skip_regex = Pattern.compile("^(java|framework)[.].*$");
+
+        @Help("package name compact to first character if true")
+        public static boolean compact_package = true;
     }
 
     public static class Mail {
@@ -126,9 +132,8 @@ public class Sys {
             "X-Download-Options: noopen #IE direct open disabled",
             "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0|Expires: -1|Pragma: no-cache # cache disabled" })
     @Separator(value = '|', pair = ':')
-    public static Map<String, String> headers = Tool.map("X-UA-Compatible", "IE=edge", "Cache-Control",
-            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0", "X-Content-Type-Options", "nosniff", "X-Download-Options", "noopen", "Pragma",
-            "no-cache", "Expires", "-1");
+    public static Map<String, String> headers = Tool
+        .map("X-UA-Compatible", "IE=edge", "Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0", "X-Content-Type-Options", "nosniff", "X-Download-Options", "noopen", "Pragma", "no-cache", "Expires", "-1");
 
     @Help("htdocs folder")
     public static String document_root_folder = "/view/";
@@ -154,8 +159,8 @@ public class Sys {
 
     @Help("file extension of text type contents")
     @Separator('|')
-    public static List<String> text_extensions = Tool.list(".txt", ".htm", ".html", ".js", ".json", ".css", ".csv", ".tsv", ".xml", ".ini", ".yml",
-            ".properties", ".php", ".java", ".jsp", ".xhtml");
+    public static List<String> text_extensions = Tool
+        .list(".txt", ".htm", ".html", ".js", ".json", ".css", ".csv", ".tsv", ".xml", ".ini", ".yml", ".properties", ".php", ".java", ".jsp", ".xhtml");
 
     @Help("http port(disabled if empty)")
     @SuppressFBWarnings("MS_CANNOT_BE_FINAL")
@@ -195,7 +200,8 @@ public class Sys {
     public static String cluster_suffix = "";
 
     @Help("job packages")
-    public static List<String> job_packages = Tool.list(Main.class.getPackage().getName());
+    public static List<String> job_packages = Tool.list(Main.class.getPackage()
+        .getName());
 
     @Help("separator of array to text")
     public static String array_separator = "\n,\n";
