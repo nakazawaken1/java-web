@@ -264,7 +264,7 @@ public class Log extends Handler {
             handler.setLevel(Sys.Log.level);
             handler.setFormatter(new Formatter(Sys.Log.format, Sys.Log.compact_package ? Formatter::compact : Function.identity()));
             if (!Sys.Log.ignore_prefixes.isEmpty()) {
-                handler.setFilter(r -> Sys.Log.ignore_prefixes.stream()
+                handler.setFilter(r -> r.getThrown() != null || Sys.Log.ignore_prefixes.stream()
                     .noneMatch(r.getLoggerName()::startsWith));
             }
         };
