@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -229,12 +230,12 @@ public class Binder implements ErrorAppender {
         }
 
         if (clazz == List.class) {
-            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values == null ? Collections.emptyList() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toList());
         }
 
         if (clazz == Set.class) {
-            return values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
+            return values == null ? Collections.emptySet() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
                     .collect(Collectors.toSet());
         }
 
