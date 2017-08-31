@@ -143,29 +143,42 @@ public class Db implements AutoCloseable {
             public Example(Db db) {
                 String table = "test_table";
                 Log.info("[tables]");
-                db.tables().peek(Log::info).filter(table::equals).forEach(db::drop);
-                String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday").date(),
-                        new Column("weight").decimal(4, 1));
+                db.tables()
+                    .peek(Log::info)
+                    .filter(table::equals)
+                    .forEach(db::drop);
+                String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday")
+                    .date(), new Column("weight").decimal(4, 1));
                 for (int i = 1; i <= 20; i++) {
                     Calendar c = Calendar.getInstance();
                     c.add(Calendar.DATE, -i * 31);
                     db.insert(table, names, 1, i, "氏名'" + i, c.getTime(), BigDecimal.valueOf(Math.random() * 80 + 40));
                 }
-                Log.info(table + " rows: " + db.from(table).count());
-                Query q = db.select("name", "birthday", "weight").from(table).where(db.builder.fn("MONTH", "birthday") + " > 6").orderBy("id");
+                Log.info(table + " rows: " + db.from(table)
+                    .count());
+                Query q = db.select("name", "birthday", "weight")
+                    .from(table)
+                    .where(db.builder.fn("MONTH", "birthday") + " > 6")
+                    .orderBy("id");
                 Log.info("querey rows: " + q.count());
                 TryConsumer<ResultSet> printer = row -> {
                     ResultSetMetaData meta = row.getMetaData();
-                    IntStream.rangeClosed(1, meta.getColumnCount()).forEach(Try.intC(i -> System.out.println(meta.getColumnName(i) + "=" + row.getObject(i))));
+                    IntStream.rangeClosed(1, meta.getColumnCount())
+                        .forEach(Try.intC(i -> System.out.println(meta.getColumnName(i) + "=" + row.getObject(i))));
                 };
                 Log.info("7月以降まれ[1-3]");
-                q.limit(3).rows(printer);
+                q.limit(3)
+                    .rows(printer);
                 Log.info("7月以降まれ[4-6]");
-                q.offset(3).rows(printer);
+                q.offset(3)
+                    .rows(printer);
                 Log.info("7月以降まれ[7-]");
-                q.offset(6).limit(0).rows(printer);
+                q.offset(6)
+                    .limit(0)
+                    .rows(printer);
                 db.truncate(table);
-                Log.info(table + " rows: " + db.from(table).count());
+                Log.info(table + " rows: " + db.from(table)
+                    .count());
                 db.drop(table);
             }
         }
@@ -219,17 +232,29 @@ public class Db implements AutoCloseable {
     /**
      * ResultSet to array
      */
-    public static final Function<ResultSet, Object[]> toArray = Try
-            .f(rs -> IntStream.rangeClosed(1, rs.getMetaData().getColumnCount()).mapToObj(Try.intF(rs::getObject)).toArray());
+    public static final TryFunction<ResultSet, Object[]> tryToArray = rs -> IntStream.rangeClosed(1, rs.getMetaData()
+        .getColumnCount())
+        .mapToObj(Try.intF(rs::getObject))
+        .toArray();
+
+    /**
+     * ResultSet to array
+     */
+    public static final Function<ResultSet, Object[]> toArray = Try.f(tryToArray);
 
     /**
      * ResultSet to map
      */
-    public static final Function<ResultSet, Map<String, Object>> toMap = Try.f(rs -> {
+    public static final TryFunction<ResultSet, Map<String, Object>> tryToMap = rs -> {
         ResultSetMetaData meta = rs.getMetaData();
-        return IntStream.rangeClosed(1, meta.getColumnCount()).collect(LinkedHashMap::new,
-                Try.intC((map, i) -> map.put(meta.getColumnName(i), rs.getObject(i))), Map::putAll);
-    });
+        return IntStream.rangeClosed(1, meta.getColumnCount())
+            .collect(LinkedHashMap::new, Try.intC((map, i) -> map.put(meta.getColumnName(i), rs.getObject(i))), Map::putAll);
+    };
+
+    /**
+     * ResultSet to map
+     */
+    public static final Function<ResultSet, Map<String, Object>> toMap = Try.f(tryToMap);
 
     /**
      * connect by config
@@ -249,7 +274,8 @@ public class Db implements AutoCloseable {
     public static Db connect(String suffix) {
         try {
             Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty("Sys.Db." + suffix));
+            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale())
+                .getProperty("Sys.Db." + suffix));
             return new Db(connection, type);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
@@ -372,7 +398,8 @@ public class Db implements AutoCloseable {
             break;
         case ORACLE:
             builder = new OracleBuilder();
-            schema = Try.s(connection::getSchema).get();
+            schema = Try.s(connection::getSchema)
+                .get();
             break;
         case SQLSERVER:
             builder = new SqlserverBuilder();
@@ -397,8 +424,10 @@ public class Db implements AutoCloseable {
             String url = p.getProperty("Sys.Db." + key);
             Log.info("Database connect to " + url);
             Type type = Type.fromUrl(url);
-            String name = Tool.string(p.getProperty("Sys.Db.datasource_class." + key)).orElse(type.dataSource);
-            Class<DataSource> c = Reflector.<DataSource>clazz(name).orElseThrow(() -> new RuntimeException("class not found : " + name));
+            String name = Tool.string(p.getProperty("Sys.Db.datasource_class." + key))
+                .orElse(type.dataSource);
+            Class<DataSource> c = Reflector.<DataSource>clazz(name)
+                .orElseThrow(() -> new RuntimeException("class not found : " + name));
             DataSource ds = Reflector.instance(c);
             if (type == Type.H2) { /* hack: h2 Duplicate property "USER" */
                 List<String> list = new ArrayList<>();
@@ -406,7 +435,8 @@ public class Db implements AutoCloseable {
                     String[] a = s.split("\\s*=\\s*", 2);
                     if ("user".equalsIgnoreCase(a[0])) {
                         if (a.length > 1) {
-                            c.getMethod("setUser", String.class).invoke(ds, a[1]);
+                            c.getMethod("setUser", String.class)
+                                .invoke(ds, a[1]);
                         }
                     } else {
                         list.add(s);
@@ -416,7 +446,8 @@ public class Db implements AutoCloseable {
             }
             for (String method : Tool.array("setURL", "setUrl")) {
                 try {
-                    c.getMethod(method, String.class).invoke(ds, url);
+                    c.getMethod(method, String.class)
+                        .invoke(ds, url);
                     break;
                 } catch (NoSuchMethodException e) {
                     continue;
@@ -438,7 +469,8 @@ public class Db implements AutoCloseable {
      * @return self
      */
     public Db withTransaction() {
-        Try.r(() -> connection.setAutoCommit(false)).run();
+        Try.r(() -> connection.setAutoCommit(false))
+            .run();
         return this;
     }
 
@@ -522,7 +554,8 @@ public class Db implements AutoCloseable {
         try {
             return stream(connection.prepareStatement(sql));
         } catch (SQLException e) {
-            Try.r(connection::rollback).run();
+            Try.r(connection::rollback)
+                .run();
             throw new UncheckedSQLException(e);
         }
     }
@@ -536,7 +569,8 @@ public class Db implements AutoCloseable {
      * @return ResultSet stream
      */
     public Stream<ResultSet> queryFile(String name, Map<String, Object> map, Object... values) {
-        return getSQL(name).map(sql -> query(sql, map, values)).orElseThrow(() -> new UncheckedIOException(new FileNotFoundException(name)));
+        return getSQL(name).map(sql -> query(sql, map, values))
+            .orElseThrow(() -> new UncheckedIOException(new FileNotFoundException(name)));
     }
 
     /**
@@ -558,7 +592,8 @@ public class Db implements AutoCloseable {
                 Log.info(s + ";");
                 total += ps.executeUpdate();
             } catch (SQLException e) {
-                Try.r(connection::rollback).run();
+                Try.r(connection::rollback)
+                    .run();
                 throw new UncheckedSQLException(e);
             } finally {
                 Log.config("PreparedStatement dropped #" + hash);
@@ -576,7 +611,8 @@ public class Db implements AutoCloseable {
      * @return affected rows
      */
     public int executeFile(String name, Map<String, Object> map, Object... values) {
-        return getSQL(name).map(sql -> execute(sql, map, values)).orElseThrow(() -> new UncheckedIOException(new FileNotFoundException(name)));
+        return getSQL(name).map(sql -> execute(sql, map, values))
+            .orElseThrow(() -> new UncheckedIOException(new FileNotFoundException(name)));
     }
 
     /**
@@ -593,12 +629,14 @@ public class Db implements AutoCloseable {
         if (!url.isPresent()) {
             url = Tool.toURL(commonPath);
         }
-        Log.info(url.map(URL::toString).orElse(name + " not found"));
+        Log.info(url.map(URL::toString)
+            .orElse(name + " not found"));
         return url.map(Try.f(i -> builder.replace(Tool.loadText(i.openStream()))));
     }
 
     /**
      * update if exists row, else insert
+     * 
      * @param update Prepare for update
      * @param insert Prepare for insert
      * @param table table name
@@ -607,7 +645,8 @@ public class Db implements AutoCloseable {
      * @param values save values
      * @return true: inserted、 false: updated
      */
-    public boolean save(Consumer<Map<String, Object>> update, Consumer<Map<String, Object>> insert, String table, String[] names, int primary, Object... values) {
+    public boolean save(Consumer<Map<String, Object>> update, Consumer<Map<String, Object>> insert, String table, String[] names, int primary,
+            Object... values) {
         Query q = from(table);
         boolean empty = false;
         for (int i = 0; i < primary; i++) {
@@ -618,7 +657,8 @@ public class Db implements AutoCloseable {
             q.where(names[i], values[i]);
         }
         if (!empty) {
-            empty = !q.forUpdate().exists();
+            empty = !q.forUpdate()
+                .exists();
         }
         if (empty) {
             insert(insert, table, names, primary, values);
@@ -648,7 +688,8 @@ public class Db implements AutoCloseable {
             q.where(names[i], values[i]);
         }
         if (!empty) {
-            empty = !q.forUpdate().exists();
+            empty = !q.forUpdate()
+                .exists();
         }
         if (empty) {
             insert(table, names, primary, values);
@@ -673,6 +714,7 @@ public class Db implements AutoCloseable {
 
     /**
      * update row
+     * 
      * @param prepare Prepare(ex. set common column info)
      * @param table table name
      * @param names row names(arrange primary key in left)
@@ -685,19 +727,28 @@ public class Db implements AutoCloseable {
         sql.append(table);
         String pad = " SET ";
         for (int i = primary; i < values.length; i++) {
-            sql.append(pad).append(names[i]).append(" = ").append(builder.escape(values[i]));
+            sql.append(pad)
+                .append(names[i])
+                .append(" = ")
+                .append(builder.escape(values[i]));
             pad = ", ";
         }
-        if(prepare != null) {
+        if (prepare != null) {
             Map<String, Object> map = new LinkedHashMap<>();
             prepare.accept(map);
             map.forEach((name, value) -> {
-                sql.append(", ").append(name).append(" = ").append(builder.escape(value));
+                sql.append(", ")
+                    .append(name)
+                    .append(" = ")
+                    .append(builder.escape(value));
             });
         }
         pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
-            sql.append(pad).append(names[i]).append(" = ").append(builder.escape(values[i]));
+            sql.append(pad)
+                .append(names[i])
+                .append(" = ")
+                .append(builder.escape(values[i]));
             pad = " AND ";
         }
         return execute(sql.toString(), null);
@@ -718,6 +769,7 @@ public class Db implements AutoCloseable {
 
     /**
      * insert row
+     * 
      * @param prepare Prepare(ex. set common column info)
      * @param table table name
      * @param names row names(arrange primary key in left)
@@ -736,7 +788,7 @@ public class Db implements AutoCloseable {
             nameList.add(i.getKey());
             valueList.add(i.getValue());
         }
-        if(prepare != null) {
+        if (prepare != null) {
             Map<String, Object> map = new LinkedHashMap<>();
             prepare.accept(map);
             map.forEach((name, value) -> {
@@ -745,7 +797,8 @@ public class Db implements AutoCloseable {
             });
         }
         StringBuilder sql = new StringBuilder("INSERT INTO ");
-        sql.append(table).append(join("(", nameList, ", "));
+        sql.append(table)
+            .append(join("(", nameList, ", "));
         boolean first = true;
         for (Object value : valueList) {
             sql.append(first ? ") VALUES(" : ", ");
@@ -757,7 +810,8 @@ public class Db implements AutoCloseable {
             }
             first = false;
         }
-        return execute(sql.append(")").toString(), null);
+        return execute(sql.append(")")
+            .toString(), null);
     }
 
     /**
@@ -774,7 +828,10 @@ public class Db implements AutoCloseable {
         sql.append(table);
         String pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
-            sql.append(pad).append(names[i]).append(" = ").append(builder.escape(values[i]));
+            sql.append(pad)
+                .append(names[i])
+                .append(" = ")
+                .append(builder.escape(values[i]));
             pad = " AND ";
         }
         return execute(sql.toString(), null);
@@ -799,7 +856,8 @@ public class Db implements AutoCloseable {
             resources = new ArrayList<>();
         }
         resources.add(i);
-        return StreamSupport.stream(i, false).onClose(i::close);
+        return StreamSupport.stream(i, false)
+            .onClose(i::close);
     }
 
     /**
@@ -812,7 +870,8 @@ public class Db implements AutoCloseable {
             resources = new ArrayList<>();
         }
         resources.add(i);
-        return StreamSupport.stream(i, false).onClose(i::close);
+        return StreamSupport.stream(i, false)
+            .onClose(i::close);
     }
 
     /**
@@ -827,9 +886,11 @@ public class Db implements AutoCloseable {
                 resources = new ArrayList<>();
             }
             resources.add(i);
-            return StreamSupport.stream(i, false).onClose(i::close);
+            return StreamSupport.stream(i, false)
+                .onClose(i::close);
         } catch (SQLException e) {
-            Try.r(connection::rollback).run();
+            Try.r(connection::rollback)
+                .run();
             throw new UncheckedSQLException(e);
         }
     }
@@ -839,9 +900,13 @@ public class Db implements AutoCloseable {
      */
     public Stream<String> tables() {
         try {
-            return stream(connection.getMetaData().getTables(null, schema, null, new String[] { "TABLE" })).map(Try.f(rs -> rs.getString(3).toLowerCase()));
+            return stream(connection.getMetaData()
+                .getTables(null, schema, null, new String[] { "TABLE" })).map(Try
+                    .f(rs -> rs.getString(3)
+                        .toLowerCase()));
         } catch (SQLException e) {
-            Try.r(connection::rollback).run();
+            Try.r(connection::rollback)
+                .run();
             throw new UncheckedSQLException(e);
         }
     }
@@ -873,7 +938,8 @@ public class Db implements AutoCloseable {
         StringBuilder result = new StringBuilder();
         if (items != null) {
             for (Object item : items) {
-                result.append(pad).append(item);
+                result.append(pad)
+                    .append(item);
             }
         }
         return result.length() <= 0 ? "" : prefix + result.substring(pad.length());
@@ -895,8 +961,10 @@ public class Db implements AutoCloseable {
      * Enum to column name
      */
     public static final Function<Enum<?>, String> toColumn = e -> {
-        Class<?> clazz = Reflector.getGenericParameter(e.getClass().getDeclaringClass(), 0);
-        return Reflector.mappingFieldName(Reflector.field(clazz, e.name()).get());
+        Class<?> clazz = Reflector.getGenericParameter(e.getClass()
+            .getDeclaringClass(), 0);
+        return Reflector.mappingFieldName(Reflector.field(clazz, e.name())
+            .get());
     };
 
     /**
@@ -907,7 +975,9 @@ public class Db implements AutoCloseable {
      */
     public Query select(Enum<?>... fields) {
         Query q = new Query(this);
-        q.fields = Stream.of(fields).map(toColumn).collect(Collectors.toList());
+        q.fields = Stream.of(fields)
+            .map(toColumn)
+            .collect(Collectors.toList());
         return q;
     }
 
@@ -945,7 +1015,9 @@ public class Db implements AutoCloseable {
      */
     public String[] create(String table, int primary, Column... columns) {
         execute(createSql(table, primary, columns), null);
-        return Stream.of(columns).map(column -> column.name).toArray(String[]::new);
+        return Stream.of(columns)
+            .map(column -> column.name)
+            .toArray(String[]::new);
     }
 
     /**
@@ -958,26 +1030,37 @@ public class Db implements AutoCloseable {
      */
     public String createSql(String table, int primary, Column... columns) {
         StringBuilder sql = new StringBuilder("CREATE TABLE ");
-        sql.append(table).append("(");
+        sql.append(table)
+            .append("(");
         String pad = "";
         String[] names = new String[columns.length];
         int i = 0;
         for (Column column : columns) {
             names[i++] = column.name;
-            sql.append(pad).append(column.name).append(" ").append(builder.type(column));
+            sql.append(pad)
+                .append(column.name)
+                .append(" ")
+                .append(builder.type(column));
             if (!column.nullable && builder.supportNullString) {
                 sql.append(" NOT NULL");
             }
-            if (!(column.value == null || !Tool.string(column.value).isPresent() && !builder.supportNullString)) {
-                sql.append(" DEFAULT ").append(builder.escape(column.value));
+            if (!(column.value == null || !Tool.string(column.value)
+                .isPresent() && !builder.supportNullString)) {
+                sql.append(" DEFAULT ")
+                    .append(builder.escape(column.value));
             }
-            Tool.string(column.display).map(j -> " COMMENT '" + j + "'").ifPresent(sql::append);
+            Tool.string(column.display)
+                .map(j -> " COMMENT '" + j + "'")
+                .ifPresent(sql::append);
             pad = ", ";
         }
         if (primary > 0) {
-            sql.append(join(", PRIMARY KEY(", Tool.list(names).subList(0, primary), ", ")).append(")");
+            sql.append(join(", PRIMARY KEY(", Tool.list(names)
+                .subList(0, primary), ", "))
+                .append(")");
         }
-        return sql.append(")").toString();
+        return sql.append(")")
+            .toString();
     }
 
     /**
@@ -1039,61 +1122,98 @@ public class Db implements AutoCloseable {
         String suffix = ".sql";
         List<String> all;
         try (Stream<String> files = Tool.getResources(folder)) {
-            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix))).peek(Log::info)
-                    .collect(Collectors.toList());
+            all = files.filter(file -> file.endsWith(suffix) && (file.startsWith(tablePrefix) || file.startsWith(dataPrefix)))
+                .peek(Log::info)
+                .collect(Collectors.toList());
         }
-        List<String> datas = all.stream().filter(file -> file.startsWith(dataPrefix)).collect(Collectors.toList());
+        List<String> datas = all.stream()
+            .filter(file -> file.startsWith(dataPrefix))
+            .collect(Collectors.toList());
 
         try (Db db = Db.connect()) {
-            db.getSQL("setup" + suffix).map(sql -> db.execute(sql, null));
+            db.getSQL("setup" + suffix)
+                .map(sql -> db.execute(sql, null));
 
             /* get table creation sql */
-            List<String> tables = all.stream().filter(file -> file.startsWith(tablePrefix)).collect(Collectors.toList());
+            List<String> tables = all.stream()
+                .filter(file -> file.startsWith(tablePrefix))
+                .collect(Collectors.toList());
 
             /* table name getter */
             Function<String, String> tableName = file -> file.substring(tablePrefix.length(), file.length() - suffix.length());
-            List<String> tableNames = tables.stream().map(tableName).collect(Collectors.toList());
+            List<String> tableNames = tables.stream()
+                .map(tableName)
+                .collect(Collectors.toList());
 
             List<Tuple<String, Class<?>>> models = new ArrayList<>();
             List<Tuple<String, Persist>> modelDatas = new ArrayList<>();
-            try (Stream<Class<?>> classes = Tool.getClasses(Account.class.getPackage().getName())) {
-                classes.map(c -> Tuple.of(c, c.getAnnotation(Persist.class))).filter(t -> t.r != null)
-                        .map(t -> Tuple.of(Reflector.mappingClassName(t.l), t.l, t.r)).filter(t -> !tableNames.contains(t.l)).peek(t -> {
-                            if (!datas.contains(t.l)) {
-                                modelDatas.add(Tuple.of(t.l, t.r.r));
-                            }
-                        }).filter(t -> !tables.contains(tablePrefix + t.l + suffix)).forEach(t -> models.add(Tuple.of(t.l, t.r.l)));
+            try (Stream<Class<?>> classes = Tool.getClasses(Account.class.getPackage()
+                .getName())) {
+                classes.map(c -> Tuple.of(c, c.getAnnotation(Persist.class)))
+                    .filter(t -> t.r != null)
+                    .map(t -> Tuple.of(Reflector.mappingClassName(t.l), t.l, t.r))
+                    .filter(t -> !tableNames.contains(t.l))
+                    .peek(t -> {
+                        if (!datas.contains(t.l)) {
+                            modelDatas.add(Tuple.of(t.l, t.r.r));
+                        }
+                    })
+                    .filter(t -> !tables.contains(tablePrefix + t.l + suffix))
+                    .forEach(t -> models.add(Tuple.of(t.l, t.r.l)));
             }
 
             /* get exists tables */
-            Set<String> existTables = db.tables().collect(Collectors.toSet());
+            Set<String> existTables = db.tables()
+                .collect(Collectors.toSet());
 
             Set<String> reloadTables;
             if (create) {
                 /* drop exists tables */
-                Stream.concat(tableNames.stream(), models.stream().map(t -> t.l)).filter(existTables::contains).forEach(db::drop);
+                Stream.concat(tableNames.stream(), models.stream()
+                    .map(t -> t.l))
+                    .filter(existTables::contains)
+                    .forEach(db::drop);
                 /* create all tables and entry to load data */
-                reloadTables = Stream.concat(tables.stream().peek(file -> db.executeFile(file, null)).map(tableName),
-                        models.stream().peek(t -> db.create(t.r)).map(t -> t.l)).collect(Collectors.toSet());
+                reloadTables = Stream.concat(tables.stream()
+                    .peek(file -> db.executeFile(file, null))
+                    .map(tableName), models.stream()
+                        .peek(t -> db.create(t.r))
+                        .map(t -> t.l))
+                    .collect(Collectors.toSet());
             } else if (reload) {
                 /* create no-exists tables */
-                tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).forEach(file -> db.executeFile(file, null));
-                models.stream().filter(t -> !existTables.contains(t.l)).forEach(t -> db.create(t.r));
+                tables.stream()
+                    .filter(file -> !existTables.contains(tableName.apply(file)))
+                    .forEach(file -> db.executeFile(file, null));
+                models.stream()
+                    .filter(t -> !existTables.contains(t.l))
+                    .forEach(t -> db.create(t.r));
                 /* entry all tables to load data */
-                reloadTables = tableNames.stream().collect(Collectors.toSet());
+                reloadTables = tableNames.stream()
+                    .collect(Collectors.toSet());
             } else {
                 /* create no-exists table and entry to load data */
-                reloadTables = Stream
-                        .concat(tables.stream().filter(file -> !existTables.contains(tableName.apply(file))).peek(file -> db.executeFile(file, null))
-                                .map(tableName), models.stream().filter(t -> !existTables.contains(t.l)).peek(t -> db.create(t.r)).map(t -> t.l))
-                        .collect(Collectors.toSet());
+                reloadTables = Stream.concat(tables.stream()
+                    .filter(file -> !existTables.contains(tableName.apply(file)))
+                    .peek(file -> db.executeFile(file, null))
+                    .map(tableName), models.stream()
+                        .filter(t -> !existTables.contains(t.l))
+                        .peek(t -> db.create(t.r))
+                        .map(t -> t.l))
+                    .collect(Collectors.toSet());
             }
 
             /* data load */
             Function<String, String> dataName = file -> file.substring(dataPrefix.length(), file.length() - suffix.length());
-            datas.stream().filter(file -> reloadTables.contains(dataName.apply(file))).peek(file -> db.truncate(dataName.apply(file)))
-                    .forEach(file -> db.executeFile(file, null));
-            modelDatas.stream().peek(t -> db.truncate(t.l)).forEach(Try.c(t -> t.r.loader().newInstance().accept(db, t.l, t.r)));
+            datas.stream()
+                .filter(file -> reloadTables.contains(dataName.apply(file)))
+                .peek(file -> db.truncate(dataName.apply(file)))
+                .forEach(file -> db.executeFile(file, null));
+            modelDatas.stream()
+                .peek(t -> db.truncate(t.l))
+                .forEach(Try.c(t -> t.r.loader()
+                    .newInstance()
+                    .accept(db, t.l, t.r)));
         }
     }
 
@@ -1103,7 +1223,9 @@ public class Db implements AutoCloseable {
      * @throws Exception exception
      */
     public static void shutdown() throws Exception {
-        Class.forName("com.mysql.jdbc.AbandonedConnectionCleanupThread").getMethod("shutdown").invoke(null);
+        Class.forName("com.mysql.jdbc.AbandonedConnectionCleanupThread")
+            .getMethod("shutdown")
+            .invoke(null);
     }
 
     /**
@@ -1124,16 +1246,21 @@ public class Db implements AutoCloseable {
          */
         public String sql(Query q) {
             StringBuilder sql = new StringBuilder();
-            sql.append("SELECT ").append(q.fields == null ? "*" : join("", q.fields, ", "));
+            sql.append("SELECT ")
+                .append(q.fields == null ? "*" : join("", q.fields, ", "));
             if (q.table != null) {
-                sql.append(" FROM ").append(q.table);
+                sql.append(" FROM ")
+                    .append(q.table);
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" HAVING ", q.havings, " AND "));
                 sql.append(join(" ORDER BY ", q.orders, ", "));
                 if (q.limit > 0 || q.offset > 0) {
                     long limit = q.limit <= 0 ? Integer.MAX_VALUE : q.limit;
-                    sql.append(" LIMIT ").append(q.offset).append(", ").append(limit);
+                    sql.append(" LIMIT ")
+                        .append(q.offset)
+                        .append(", ")
+                        .append(limit);
                 }
                 if (q.forUpdate) {
                     sql.append(" FOR UPDATE");
@@ -1151,7 +1278,8 @@ public class Db implements AutoCloseable {
         public String deleteSql(Query q) {
             StringBuilder sql = new StringBuilder();
             sql.append("DELETE");
-            sql.append(" FROM ").append(q.table);
+            sql.append(" FROM ")
+                .append(q.table);
             sql.append(join(" WHERE ", q.wheres, " AND "));
             return sql.toString();
         }
@@ -1207,15 +1335,18 @@ public class Db implements AutoCloseable {
                 return "TIMESTAMP '" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value) + "'";
             }
             if (value instanceof LocalDateTime || value instanceof ZonedDateTime || value instanceof OffsetDateTime) {
-                return "TIMESTAMP '" + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format((TemporalAccessor) value) + "'";
+                return "TIMESTAMP '" + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .format((TemporalAccessor) value) + "'";
             }
             if (value instanceof LocalDate) {
-                return "DATE '" + DateTimeFormatter.ofPattern("yyyy-MM-dd").format((TemporalAccessor) value) + "'";
+                return "DATE '" + DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                    .format((TemporalAccessor) value) + "'";
             }
             if (value instanceof Number) {
                 return String.valueOf(value);
             }
-            return "'" + prefix + value.toString().replace("'", "''") + suffix + "'";
+            return "'" + prefix + value.toString()
+                .replace("'", "''") + suffix + "'";
         }
 
         /**
@@ -1257,7 +1388,9 @@ public class Db implements AutoCloseable {
          * @return native SQL
          */
         public String replace(String sql) {
-            return Pattern.compile("VARCHAR2", Pattern.CASE_INSENSITIVE).matcher(sql).replaceAll("VARCHAR");
+            return Pattern.compile("VARCHAR2", Pattern.CASE_INSENSITIVE)
+                .matcher(sql)
+                .replaceAll("VARCHAR");
         }
     }
 
@@ -1274,17 +1407,21 @@ public class Db implements AutoCloseable {
         @Override
         public String sql(Query q) {
             StringBuilder sql = new StringBuilder();
-            sql.append("SELECT ").append(q.fields == null ? "*" : join("", q.fields, ", "));
+            sql.append("SELECT ")
+                .append(q.fields == null ? "*" : join("", q.fields, ", "));
             if (q.table != null) {
-                sql.append(" FROM ").append(q.table);
+                sql.append(" FROM ")
+                    .append(q.table);
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" ORDER BY ", q.orders, ", "));
                 if (q.limit > 0) {
-                    sql.append(" LIMIT ").append(q.limit);
+                    sql.append(" LIMIT ")
+                        .append(q.limit);
                 }
                 if (q.offset > 0) {
-                    sql.append(" OFFSET ").append(q.offset);
+                    sql.append(" OFFSET ")
+                        .append(q.offset);
                 }
                 if (q.forUpdate) {
                     sql.append(" FOR UPDATE");
@@ -1325,7 +1462,9 @@ public class Db implements AutoCloseable {
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ");
             if (q.limit > 0 && q.offset <= 0) {
-                sql.append("TOP ").append(q.limit).append(" ");
+                sql.append("TOP ")
+                    .append(q.limit)
+                    .append(" ");
             }
             sql.append(q.fields == null ? "*" : join("", q.fields, ", "));
             String orderBy = join(" ORDER BY ", q.orders, ", ");
@@ -1335,14 +1474,17 @@ public class Db implements AutoCloseable {
                 if (orderBy.isEmpty()) {
                     orderBy = " ORDER BY " + (q.fields == null ? "id" : q.fields.get(0));
                 }
-                sql.append(" FROM (").append(select).append(", ROW_NUMBER()");
+                sql.append(" FROM (")
+                    .append(select)
+                    .append(", ROW_NUMBER()");
                 if (!orderBy.isEmpty()) {
                     sql.append(" OVER(" + orderBy.substring(1) + ")");
                 }
                 sql.append(" N__");
             }
             if (q.table != null) {
-                sql.append(" FROM ").append(q.table);
+                sql.append(" FROM ")
+                    .append(q.table);
                 if (q.forUpdate) {
                     sql.append(" WITH (UPDLOCK)");
                 }
@@ -1351,9 +1493,13 @@ public class Db implements AutoCloseable {
                 if (range) {
                     sql.append(") T__ WHERE N__");
                     if (q.limit <= 0) {
-                        sql.append(" > ").append(q.offset);
+                        sql.append(" > ")
+                            .append(q.offset);
                     } else {
-                        sql.append(" BETWEEN ").append(q.offset + 1).append(" AND ").append(q.offset + q.limit);
+                        sql.append(" BETWEEN ")
+                            .append(q.offset + 1)
+                            .append(" AND ")
+                            .append(q.offset + q.limit);
                     }
                     sql.append(" ORDER BY N__");
                 } else {
@@ -1375,10 +1521,12 @@ public class Db implements AutoCloseable {
                 return "'" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value) + "'";
             }
             if (value instanceof LocalDateTime || value instanceof ZonedDateTime || value instanceof OffsetDateTime) {
-                return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format((TemporalAccessor) value) + "'";
+                return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .format((TemporalAccessor) value) + "'";
             }
             if (value instanceof LocalDate) {
-                return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd").format((TemporalAccessor) value) + "'";
+                return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                    .format((TemporalAccessor) value) + "'";
             }
             return super.escape(value);
         }
@@ -1440,18 +1588,26 @@ public class Db implements AutoCloseable {
             sql.append(q.fields == null ? "*" : join("", q.fields, ", "));
             String orderBy = join(" ORDER BY ", q.orders, ", ");
             if (q.table != null) {
-                sql.append(" FROM ").append(q.table).append(join(" WHERE ", q.wheres, " AND "));
+                sql.append(" FROM ")
+                    .append(q.table)
+                    .append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" HAVING ", q.havings, " AND "));
                 sql.append(orderBy);
                 if (q.limit > 0 || q.offset > 0) {
-                    sql.insert(0, "SELECT * FROM (SELECT T__.*, ROWNUM N__ FROM (").append(") T__) WHERE N__");
+                    sql.insert(0, "SELECT * FROM (SELECT T__.*, ROWNUM N__ FROM (")
+                        .append(") T__) WHERE N__");
                     if (q.offset <= 0) {
-                        sql.append(" <= ").append(q.limit);
+                        sql.append(" <= ")
+                            .append(q.limit);
                     } else if (q.limit <= 0) {
-                        sql.append(" > ").append(q.offset);
+                        sql.append(" > ")
+                            .append(q.offset);
                     } else {
-                        sql.append(" BETWEEN ").append(q.offset + 1).append(" AND ").append(q.offset + q.limit);
+                        sql.append(" BETWEEN ")
+                            .append(q.offset + 1)
+                            .append(" AND ")
+                            .append(q.offset + q.limit);
                     }
                 }
                 if (q.forUpdate) {
@@ -1470,7 +1626,9 @@ public class Db implements AutoCloseable {
          */
         @Override
         public String replace(String sql) {
-            return sql.replace("BIGINT", "NUMBER(19, 0)").replace("VARCHAR(", "VARCHAR2(").replace(" DEFAULT '' NOT NULL", "");
+            return sql.replace("BIGINT", "NUMBER(19, 0)")
+                .replace("VARCHAR(", "VARCHAR2(")
+                .replace(" DEFAULT '' NOT NULL", "");
         }
     }
 
@@ -1698,7 +1856,10 @@ public class Db implements AutoCloseable {
                     return true;
                 }
             } catch (SQLException e) {
-                Try.r(() -> rs.getStatement().getConnection().rollback()).run();
+                Try.r(() -> rs.getStatement()
+                    .getConnection()
+                    .rollback())
+                    .run();
                 throw new UncheckedSQLException(e);
             }
             close();
@@ -1851,16 +2012,19 @@ public class Db implements AutoCloseable {
                 return where(field + " IS NULL");
             }
             StringBuilder s = null;
-            if (value.getClass().isArray()) {
+            if (value.getClass()
+                .isArray()) {
                 s = new StringBuilder();
                 for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
-                    s.append(separator).append(Array.get(value, i));
+                    s.append(separator)
+                        .append(Array.get(value, i));
                 }
             }
             if (value instanceof Iterable) {
                 s = new StringBuilder();
                 for (Object i : (Iterable<?>) value) {
-                    s.append(separator).append(i);
+                    s.append(separator)
+                        .append(i);
                 }
             }
             if (s != null) {
@@ -1983,7 +2147,9 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query orderBy(Enum<?>... fields) {
-            return orderBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+            return orderBy(Stream.of(fields)
+                .map(toColumn)
+                .toArray(String[]::new));
         }
 
         /**
@@ -2009,7 +2175,9 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query orderByDesc(Enum<?>... fields) {
-            return orderBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+            return orderBy(Stream.of(fields)
+                .map(toColumn)
+                .toArray(String[]::new));
         }
 
         /**
@@ -2035,7 +2203,9 @@ public class Db implements AutoCloseable {
          * @return preparedQuery
          */
         public Query groupBy(Enum<?>... fields) {
-            return groupBy(Stream.of(fields).map(toColumn).toArray(String[]::new));
+            return groupBy(Stream.of(fields)
+                .map(toColumn)
+                .toArray(String[]::new));
         }
 
         /**
@@ -2075,7 +2245,8 @@ public class Db implements AutoCloseable {
          */
         public boolean exists() {
             try (Stream<ResultSet> stream = stream()) {
-                return stream.findAny().isPresent();
+                return stream.findAny()
+                    .isPresent();
             }
         }
 
@@ -2086,7 +2257,9 @@ public class Db implements AutoCloseable {
          */
         public long count() {
             try (Stream<ResultSet> stream = db.stream(db.builder.countSql(sql()))) {
-                return stream.findFirst().map(Try.f(rs -> rs.getLong(1))).orElse(0L);
+                return stream.findFirst()
+                    .map(Try.f(rs -> rs.getLong(1)))
+                    .orElse(0L);
             }
         }
 
@@ -2099,20 +2272,8 @@ public class Db implements AutoCloseable {
          */
         public <T> Optional<T> one(TryFunction<ResultSet, T> fetcher) {
             try (Stream<ResultSet> rows = stream()) {
-                return rows.findFirst().map(Try.f(fetcher));
-            }
-        }
-
-        /**
-         * get one value
-         *
-         * @param <T> value type
-         * @param fetcher function that ResultSet to value
-         * @return value
-         */
-        public <T> Optional<T> one(Function<ResultSet, T> fetcher) {
-            try (Stream<ResultSet> rows = stream()) {
-                return rows.findFirst().map(fetcher);
+                return rows.findFirst()
+                    .map(Try.f(fetcher));
             }
         }
 
@@ -2124,10 +2285,13 @@ public class Db implements AutoCloseable {
          */
         public boolean row(TryConsumer<ResultSet> fetcher) {
             try (Stream<ResultSet> rows = stream()) {
-                return rows.findFirst().map(rs -> {
-                    Try.c(fetcher).accept(rs);
-                    return true;
-                }).orElse(false);
+                return rows.findFirst()
+                    .map(rs -> {
+                        Try.c(fetcher)
+                            .accept(rs);
+                        return true;
+                    })
+                    .orElse(false);
             }
         }
 
@@ -2139,7 +2303,8 @@ public class Db implements AutoCloseable {
          */
         public long rows(TryConsumer<ResultSet> fetcher) {
             try (Stream<ResultSet> rows = stream()) {
-                return rows.peek(Try.c(fetcher)).count();
+                return rows.peek(Try.c(fetcher))
+                    .count();
             }
         }
 
@@ -2152,7 +2317,8 @@ public class Db implements AutoCloseable {
             try (PreparedStatement ps = db.connection.prepareStatement(sql)) {
                 ps.execute();
             } catch (SQLException e) {
-                Try.r(db.connection::rollback).run();
+                Try.r(db.connection::rollback)
+                    .run();
                 throw new UncheckedSQLException(e);
             }
         }
@@ -2167,11 +2333,14 @@ public class Db implements AutoCloseable {
      */
     public String preparedSQL(String sql, Object... values) {
         Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters, " ...");
-        Function<Object, String> to = v -> v instanceof Collection
-                ? ((Collection<?>) v).stream().map(cut).map(builder::escape).collect(Collectors.joining(", ", "[", "]"))
-                : builder.escape(v);
-        return Tool.trim(null, Tool.zip(Stream.of(sql.split("[?]")), Stream.concat(Stream.of(values).map(to), Stream.generate(() -> "?"))).map(t -> t.l + t.r)
-                .collect(Collectors.joining()), "?");
+        Function<Object, String> to = v -> v instanceof Collection ? ((Collection<?>) v).stream()
+            .map(cut)
+            .map(builder::escape)
+            .collect(Collectors.joining(", ", "[", "]")) : builder.escape(v);
+        return Tool.trim(null, Tool.zip(Stream.of(sql.split("[?]")), Stream.concat(Stream.of(values)
+            .map(to), Stream.generate(() -> "?")))
+            .map(t -> t.l + t.r)
+            .collect(Collectors.joining()), "?");
     }
 
     /**
@@ -2182,12 +2351,14 @@ public class Db implements AutoCloseable {
      */
     public void prepare(String sql, TryFunction<PreparedStatement, Object[]> prepare) {
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            Object[] values = Try.f(prepare).apply(ps);
+            Object[] values = Try.f(prepare)
+                .apply(ps);
             if (values != null) {
                 Log.info(() -> preparedSQL(sql, values));
             }
         } catch (SQLException e) {
-            Try.r(connection::rollback).run();
+            Try.r(connection::rollback)
+                .run();
             throw new UncheckedSQLException(e);
         }
     }
@@ -2203,18 +2374,21 @@ public class Db implements AutoCloseable {
     public long preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
         long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            Object[] values = Try.f(prepare).apply(ps);
+            Object[] values = Try.f(prepare)
+                .apply(ps);
             if (values != null) {
                 Log.info(() -> preparedSQL(sql, values));
             }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     count++;
-                    Try.c(fetch).accept(rs);
+                    Try.c(fetch)
+                        .accept(rs);
                 }
             }
         } catch (SQLException e) {
-            Try.r(connection::rollback).run();
+            Try.r(connection::rollback)
+                .run();
             throw new UncheckedSQLException(e);
         }
         return count;
@@ -2226,7 +2400,8 @@ public class Db implements AutoCloseable {
      * @return stream of target class instance
      */
     public <T> Stream<T> findAll(Class<T> clazz) {
-        return from(clazz).stream().map(Try.f(toObject(clazz)));
+        return from(clazz).stream()
+            .map(Try.f(toObject(clazz)));
     }
 
     /**
@@ -2239,23 +2414,41 @@ public class Db implements AutoCloseable {
         List<Field> fields;
         if (targetColumns == null || targetColumns.length <= 0) {
             targetColumns = Tool.array("*");
-            fields = Reflector.mappingFields(clazz).values().stream().filter(f -> !Modifier.isTransient(f.getModifiers())).collect(Collectors.toList());
+            fields = Reflector.mappingFields(clazz)
+                .values()
+                .stream()
+                .filter(f -> !Modifier.isTransient(f.getModifiers()))
+                .collect(Collectors.toList());
         } else {
-            targetColumns = Stream.of(targetColumns).map(name -> Reflector.field(clazz, name).orElse(null)).map(Reflector::mappingFieldName)
-                    .toArray(String[]::new);
-            fields = Stream.of(targetColumns).map(s -> Reflector.mappingField(clazz, s)).filter(Optional::isPresent).map(Optional::get)
-                    .collect(Collectors.toList());
+            targetColumns = Stream.of(targetColumns)
+                .map(name -> Reflector.field(clazz, name)
+                    .orElse(null))
+                .map(Reflector::mappingFieldName)
+                .toArray(String[]::new);
+            fields = Stream.of(targetColumns)
+                .map(s -> Reflector.mappingField(clazz, s))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
         }
-        List<Field> instanceFields = fields.stream().filter(f -> !Modifier.isStatic(f.getModifiers())).collect(Collectors.toList());
-        if (Reflector.constructor(clazz).isPresent()) {
-            return select(targetColumns).from(clazz).stream().map(rs -> instanceFields.stream().collect(() -> Reflector.instance(clazz),
-                    Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
+        List<Field> instanceFields = fields.stream()
+            .filter(f -> !Modifier.isStatic(f.getModifiers()))
+            .collect(Collectors.toList());
+        if (Reflector.constructor(clazz)
+            .isPresent()) {
+            return select(targetColumns).from(clazz)
+                .stream()
+                .map(rs -> instanceFields.stream()
+                    .collect(() -> Reflector.instance(clazz), Try.biC((o, f) -> f.set(o, resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
                     }));
         } else {
-            return select(targetColumns).from(clazz).stream()
-                    .map(rs -> instanceFields.stream().<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz),
-                            Try.biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
-                            }).get());
+            return select(targetColumns).from(clazz)
+                .stream()
+                .map(rs -> instanceFields.stream()
+                    .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), Try
+                        .biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
+                        })
+                    .get());
         }
     }
 
@@ -2268,7 +2461,10 @@ public class Db implements AutoCloseable {
      * @return Model
      */
     public <T> Stream<T> findBy(Class<T> clazz, String key, Object value, String... columns) {
-        return select(columns.length > 0 ? columns : Tool.array("*")).from(clazz).where(key, value).stream().map(Try.f(Db.toObject(clazz)));
+        return select(columns.length > 0 ? columns : Tool.array("*")).from(clazz)
+            .where(key, value)
+            .stream()
+            .map(Try.f(Db.toObject(clazz)));
     }
 
     /**
@@ -2280,11 +2476,12 @@ public class Db implements AutoCloseable {
         Map<String, Field> map = Reflector.mappingFields(clazz);
         return rs -> {
             ResultSetMetaData meta = rs.getMetaData();
-            return IntStream.rangeClosed(1, meta.getColumnCount()).mapToObj(Try.intF(meta::getColumnName))
-                    .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), (b, c) -> Tool.val(Tool.getIgnoreCase(map, c.toLowerCase()),
-                            Try.f(field -> b.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))), (a, b) -> {
-                            })
-                    .get();
+            return IntStream.rangeClosed(1, meta.getColumnCount())
+                .mapToObj(Try.intF(meta::getColumnName))
+                .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), (b, c) -> Tool.val(Tool.getIgnoreCase(map, c.toLowerCase()), Try
+                    .f(field -> b.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))), (a, b) -> {
+                    })
+                .get();
         };
     }
 
@@ -2306,7 +2503,8 @@ public class Db implements AutoCloseable {
         }
         Stringer stringer = field.getAnnotation(Stringer.class);
         if (stringer != null) {
-            return Reflector.instance(stringer.value()).fromString(rs.getString(name));
+            return Reflector.instance(stringer.value())
+                .fromString(rs.getString(name));
         }
         Class<?> baseType = field.getType();
         boolean isOptional = baseType == Optional.class;
@@ -2315,16 +2513,21 @@ public class Db implements AutoCloseable {
         if (Enum.class.isAssignableFrom(type)) {
             if (IntSupplier.class.isAssignableFrom(type)) {
                 int n = rs.getInt(name);
-                optional = Stream.<Object>of(type.getEnumConstants()).filter(i -> ((IntSupplier) i).getAsInt() == n).findFirst();
+                optional = Stream.<Object>of(type.getEnumConstants())
+                    .filter(i -> ((IntSupplier) i).getAsInt() == n)
+                    .findFirst();
             } else {
                 optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
         } else if (type == LocalDate.class) {
-            optional = Tool.val(rs.getDate(name), v -> Tool.of(v).map(java.sql.Date::toLocalDate));
+            optional = Tool.val(rs.getDate(name), v -> Tool.of(v)
+                .map(java.sql.Date::toLocalDate));
         } else if (type == LocalTime.class) {
-            optional = Tool.val(rs.getTime(name), v -> Tool.of(v).map(java.sql.Time::toLocalTime));
+            optional = Tool.val(rs.getTime(name), v -> Tool.of(v)
+                .map(java.sql.Time::toLocalTime));
         } else if (type == LocalDateTime.class) {
-            optional = Tool.val(rs.getTimestamp(name), v -> Tool.of(v).map(java.sql.Timestamp::toLocalDateTime));
+            optional = Tool.val(rs.getTimestamp(name), v -> Tool.of(v)
+                .map(java.sql.Timestamp::toLocalDateTime));
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
         return isOptional ? Tool.of(value) : value;
@@ -2377,32 +2580,46 @@ public class Db implements AutoCloseable {
         Class<?> clazz = model.getClass();
         List<String> names = new ArrayList<>();
         List<Object> values = new ArrayList<>();
-        List<String> keys = Reflector.fields(clazz).values().stream().filter(Reflector.hasAnnotation(Id.class)).map(Try.f(field -> {
-            String name = Reflector.mappingFieldName(field);
-            names.add(name);
-            Object value = field.get(model);
-            if (field.getType().isPrimitive() && ((Number) value).intValue() == 0) {
-                value = null;/* for generate id */
-            }
-            values.add(value);
-            return name;
-        })).collect(Collectors.toList());
+        List<String> keys = Reflector.fields(clazz)
+            .values()
+            .stream()
+            .filter(Reflector.hasAnnotation(Id.class))
+            .map(Try.f(field -> {
+                String name = Reflector.mappingFieldName(field);
+                names.add(name);
+                Object value = field.get(model);
+                if (field.getType()
+                    .isPrimitive() && ((Number) value).intValue() == 0) {
+                    value = null;/* for generate id */
+                }
+                values.add(value);
+                return name;
+            }))
+            .collect(Collectors.toList());
         if (targetColumns == null || targetColumns.length <= 0) {
-            Reflector.mappingFields(clazz).entrySet().stream().filter(t -> !keys.contains(t.getKey()))
-                    .filter(t -> !Modifier.isTransient(t.getValue().getModifiers())).forEach(Try.c(t -> {
-                        names.add(t.getKey());
-                        values.add(t.getValue().get(model));
-                    }));
+            Reflector.mappingFields(clazz)
+                .entrySet()
+                .stream()
+                .filter(t -> !keys.contains(t.getKey()))
+                .filter(t -> !Modifier.isTransient(t.getValue()
+                    .getModifiers()))
+                .forEach(Try.c(t -> {
+                    names.add(t.getKey());
+                    values.add(t.getValue()
+                        .get(model));
+                }));
         } else {
             for (String name : targetColumns) {
-                Field field = Reflector.field(clazz, name).get();
+                Field field = Reflector.field(clazz, name)
+                    .get();
                 String mappingName = Reflector.mappingFieldName(field);
                 if (keys.contains(mappingName)) {
                     continue;
                 }
-                Object value = Try.f(field::get).apply(model);
+                Object value = Try.f(field::get)
+                    .apply(model);
                 if (value != Optional.empty()) {
-                names.add(mappingName);
+                    names.add(mappingName);
                     values.add(value);
                 }
             }
@@ -2417,25 +2634,36 @@ public class Db implements AutoCloseable {
     public String createSql(Class<?> clazz) {
         List<Column> primary = new ArrayList<>();
         List<Column> columns = new ArrayList<>();
-        Reflector.mappingFields(clazz).forEach((name, field) -> {
-            if (Modifier.isTransient(field.getModifiers())) {
-                return;
-            }
-            if (Tool.of(field.getAnnotation(Join.class)).flatMap(join -> Tool.string(join.table())).isPresent()) {
-                return;
-            }
-            Column c = new Column(name);
-            c.type = field.getType();
-            if (Optional.class.isAssignableFrom(c.type)) {
-                c.type = Reflector.getGenericParameter(field, 0);
-                c.nullable();
-            }
-            Tool.of(field.getAnnotation(Help.class)).ifPresent(help -> c.display(String.join(" ", help.value())));
-            Tool.of(field.getAnnotation(Size.class)).ifPresent(size -> c.length(size.value()));
-            Tool.of(field.getAnnotation(Id.class)).map(id -> primary).orElse(columns).add(c);
-            Tool.of(field.getAnnotation(Required.class)).filter(required -> required.value().length > 0).ifPresent(required -> c.value(required.value()[0]));
-        });
-        return createSql(Reflector.mappingClassName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream()).toArray(Column[]::new));
+        Reflector.mappingFields(clazz)
+            .forEach((name, field) -> {
+                if (Modifier.isTransient(field.getModifiers())) {
+                    return;
+                }
+                if (Tool.of(field.getAnnotation(Join.class))
+                    .flatMap(join -> Tool.string(join.table()))
+                    .isPresent()) {
+                    return;
+                }
+                Column c = new Column(name);
+                c.type = field.getType();
+                if (Optional.class.isAssignableFrom(c.type)) {
+                    c.type = Reflector.getGenericParameter(field, 0);
+                    c.nullable();
+                }
+                Tool.of(field.getAnnotation(Help.class))
+                    .ifPresent(help -> c.display(String.join(" ", help.value())));
+                Tool.of(field.getAnnotation(Size.class))
+                    .ifPresent(size -> c.length(size.value()));
+                Tool.of(field.getAnnotation(Id.class))
+                    .map(id -> primary)
+                    .orElse(columns)
+                    .add(c);
+                Tool.of(field.getAnnotation(Required.class))
+                    .filter(required -> required.value().length > 0)
+                    .ifPresent(required -> c.value(required.value()[0]));
+            });
+        return createSql(Reflector.mappingClassName(clazz), primary.size(), Stream.concat(primary.stream(), columns.stream())
+            .toArray(Column[]::new));
     }
 
     /**
@@ -2451,7 +2679,11 @@ public class Db implements AutoCloseable {
      * @param values Values(Comma separated)
      */
     public void insert(String table, String fields, String[] values) {
-        String prefix = "INSERT INTO " + table + Tool.string(fields).map(s -> "(" + s + ")").orElse("") + " VALUES(";
-        Stream.of(values).map(value -> prefix + value + ")").forEach(sql -> execute(sql, null));
+        String prefix = "INSERT INTO " + table + Tool.string(fields)
+            .map(s -> "(" + s + ")")
+            .orElse("") + " VALUES(";
+        Stream.of(values)
+            .map(value -> prefix + value + ")")
+            .forEach(sql -> execute(sql, null));
     }
 }
