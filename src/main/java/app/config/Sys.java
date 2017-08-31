@@ -39,9 +39,12 @@ public class Sys {
         @Help("output log level")
         public static Level level = Level.CONFIG;
 
-        @Help("classes of suppress log")
+        @Help("Class prefixes of suppress log")
         @Separator(',')
         public static List<String> ignore_prefixes = Tool.list("com.sun.");
+
+        @Help("Class prefixes of skip stack trace")
+        public static List<String> skip_prefixes = Tool.list("java.", "framework.");
 
         @Help("shared lock if true else exclusive lock")
         public static boolean is_shared = true;
@@ -51,9 +54,6 @@ public class Sys {
 
         @Help("request parameter max output letters")
         public static int parameter_max_letters = 50;
-
-        @Help("regular expression for skip stack trace classes")
-        public static Pattern trace_skip_regex = Pattern.compile("^(java|framework)[.].*$");
 
         @Help("package name compact to first character if true")
         public static boolean compact_package = true;

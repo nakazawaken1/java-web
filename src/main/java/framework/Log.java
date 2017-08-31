@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.ErrorManager;
@@ -40,6 +39,11 @@ import sun.misc.SharedSecrets;
  */
 @SuppressWarnings("restriction")
 public class Log extends Handler {
+
+    /**
+     * Class name
+     */
+    public static final String CLASS_NAME = Log.class.getName();
 
     /**
      * log formatter
@@ -247,11 +251,6 @@ public class Log extends Handler {
     private static volatile Handler handler;
 
     /**
-     * class name matcher for skip stack trace
-     */
-    private static Predicate<String> matcher = s -> true;
-
-    /**
      * For access to stack trace
      */
     static final JavaLangAccess access = SharedSecrets.getJavaLangAccess();
@@ -283,7 +282,6 @@ public class Log extends Handler {
             if (noEntry) {
                 if (first.compareAndSet(true, false)) {
                     handler = new Log(Sys.Log.folder, Sys.Log.file_pattern);
-                    matcher = Sys.Log.trace_skip_regex.asPredicate().negate();
                     setup.accept(handler);
                 }
                 root.addHandler(handler);
@@ -490,21 +488,31 @@ public class Log extends Handler {
             record.setThrown(thrown);
         }
         Throwable throwable = new Throwable();
-        int depth = access.getStackTraceDepth(throwable);
-        for (int i = 0; i < depth; i++) {
-            StackTraceElement frame = access.getStackTraceElement(throwable, i);
-            String className = frame.getClassName();
-            if (matcher.test(className)) {
-                if (skip != 0 && i + skip < depth) {
-                    frame = access.getStackTraceElement(throwable, i + skip);
-                }
-                String methodName = frame.getMethodName();
-                record.setSourceClassName(className);
-                record.setSourceMethodName(methodName);
-                record.setLoggerName(className + "." + methodName + "(" + frame.getLineNumber() + ")");
+        int max = skip;
+        int first = skip;
+        for (int i = 0, i2 = access.getStackTraceDepth(throwable); i < i2; i++) {
+            String className = access.getStackTraceElement(throwable, i)
+                .getClassName();
+            if(CLASS_NAME.equals(className) && i + 1 < i2) {
+                first = i;
+            }
+            if (Sys.Log.ignore_prefixes.stream()
+                .anyMatch(className::startsWith)) {
+                max = first + 1;
+                break;
+            }
+            max = i;
+            if (Sys.Log.skip_prefixes.stream()
+                .noneMatch(className::startsWith)) {
                 break;
             }
         }
+        StackTraceElement frame = access.getStackTraceElement(throwable, max);
+        String className = frame.getClassName();
+        String methodName = frame.getMethodName();
+        record.setSourceClassName(className);
+        record.setSourceMethodName(methodName);
+        record.setLoggerName(className + "." + methodName + "(" + frame.getLineNumber() + ")");
         for (Logger logger = Logger.getGlobal(); logger != null; logger = logger.getParent()) {
             for (Handler handler : logger.getHandlers()) {
                 if (levelValue >= handler.getLevel()
