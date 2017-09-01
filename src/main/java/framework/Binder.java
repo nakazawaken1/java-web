@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,19 +77,8 @@ public class Binder implements ErrorAppender {
      */
     @Override
     public void addError(String name, String value, String error, Object... keyValues) {
-        Tool.addValue(errors, name,
-                Formatter.format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)));
-    }
-
-    /**
-     * @param parameters parameters
-     * @return map
-     */
-    public static Map<String, Object> toMap(Map<String, List<String>> parameters) {
-        if (parameters == null || parameters.isEmpty()) {
-            return Tool.map();
-        }
-        throw new UnsupportedOperationException();
+        Tool.addValue(errors, name, Formatter
+            .format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)));
     }
 
     /**
@@ -103,7 +92,8 @@ public class Binder implements ErrorAppender {
             validator.accept(text);
         }
         Function<Function<String, Object>, Object> toNumber = f -> Try
-                .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error).get();
+            .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error)
+            .get();
         if (clazz == String.class) {
             return text == null ? error == null ? "" : error.apply(null) : text;
         }
@@ -129,16 +119,20 @@ public class Binder implements ErrorAppender {
             return toNumber.apply(Double::valueOf);
         }
         if (clazz == LocalDate.class) {
-            return Try.<String, LocalDate>f(LocalDate::parse, (e, s) -> (LocalDate) error.apply(null)).apply(text);
+            return Try.<String, LocalDate>f(LocalDate::parse, (e, s) -> error == null ? null : (LocalDate) error.apply(null))
+                .apply(text);
         }
         if (clazz == LocalDateTime.class) {
-            return Try.<String, LocalDateTime>f(LocalDateTime::parse, (e, s) -> (LocalDateTime) error.apply(null)).apply(text);
+            return Try.<String, LocalDateTime>f(LocalDateTime::parse, (e, s) -> error == null ? null : (LocalDateTime) error.apply(null))
+                .apply(text);
         }
         if (clazz == LocalTime.class) {
-            return Try.<String, LocalTime>f(LocalTime::parse, (e, s) -> (LocalTime) error.apply(null)).apply(text);
+            return Try.<String, LocalTime>f(LocalTime::parse, (e, s) -> error == null ? null : (LocalTime) error.apply(null))
+                .apply(text);
         }
         if (Enum.class.isAssignableFrom((Class<?>) clazz)) {
-            return text != null ? Reflector.invoke(((Class<?>) clazz).getName() + ".valueOf", Tool.array(String.class), text) : error == null ? ((Class<?>)clazz).getEnumConstants()[0] : error.apply(null);
+            return text != null ? Reflector.invoke(((Class<?>) clazz).getName() + ".valueOf", Tool.array(String.class), text)
+                    : error == null ? ((Class<?>) clazz).getEnumConstants()[0] : error.apply(null);
         }
         return text;
     }
@@ -150,38 +144,99 @@ public class Binder implements ErrorAppender {
      * @return value
      */
     public Object bind(String name, Class<?> clazz, Type... parameterizedType) {
-        return bind(0, name, clazz, parameterizedType);
+        return bind(parameters, 0, name, clazz, parameterizedType);
     }
 
     /**
+     * @param nest Nest level
+     * @param type Value type
+     * @return Mapper
+     */
+    @SuppressWarnings("unchecked")
+    public Function<Object, Object> rebind(int nest, Class<?> type) {
+        return i -> {
+            if (i instanceof Map) {
+                if (type == Map.class) {
+                    return ((Map<String, List<String>>) i).entrySet()
+                        .stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> Tool.<List<String>, String>val(e.getValue(), j -> j.isEmpty() ? "" : j.get(0))));
+                }
+                Object instance = Try.s(type::newInstance)
+                    .get();
+                Reflector.fields(type)
+                    .forEach(Try.biC((n, field) -> {
+                        field.set(instance, bind((Map<String, List<String>>) i, nest + 1, n, field.getType(), Reflector.getGenericParameters(field)));
+                    }));
+                return instance;
+            }
+            return convert((String)i, type, null);
+        };
+    }
+
+    /**
+     * @param parameters Parameters
      * @param nest Nest level
      * @param name name
      * @param clazz class
      * @param parameterizedType Parameterized type
      * @return value
      */
-    public Object bind(int nest, String name, Class<?> clazz, Type... parameterizedType) {
+    @SuppressWarnings("unchecked")
+    public Object bind(Map<String, List<String>> parameters, int nest, String name, Class<?> clazz, Type... parameterizedType) {
         if (clazz == null) {
             return null;
         }
-        List<String> values = Tool.or(parameters.get(name), () -> parameters.get(name + "[]")).orElse(null);
-        String first = values == null || values.isEmpty() ? null : values.get(0);
+        // List<String> values = Tool.or(parameters.get(name), () -> parameters.get(name + "[]")).orElse(null);
+        List<Object> sub = new ArrayList<>();
+        parameters.forEach((key, value) -> {
+            int start = key.indexOf('[');
+            int dot = key.indexOf('.');
+            int min = start < 0 ? (dot < 0 ? key.length() : dot) : (dot < 0 ? start : Math.min(start, dot));
+            String realKey = key.substring(0, min);
+            if (!name.equals(realKey)) {
+                return;
+            }
+            if (key.equals(realKey)) {
+                sub.addAll(value);
+            }
+            if (start >= 0 && start < dot) {
+                int end = key.indexOf(']');
+                int index = Integer.parseInt(key.substring(start + 1, end));
+                while (sub.size() <= index) {
+                    sub.add(null);
+                }
+                Object o = sub.get(index);
+                if (dot > 0) {
+                    if (!(o instanceof Map)) {
+                        sub.set(index, o = new LinkedHashMap<>());
+                    }
+                    ((Map<String, List<String>>) o).put(key.substring(dot + 1), value);
+                }
+            }
+        });
+        String first = sub.isEmpty() ? Tool.getFirst(parameters, name).orElse(null)
+                : sub.get(0)
+                    .toString();
+        if (sub.size() == 1 && "".equals(first)) {
+            sub.clear();
+        }
 
         // Array
         Class<?> component = clazz.getComponentType();
         if (component != null) {
-            if((values == null || values.size() == 1 && "".equals(first)) && nest > 0) {
-                return null;
-            }
-            Stream<Object> stream = values == null ? Stream.empty() : values.stream().map(value -> convert(value, component, null));
+            Stream<Object> stream = sub.stream()
+                .map(value -> convert((String) value, component, null));
             if (clazz == int[].class) {
-                return stream.mapToInt(Integer.class::cast).toArray();
+                return stream.mapToInt(Integer.class::cast)
+                    .toArray();
             }
             if (clazz == long[].class) {
-                return stream.mapToLong(Long.class::cast).toArray();
+                return stream.mapToLong(Long.class::cast)
+                    .toArray();
             }
             if (clazz == double[].class) {
-                return stream.mapToDouble(Double.class::cast).toArray();
+                return stream.mapToDouble(Double.class::cast)
+                    .toArray();
             }
             if (clazz == boolean[].class) {
                 Object[] from = stream.toArray();
@@ -192,8 +247,9 @@ public class Binder implements ErrorAppender {
                 return to;
             }
             if (clazz == byte[].class) {
-                if(values.size() == 1 && files.containsKey(first)) {
-                    return Tool.val(files.get(first), t -> t.l == null ? Try.f(Files::readAllBytes).apply(t.r.toPath()) : t.l);
+                if (sub.size() == 1 && files.containsKey(first)) {
+                    return Tool.val(files.get(first), t -> t.l == null ? Try.f(Files::readAllBytes)
+                        .apply(t.r.toPath()) : t.l);
                 }
                 Object[] from = stream.toArray();
                 byte[] to = new byte[from.length];
@@ -226,45 +282,54 @@ public class Binder implements ErrorAppender {
                 }
                 return to;
             }
-            return stream.toArray(n -> (Object[]) Array.newInstance(component, n));
+            return sub.stream()
+                .map(rebind(nest, component))
+                .toArray(n -> (Object[]) Array.newInstance(component, n));
         }
 
         if (clazz == List.class) {
-            return values == null ? Collections.emptyList() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
-                    .collect(Collectors.toList());
+            return sub.stream()
+                .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
+                .collect(Collectors.toList());
         }
 
         if (clazz == Set.class) {
-            return values == null ? Collections.emptySet() : values.stream().map(value -> convert(value, parameterizedType.length > 0 ? parameterizedType[0] : Object.class, null))
-                    .collect(Collectors.toSet());
+            return sub.stream()
+                .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
+                .collect(Collectors.toSet());
         }
 
         if (clazz == Map.class) {
             String prefix = name + ".";
             return parameters.entrySet()
-                    .stream().filter(
-                            e -> e.getKey().startsWith(prefix))
-                    .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey().substring(prefix.length()),
-                            bind(nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1] : Object.class)), Map::putAll);
+                .stream()
+                .filter(e -> e.getKey()
+                    .startsWith(prefix))
+                .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey()
+                    .substring(prefix.length()), bind(parameters, nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1]
+                            : Object.class)), Map::putAll);
         }
 
         if (clazz == Optional.class) {
             Class<?> c = parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class;
-            return c == String.class ? Tool.string(bind(nest + 1, name, c)) : Tool.of(bind(nest + 1, name, c));
+            return c == String.class ? Tool.string(bind(parameters, nest + 1, name, c)) : Tool.of(bind(parameters, nest + 1, name, c));
         }
 
-        if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz)
-                && !Tool.val(clazz.getName(), i -> Stream.of("java.", "com.sun.").anyMatch(i::startsWith))) {
+        if (!clazz.isPrimitive() && !Enum.class.isAssignableFrom(clazz) && !Tool.val(clazz.getName(), i -> Stream.of("java.", "com.sun.")
+            .anyMatch(i::startsWith))) {
             Constructor<?> constructor = clazz.getDeclaredConstructors()[0];
             constructor.setAccessible(true);
             if (constructor.getParameterCount() > 0) {
-                Object[] args = Stream.of(constructor.getParameters()).map(p -> bind(name + "." + p.getName(), p.getType(), Reflector.getGenericParameters(p)))
-                        .toArray();
-                return Try.s(() -> constructor.newInstance(args)).get();
+                Object[] args = Stream.of(constructor.getParameters())
+                    .map(p -> bind(name + "." + p.getName(), p.getType(), Reflector.getGenericParameters(p)))
+                    .toArray();
+                return Try.s(() -> constructor.newInstance(args))
+                    .get();
             }
-            Object o = Try.s(constructor::newInstance).get();
+            Object o = Try.s(constructor::newInstance)
+                .get();
             Reflector.fields(o.getClass())
-                    .forEach(Try.biC((fieldName, field) -> field.set(o, bind(name + "." + fieldName, field.getType(), Reflector.getGenericParameters(field)))));
+                .forEach(Try.biC((fieldName, field) -> field.set(o, bind(name + "." + fieldName, field.getType(), Reflector.getGenericParameters(field)))));
             return o;
         }
 
