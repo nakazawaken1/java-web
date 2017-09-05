@@ -191,6 +191,7 @@ public class TestBinder extends Tester {
 
         expect("String[]", n -> binder("a=abc&a=def").bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
         expect("int[]", n -> binder("a=1&a=2").bind("a", int[].class)).toArrayEqual(new int[] { 1, 2 });
+        expect("int[]2", n -> binder("a[]=1&a[]=2").bind("a", int[].class)).toArrayEqual(new int[] { 1, 2 });
         expect("List", n -> binder("a=abc&a=def").bind("a", List.class, String.class)).toEqual(Tool.list("abc", "def"));
         expect("EmptyList", n -> binder("a=").bind("a", List.class, String.class)).toEqual(Tool.list());
         expect("List<Long>", n -> binder("a=1234567890123&a=-222").bind("a", List.class, Long.class)).toEqual(Tool.list(1234567890123L, -222L));
@@ -222,6 +223,7 @@ public class TestBinder extends Tester {
 //        System.out.println(new Binder(new Parser.Url().parse("c[0].id=1&c[1].id=2&c[0].name=abc&c[1].name=def&c[0].birthday=2001-02-03&c[0].gender=FEMALE")).bind("c", List.class, Map.class));
 //        System.out.println(new Binder(new Parser.Url().parse("m.a=abc&m.b=def")).bind("m", Map.class, String.class, String.class));
 //        System.out.println(new Binder(new Parser.Url().parse("m.a=abc&m.b=def")).bind("m", Map.class, String.class, String.class));
-        System.out.println(new Binder(new Parser.Url().parse("a=")).bind("a", List.class, String.class));
+//        System.out.println(new Binder(new Parser.Url().parse("a=")).bind("a", List.class, String.class));
+        System.out.println(new Binder(new Parser.Url().parse("a[]=1&a[]=2")).bind("a", List.class, String.class));
     }
 }

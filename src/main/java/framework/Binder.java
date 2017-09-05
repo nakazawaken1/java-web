@@ -199,18 +199,29 @@ public class Binder implements ErrorAppender {
             if (key.equals(realKey)) {
                 sub.addAll(value);
             }
-            if (start >= 0 && start < dot) {
+            if (start >= 0 && (dot == -1 || start < dot)) {
                 int end = key.indexOf(']');
-                int index = Integer.parseInt(key.substring(start + 1, end));
-                while (sub.size() <= index) {
-                    sub.add(null);
-                }
-                Object o = sub.get(index);
-                if (dot > 0) {
-                    if (!(o instanceof Map)) {
-                        sub.set(index, o = new LinkedHashMap<>());
+                if(start + 1 < end) {
+                    int index = Integer.parseInt(key.substring(start + 1, end));
+                    while (sub.size() <= index) {
+                        sub.add(null);
                     }
-                    ((Map<String, List<String>>) o).put(key.substring(dot + 1), value);
+                    Object o = sub.get(index);
+                    if (dot > 0) {
+                        if (!(o instanceof Map)) {
+                            sub.set(index, o = new LinkedHashMap<>());
+                        }
+                        ((Map<String, List<String>>) o).put(key.substring(dot + 1), value);
+                    }
+                } else {
+                    key = key.substring(end + 1);
+                    if(key.isEmpty()) {
+                        for(String i : value) {
+                            sub.add(i);
+                        }
+                    } else {
+                        sub.add(Tool.map(key, value));
+                    }
                 }
             }
         });

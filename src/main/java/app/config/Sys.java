@@ -311,7 +311,10 @@ public class Sys {
         @Mapping("Value is out of range")
         range,
         @Mapping("Time is out of range")
-        time,;
+        time,
+        @Mapping("Session Timeout, please login.")
+        timeout,
+        ;
 
         @Override
         public String toString() {

@@ -1856,10 +1856,12 @@ public class Db implements AutoCloseable {
                     return true;
                 }
             } catch (SQLException e) {
-                Try.r(() -> rs.getStatement()
-                    .getConnection()
-                    .rollback())
-                    .run();
+                if (rs != null) {
+                    Try.r(() -> rs.getStatement()
+                        .getConnection()
+                        .rollback())
+                        .run();
+                }
                 throw new UncheckedSQLException(e);
             }
             close();

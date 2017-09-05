@@ -51,7 +51,7 @@ public abstract class Request implements Attributes<Object> {
     public abstract String getPath();
 
     /**
-     * @return file name(without extension)
+     * @return Folder name(with end separator)
      */
     public String getFolder() {
         return Tool.getFolder(getPath());
@@ -72,7 +72,7 @@ public abstract class Request implements Attributes<Object> {
     }
 
     /**
-     * @return file name(without extension)
+     * @return file name(with extension)
      */
     public String getFile() {
         return getName() + getExtension();

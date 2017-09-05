@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -863,6 +864,17 @@ public class Xml {
         Stream.Builder<Xml> builder = Stream.builder();
         streamInner(builder);
         return builder.build();
+    }
+
+    /**
+     * @param attr Attribute name
+     * @param matcher Matcher of attribute value
+     * @return Matches nodes
+     */
+    public Stream<Xml> findBy(String attr, Predicate<String> matcher) {
+        return stream().filter(xml -> xml.attributes()
+            .containsKey(attr))
+            .filter(xml -> matcher.test(xml.attributes.get(attr)));
     }
 
     /**
