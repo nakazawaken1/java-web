@@ -46,7 +46,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     /**
      * elClass entries
      */
-    static Map<String, Class<?>> elClassMap = Tool.map("Sys", Sys.class, "Tool", Tool.class, "JapaneseDate", JapaneseDate.class);
+    public static Map<String, Class<?>> elClassMap = Tool.map("Sys", Sys.class, "Tool", Tool.class, "JapaneseDate", JapaneseDate.class);
 
     /**
      * cache enabled
