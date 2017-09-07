@@ -27,6 +27,7 @@ import javax.el.ELContext;
 import javax.el.ELProcessor;
 import javax.el.ELResolver;
 import javax.el.LambdaExpression;
+import javax.el.PropertyNotFoundException;
 import javax.el.PropertyNotWritableException;
 import javax.el.StandardELContext;
 
@@ -474,6 +475,8 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 /* bind el */
                 try {
                     return getResult.apply(Tool.string(el().eval(key)).orElse(""), "el");
+                } catch(PropertyNotFoundException e) {
+                    return null;
                 } catch (Exception e) {
                     Log.warning(e, () -> "el error");
                     return s;
