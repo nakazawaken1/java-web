@@ -265,7 +265,7 @@ public class Xml {
                             int end = index;
                             eat(">");
                             String name = subSequence(start, end).toString();
-                            for (;;) {
+                            while (!stack.isEmpty()) {
                                 String s = stack.pop();
                                 handler.tagEnd(s);
                                 if (name.equalsIgnoreCase(s)) {
@@ -292,7 +292,7 @@ public class Xml {
                         continue;
                     }
                     int start = index;
-                    if (skipUntil(' ', '/', '>')) { /* start tag */
+                    if (skipUntil('\t', '\r', '\n', ' ', '/', '>')) { /* start tag */
                         int end = index;
                         String name = subSequence(start, end).toString();
                         String lower = name.toLowerCase(Locale.ENGLISH);
@@ -502,10 +502,13 @@ public class Xml {
                 .toString();
         }
         boolean isNull = isNull();
+        boolean single = isSingle.apply(this);
         if (!isNull) {
-            s.append(newline)
-                .append(indent)
-                .append('<')
+            if (!single) {
+                s.append(newline)
+                    .append(indent);
+            }
+            s.append('<')
                 .append(content);
             if (attributes != null && !attributes.isEmpty()) {
                 attributes.entrySet()
@@ -518,7 +521,7 @@ public class Xml {
         }
         boolean noChild = children == null || children.isEmpty();
         if (!isNull) {
-            if (noChild && isSingle.apply(this)) {
+            if (noChild && single) {
                 return s.append(" />")
                     .toString();
             }
@@ -893,6 +896,7 @@ public class Xml {
      * @param args No use
      */
     public static void main(String[] args) {
+        System.out.println(parse("<td>あ<br/>い<br/>う<br/>え<br/>お</td>"));
         // Xml xml = Xml.of("b");
         // System.out.println(xml.child("i").text("test"));
         // System.out.println(xml.copy().clear().child("a").text("test2"));
@@ -903,43 +907,17 @@ public class Xml {
         // System.out.println(Xml.of("ol").child(IntStream.rangeClosed(1, 2).mapToObj(i -> Xml.of("li").text(i))));
         // System.out.println(Xml.of("table").child("thead").child("tr").child("th", Stream.of("a", "b")).root().child("tbody").child("tr")
         // .child("th", Stream.of(1, 2)).after("tr").child("th", Stream.of(3, 4)));
-        Function<Xml, Xml> a = div -> Xml.of(null)
-            .text("あい<a>うえお");
-        Function<Xml, Xml> b = ul -> ul.clear()
-            .child("li", Stream.of("aa", "bb", "cc"));
-        Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 44), Tuple.of(2, "S<a>m", 55), Tuple.of(3, "Andy", 66)), (t, i) -> {
-            t.children()
-                .get(0)
-                .text(i.l);
-            t.children()
-                .get(1)
-                .text(i.r.l);
-            t.children()
-                .get(2)
-                .text(i.r.r);
-            return t;
-        });
-        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + //
-                "<!DOCTYPE html>\n" + //
-                "<style type=\"text/css\">\nbody > div{\n  font-size:11pt;\n}\n</style>" + //
-                "<script type=\"text/javascript\">\nwindow.onload=function(){\n  if(Math.random() < 0.5) alert('1');\n}\n</script>" + //
-                "<!--abcde-->" + //
-                "<body>" + //
-                "<div data-render=\"0\">" + //
-                "<!--abcde-->" + //
-                "</div>" + //
-                "<ul data-render=\"1\">" + //
-                "  <li>a</li>" + //
-                "  <li>b</li>" + //
-                "</ul>" + //
-                "<table>" + //
-                "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
-                "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + //
-                "</table>" + //
-                "</body>", a, b, c)/*
-                                    * .stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text)
-                                    * .collect(Collectors.joining(System.lineSeparator()))
-                                    */);
-        // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
+        /*
+         * Function<Xml, Xml> a = div -> Xml.of(null) .text("あい<a>うえお"); Function<Xml, Xml> b = ul -> ul.clear() .child("li", Stream.of("aa", "bb", "cc"));
+         * Function<Xml, Xml> c = tr -> tr.repeat(Stream.of(Tuple.of(1, "Tom", 44), Tuple.of(2, "S<a>m", 55), Tuple.of(3, "Andy", 66)), (t, i) -> { t.children()
+         * .get(0) .text(i.l); t.children() .get(1) .text(i.r.l); t.children() .get(2) .text(i.r.r); return t; });
+         * System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + // "<!DOCTYPE html>\n" + //
+         * "<style type=\"text/css\">\nbody > div{\n  font-size:11pt;\n}\n</style>" + //
+         * "<script type=\"text/javascript\">\nwindow.onload=function(){\n  if(Math.random() < 0.5) alert('1');\n}\n</script>" + // "<!--abcde-->" + // "<body>"
+         * + // "<div data-render=\"0\">" + // "<!--abcde-->" + // "</div>" + // "<ul data-render=\"1\">" + // "  <li>a</li>" + // "  <li>b</li>" + // "</ul>" +
+         * // "<table>" + // "  <tr><th>id</th><th>name</th><th>age</th></tr>" + //
+         * "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + // "</table>" + // "</body>", a, b, c)
+         * .stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text) .collect(Collectors.joining(System.lineSeparator())) );
+         */ // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
     }
 }
