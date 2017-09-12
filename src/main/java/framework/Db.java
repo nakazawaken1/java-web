@@ -2376,7 +2376,7 @@ public class Db implements AutoCloseable {
     public long preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
         long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            Object[] values = Try.f(prepare)
+            Object[] values = prepare == null ? Tool.array() : Try.f(prepare)
                 .apply(ps);
             if (values != null) {
                 Log.info(() -> preparedSQL(sql, values));

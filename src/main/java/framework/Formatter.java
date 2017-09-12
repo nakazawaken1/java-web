@@ -476,6 +476,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 try {
                     return getResult.apply(Tool.string(el().eval(key)).orElse(""), "el");
                 } catch(PropertyNotFoundException e) {
+                    Log.warning(e, () -> key);
                     return null;
                 } catch (Exception e) {
                     Log.warning(e, () -> "el error");
@@ -497,15 +498,13 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             if (key.indexOf('\n') < 0) {
                 String[] keys = key.split("\\s*:\\s*");
                 boolean hasParameter = keys.length > 1;
-                if (hasParameter) {
-                    key = keys[0];
-                }
-                Optional<String> message = Config.Injector.getValue(key, locale);
+                String realKey = hasParameter ? keys[0] : key;
+                Optional<String> message = Config.Injector.getValue(realKey, locale);
                 if (message.isPresent()) {
                     return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
                             "config");
                 }
-                Log.info("not found config: " + key);
+                Log.info("not found config: " + realKey);
             }
             return s;
         };
@@ -752,7 +751,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             el.defineBean("V", Tool.list(values));
             elClassMap.forEach((k, v) -> el.defineBean(k, new ELClass(v)));
             if (map != null) {
-                map.forEach(el::defineBean);
+                map.forEach((k, v) -> el.defineBean(k, v == null ? "" : v));
             }
         }
         return el;
