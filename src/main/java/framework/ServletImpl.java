@@ -229,7 +229,7 @@ public class ServletImpl implements javax.servlet.Servlet {
          */
         @Override
         public void clear() {
-            session.invalidate();
+            Tool.stream(session.getAttributeNames()).forEach(session::removeAttribute);
         }
 
         /*
