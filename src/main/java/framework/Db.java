@@ -230,6 +230,16 @@ public class Db implements AutoCloseable {
     private String schema;
 
     /**
+     * ResultSet to int
+     */
+    public static final TryFunction<ResultSet, Integer> toInt = rs -> rs.getInt(1);
+
+    /**
+     * ResultSet to String
+     */
+    public static final TryFunction<ResultSet, String> toString = rs -> rs.getString(1);
+
+    /**
      * ResultSet to array
      */
     public static final TryFunction<ResultSet, Object[]> tryToArray = rs -> IntStream.rangeClosed(1, rs.getMetaData()

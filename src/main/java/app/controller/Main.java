@@ -53,6 +53,7 @@ public class Main {
     @Route(value = "logout(?<extension>\\.json|)")
     Object logout(Application application, String extension, Session session) {
         session.logout();
+        session.put("alert", "");
         return ".json".equals(extension) ? Response.of(Tool.array("", application.getContextPath())) : Response.redirect(application.getContextPath());
     }
 
