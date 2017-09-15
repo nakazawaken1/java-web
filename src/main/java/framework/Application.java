@@ -316,6 +316,17 @@ public abstract class Application implements Attributes<Object> {
                 /* go login page if not logged in */
                 if (only != null && Sys.redirect_if_not_login.filter(i -> !i.equals(path))
                     .isPresent() && !session.isLoggedIn()) {
+                    String host = Tool.getFirst(request.getHeaders(), "Host")
+                        .orElse("localhost");
+                    String referer = Tool.getFirst(request.getHeaders(), "Referer")
+                        .orElse("");
+                    if (referer.contains(host) && !session.containsKey("alert")) {
+                        session.put("alert", Sys.Alert.timeout);
+                    }
+                    if(Tool.getFirst(request.getHeaders(), "X-requested-with").filter(i -> i.equals("XMLHttpRequest")).isPresent()) {
+                        Response.error(Status.No_Content).flush();
+                        return;
+                    }
                     Response.redirect(Tool.path(getContextPath(), Sys.redirect_if_not_login.get())
                         .apply("/"))
                         .flush();
