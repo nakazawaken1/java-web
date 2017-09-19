@@ -17,7 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
@@ -259,8 +259,8 @@ public class Log extends Handler {
      * log initialize
      */
     public static void startup() {
-        Consumer<Handler> setup = handler -> {
-            handler.setLevel(Sys.Log.level);
+        BiConsumer<Handler, Level> setup = (handler, level) -> {
+            handler.setLevel(level);
             handler.setFormatter(new Formatter(Sys.Log.format, Sys.Log.compact_package ? Formatter::compact : Function.identity()));
             if (!Sys.Log.ignore_prefixes.isEmpty()) {
                 handler.setFilter(r -> r.getThrown() != null || Sys.Log.ignore_prefixes.stream()
@@ -269,11 +269,13 @@ public class Log extends Handler {
         };
         try {
             Logger root = Logger.getLogger("");
-            root.setLevel(Sys.Log.level);
+            Level level = Sys.Log.level;
+            Level consoleLevel = Sys.Log.console_level.orElse(level);
+            root.setLevel(level.intValue() < consoleLevel.intValue() ? level : consoleLevel);
             boolean noEntry = true;
             for (Handler i : root.getHandlers()) {
                 if (i instanceof ConsoleHandler && !(i.getFormatter() instanceof Formatter)) {
-                    setup.accept(i);
+                    setup.accept(i, consoleLevel);
                 }
                 if (i instanceof Log) {
                     noEntry = false;
@@ -282,7 +284,7 @@ public class Log extends Handler {
             if (noEntry) {
                 if (first.compareAndSet(true, false)) {
                     handler = new Log(Sys.Log.folder, Sys.Log.file_pattern);
-                    setup.accept(handler);
+                    setup.accept(handler, level);
                 }
                 root.addHandler(handler);
                 Logger.getLogger(Log.class.getCanonicalName())
