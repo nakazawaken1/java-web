@@ -125,6 +125,9 @@ public class Sys {
     @Help("session timeout minutes(indefinite if negative value)")
     public static int session_timeout_minutes = 30;
 
+    @Help("session cleaning interval milliseconds")
+    public static long session_clean_millis = 30 * 1000;
+
     @Help("upload folder")
     public static String upload_folder = "/temp/";
 

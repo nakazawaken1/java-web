@@ -50,6 +50,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -92,7 +94,7 @@ public class Standalone {
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
             try (Defer<RequestImpl> request = new Defer<>(Tool.peek(new RequestImpl(exchange), Request.CURRENT::set), r -> Request.CURRENT.remove());
-                    Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(exchange), Session.CURRENT::set), s -> Session.CURRENT.remove())) {
+                 Defer<SessionImpl> session = new Defer<>(Tool.peek(new SessionImpl(exchange), Session.CURRENT::set), s -> Session.CURRENT.remove())) {
                 application.handle(request.get(), session.get());
             } catch (Exception e) {
                 Log.warning(e, () -> "500");
@@ -131,7 +133,8 @@ public class Standalone {
             }
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(application::shutdown));
+        Runtime.getRuntime()
+            .addShutdownHook(new Thread(application::shutdown));
     }
 
     /**
@@ -152,8 +155,10 @@ public class Standalone {
         // load private key(.key)
         PrivateKey key;
         try (Stream<String> lines = Files.lines(Paths.get(keyPath))) {
-            String text = lines.filter(line -> !line.isEmpty() && !line.startsWith("--") && line.indexOf(':') < 0).collect(Collectors.joining());
-            byte[] bytes = Base64.getMimeDecoder().decode(text);
+            String text = lines.filter(line -> !line.isEmpty() && !line.startsWith("--") && line.indexOf(':') < 0)
+                .collect(Collectors.joining());
+            byte[] bytes = Base64.getMimeDecoder()
+                .decode(text);
             KeyFactory factory = KeyFactory.getInstance("RSA");
             try {
                 key = factory.generatePrivate(new PKCS8EncodedKeySpec(bytes)); // PKCS#8
@@ -175,12 +180,15 @@ public class Standalone {
         // load certificates(.crt)
         Certificate[] chain = certPaths.flatMap(path -> {
             try (InputStream in = Files.newInputStream(Paths.get(path))) {
-                return CertificateFactory.getInstance("X.509").generateCertificates(in).stream();
+                return CertificateFactory.getInstance("X.509")
+                    .generateCertificates(in)
+                    .stream();
             } catch (IOException | CertificateException e) {
                 e.printStackTrace();
             }
             return Stream.empty();
-        }).toArray(Certificate[]::new);
+        })
+            .toArray(Certificate[]::new);
 
         // create key store
         KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -264,7 +272,8 @@ public class Standalone {
 
         @Override
         public Stream<String> names() {
-            return attributes.keySet().stream();
+            return attributes.keySet()
+                .stream();
         }
 
         @SuppressWarnings("unchecked")
@@ -314,6 +323,11 @@ public class Standalone {
     public static class SessionStoreDb implements SessionStore {
 
         /**
+         * Last Load millis
+         */
+        static final AtomicLong lastClean = new AtomicLong();
+
+        /**
          * Database
          */
         final Db db = Db.connect(Sys.Db.session_suffix);
@@ -325,10 +339,10 @@ public class Standalone {
          */
         @Override
         public void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys) {
+            Timestamp now = Timestamp.valueOf(LocalDateTime.now());
             if (!keyValues.isEmpty()) {
-                Timestamp now = Timestamp.valueOf(LocalDateTime.now());
-                db.prepare("UPDATE t_session SET value = ?, last_access = ? WHERE id = ? AND name = ?", update -> {
-                    update.setString(3, id);
+                db.prepare("UPDATE t_session SET value = ? WHERE id = ? AND name = ?", update -> {
+                    update.setString(2, id);
                     List<String> namesUpdate = new ArrayList<>();
                     List<String> valuesUpdate = new ArrayList<>();
                     db.prepare("INSERT INTO t_session(id, name, value, last_access) VALUES(?, ?, ?, ?)", insert -> {
@@ -345,8 +359,7 @@ public class Standalone {
                                 namesUpdate.add(name);
                                 valuesUpdate.add(Objects.toString(value));
                                 update.setBytes(1, Tool.serialize(value, out));
-                                update.setTimestamp(2, now);
-                                update.setString(4, name);
+                                update.setString(3, name);
                                 update.executeUpdate();
                             }) <= 0) {
                                 namesInsert.add(name);
@@ -359,7 +372,7 @@ public class Standalone {
                         }));
                         return namesInsert.isEmpty() ? null : Tool.array(id, namesInsert, valuesInsert, now);
                     });
-                    return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, now, id, namesUpdate);
+                    return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, id, namesUpdate);
                 });
             }
             if (!removeKeys.isEmpty()) {
@@ -370,6 +383,14 @@ public class Standalone {
                         delete.executeUpdate();
                     }));
                     return Tool.array(id, removeKeys);
+                });
+            }
+            if (Sys.session_timeout_minutes > 0) {
+                db.prepare("UPDATE t_session SET last_access = ? WHERE id = ?", p -> {
+                    p.setTimestamp(1, now);
+                    p.setString(2, id);
+                    p.executeUpdate();
+                    return Tool.array(now, id);
                 });
             }
         }
@@ -394,15 +415,26 @@ public class Standalone {
             Map<String, Serializable> map = new ConcurrentHashMap<>();
             int timeout = Sys.session_timeout_minutes;
             if (timeout > 0) {
-                db.from("t_session").where("last_access", "<", LocalDateTime.now().minusMinutes(timeout)).delete();
-            }
-            db.select("name", "value").from("t_session").where("id", id).rows(rs -> {
-                try (InputStream in = rs.getBinaryStream(2); ObjectInputStream i = new ObjectInputStream(in)) {
-                    if (in != null) {
-                        map.put(rs.getString(1), (Serializable) i.readObject());
-                    }
+                long current = System.currentTimeMillis();
+                if (current > lastClean.longValue() + Sys.session_clean_millis) {
+                    lastClean.set(current);
+                    db.from("t_session")
+                        .where("last_access", "<", LocalDateTime.now()
+                            .minusMinutes(timeout))
+                        .delete();
                 }
-            });
+            }
+            db.select("name", "value")
+                .from("t_session")
+                .where("id", id)
+                .rows(rs -> {
+                    try (InputStream in = rs.getBinaryStream(2);
+                         ObjectInputStream i = new ObjectInputStream(in)) {
+                        if (in != null) {
+                            map.put(rs.getString(1), (Serializable) i.readObject());
+                        }
+                    }
+                });
             return map;
         }
     }
@@ -415,7 +447,8 @@ public class Standalone {
         /**
          * Redis client
          */
-        final Redis redis = Try.s(() -> new Redis(Sys.session_redis_host, Sys.session_redis_port)).get();
+        final Redis redis = Try.s(() -> new Redis(Sys.session_redis_host, Sys.session_redis_port))
+            .get();
 
         /*
          * (non-Javadoc)
@@ -489,12 +522,18 @@ public class Standalone {
          * @param exchange exchange
          */
         SessionImpl(HttpExchange exchange) {
-            id = Tool.of(exchange.getRequestHeaders().getFirst("Cookie"))
-                    .flatMap(s -> Stream.of(s.split("\\s*;\\s*")).map(t -> t.split("=", 2)).filter(a -> Sys.session_name.equalsIgnoreCase(a[0])).findAny()
-                            .map(a -> a[1].substring(0, a[1].length() - Sys.cluster_suffix.length())))
-                    .orElseGet(() -> Tool.peek(Tool.hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()),
-                            i -> exchange.getResponseHeaders().add("Set-Cookie", createSetCookie(Sys.session_name, i + Sys.cluster_suffix, null, -1, null,
-                                    Application.current().map(Application::getContextPath).orElse(null), false, true))));
+            id = Tool.of(exchange.getRequestHeaders()
+                .getFirst("Cookie"))
+                .flatMap(s -> Stream.of(s.split("\\s*;\\s*"))
+                    .map(t -> t.split("=", 2))
+                    .filter(a -> Sys.session_name.equalsIgnoreCase(a[0]))
+                    .findAny()
+                    .map(a -> a[1].substring(0, a[1].length() - Sys.cluster_suffix.length())))
+                .orElseGet(() -> Tool.peek(Tool
+                    .hash("" + hashCode() + System.currentTimeMillis() + exchange.getRemoteAddress() + Math.random()), i -> exchange.getResponseHeaders()
+                        .add("Set-Cookie", createSetCookie(Sys.session_name, i + Sys.cluster_suffix, null, -1, null, Application.current()
+                            .map(Application::getContextPath)
+                            .orElse(null), false, true))));
         }
 
         /**
@@ -535,12 +574,20 @@ public class Standalone {
         static String createSetCookie(String name, String value, ZonedDateTime expires, long maxAge, String domain, String path, boolean secure,
                 boolean httpOnly) {
             StringBuilder result = new StringBuilder(name + "=" + value);
-            Tool.of(expires).map(DateTimeFormatter.RFC_1123_DATE_TIME::format).ifPresent(s -> result.append("; Expires=").append(s));
+            Tool.of(expires)
+                .map(DateTimeFormatter.RFC_1123_DATE_TIME::format)
+                .ifPresent(s -> result.append("; Expires=")
+                    .append(s));
             if (maxAge > 0) {
-                result.append("; Max-Age=").append(maxAge);
+                result.append("; Max-Age=")
+                    .append(maxAge);
             }
-            Tool.of(domain).ifPresent(s -> result.append("; Domain=").append(s));
-            Tool.of(path).ifPresent(s -> result.append("; Path=").append(s));
+            Tool.of(domain)
+                .ifPresent(s -> result.append("; Domain=")
+                    .append(s));
+            Tool.of(path)
+                .ifPresent(s -> result.append("; Path=")
+                    .append(s));
             if (secure) {
                 result.append("; Secure");
             }
@@ -578,23 +625,30 @@ public class Standalone {
 
         @Override
         public Stream<String> names() {
-            return Stream.concat(oldAttributes().keySet().stream(), newAttributes().keySet().stream()).distinct()
-                    .filter(Tool.of(removeAttributes).map(a -> Tool.not(a::contains)).orElse(i -> true));
+            return Stream.concat(oldAttributes().keySet()
+                .stream(), newAttributes().keySet()
+                    .stream())
+                .distinct()
+                .filter(Tool.of(removeAttributes)
+                    .map(a -> Tool.not(a::contains))
+                    .orElse(i -> true));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
             return Tool.of(newAttributes().containsKey(name) ? (T) newAttributes().get(name)
-                    : oldAttributes().containsKey(name) && !Tool.of(removeAttributes).map(a -> a.contains(name)).orElse(false) ? (T) oldAttributes().get(name)
-                            : Reflector.getProperty(this, name, () -> null));
+                    : oldAttributes().containsKey(name) && !Tool.of(removeAttributes)
+                        .map(a -> a.contains(name))
+                        .orElse(false) ? (T) oldAttributes().get(name) : Reflector.getProperty(this, name, () -> null));
         }
 
         @Override
         public void setAttr(String name, Serializable value) {
             if (!Objects.equals(value, oldAttributes().get(name))) {
                 newAttributes().put(name, value);
-                Tool.of(removeAttributes).ifPresent(a -> a.remove(name));
+                Tool.of(removeAttributes)
+                    .ifPresent(a -> a.remove(name));
             }
         }
 
@@ -605,7 +659,8 @@ public class Standalone {
                     removeAttributes = new HashSet<>();
                 }
                 removeAttributes.add(name);
-                Tool.of(newAttributes).ifPresent(a -> a.remove(name));
+                Tool.of(newAttributes)
+                    .ifPresent(a -> a.remove(name));
             }
         }
 
@@ -618,7 +673,8 @@ public class Standalone {
             if (!hasNew && !hasRemove) {
                 return;
             }
-            try (SessionStore store = factory.get(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            try (SessionStore store = factory.get();
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 store.save(id, hasNew ? newAttributes : Collections.emptyMap(), hasRemove ? removeAttributes : Collections.emptySet());
                 if (hasNew) {
                     newAttributes.forEach(oldAttributes::put);
@@ -673,7 +729,9 @@ public class Standalone {
         /**
          * Accept methods
          */
-        static final Set<String> methods = Stream.of(Method.values()).map(Enum::name).collect(Collectors.toSet());
+        static final Set<String> methods = Stream.of(Method.values())
+            .map(Enum::name)
+            .collect(Collectors.toSet());
 
         /**
          * @param exchange exchange
@@ -681,12 +739,16 @@ public class Standalone {
          */
         RequestImpl(HttpExchange exchange) throws IOException {
             this.exchange = exchange;
-            String path = exchange.getRequestURI().getPath();
-            String contextPath = Application.current().map(Application::getContextPath).orElse("");
+            String path = exchange.getRequestURI()
+                .getPath();
+            String contextPath = Application.current()
+                .map(Application::getContextPath)
+                .orElse("");
             this.path = path.length() <= contextPath.length() ? "/" : Tool.prefix(path.substring(contextPath.length()), "/");
 
             // query parameter
-            String query = exchange.getRequestURI().getRawQuery();
+            String query = exchange.getRequestURI()
+                .getRawQuery();
             if (query != null) {
                 parse(parameters, new Scanner(query));
             }
@@ -698,7 +760,8 @@ public class Standalone {
                 Log.info(e, () -> "Invalid method: " + m);
                 return null;
             });
-            Method method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key).orElseGet(exchange::getRequestMethod));
+            Method method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key)
+                .orElseGet(exchange::getRequestMethod));
             if (contentType == null || method == null) {
                 this.method = method;
                 return;
@@ -759,9 +822,12 @@ public class Standalone {
                                     int n = in.read(bytes);
                                     files.put(filename, Tuple.of(Arrays.copyOfRange(bytes, 0, n), null));
                                 } else {
-                                    File f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
+                                    File f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder)
+                                        .map(File::new)
+                                        .orElse(null));
                                     f.deleteOnExit();
-                                    try (FileOutputStream out = new FileOutputStream(f); FileChannel to = out.getChannel()) {
+                                    try (FileOutputStream out = new FileOutputStream(f);
+                                         FileChannel to = out.getChannel()) {
                                         to.transferFrom(Channels.newChannel(in), 0, length);
                                     }
                                     Log.info("saved " + f + " " + length + "bytes");
@@ -784,12 +850,14 @@ public class Standalone {
                     }
                 }
             }
-            this.method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key).orElseGet(exchange::getRequestMethod));
+            this.method = getMethod.apply(Tool.getFirst(parameters, Sys.request_method_key)
+                .orElseGet(exchange::getRequestMethod));
         }
 
         @Override
         public Stream<String> names() {
-            return attributes.keySet().stream();
+            return attributes.keySet()
+                .stream();
         }
 
         @SuppressWarnings("unchecked")
@@ -854,7 +922,9 @@ public class Standalone {
                 File f = null;
                 for (;;) {
                     if (f == null && size >= fileSizeThreshold) {
-                        f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder).map(File::new).orElse(null));
+                        f = File.createTempFile("upload", "file", Tool.string(Sys.upload_folder)
+                            .map(File::new)
+                            .orElse(null));
                         f.deleteOnExit();
                         out = new BufferedOutputStream(Files.newOutputStream(f.toPath()));
                         out.write(lines.toByteArray());
@@ -947,8 +1017,12 @@ public class Standalone {
                     if (valueAttr != null && valueAttr.length > 0) {
                         value = decode.apply(valueAttr[0]);
                         if (valueAttr.length > 1) {
-                            attr = Stream.of(valueAttr).skip(1).filter(Tool.notEmpty).map(i -> ATTRIBUTE_PAIR_SEPARATOR.split(i, 2)).collect(LinkedHashMap::new,
-                                    (map, a) -> map.put(normalize.apply(a[0]), a.length < 1 ? "" : decode.apply(Tool.trim("\"", a[1], "\""))), Map::putAll);
+                            attr = Stream.of(valueAttr)
+                                .skip(1)
+                                .filter(Tool.notEmpty)
+                                .map(i -> ATTRIBUTE_PAIR_SEPARATOR.split(i, 2))
+                                .collect(LinkedHashMap::new, (map, a) -> map
+                                    .put(normalize.apply(a[0]), a.length < 1 ? "" : decode.apply(Tool.trim("\"", a[1], "\""))), Map::putAll);
                             return;
                         }
                     } else {
@@ -970,8 +1044,8 @@ public class Standalone {
             scanner.forEachRemaining(Try.c(part -> {
                 String[] pair = part.split("[=]");
                 if (pair.length > 0) {
-                    Tool.addValue(parameters, URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()),
-                            pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "");
+                    Tool.addValue(parameters, URLDecoder
+                        .decode(pair[0], StandardCharsets.UTF_8.name()), pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "");
                 }
             }));
         }
@@ -1033,7 +1107,8 @@ public class Standalone {
 
         @Override
         protected String getRemoteAddr() {
-            return Tool.trim("/", exchange.getRemoteAddress().toString(), null);
+            return Tool.trim("/", exchange.getRemoteAddress()
+                .toString(), null);
         }
     }
 
@@ -1044,25 +1119,34 @@ public class Standalone {
 
         @Override
         void flush() {
-            Session.current().filter(s -> s instanceof SessionImpl).ifPresent(s -> ((SessionImpl) s).save());
+            Session.current()
+                .filter(s -> s instanceof SessionImpl)
+                .ifPresent(s -> ((SessionImpl) s).save());
             super.flush();
         }
 
         @Override
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
-            HttpExchange exchange = ((RequestImpl) Request.current().get()).exchange;
+            HttpExchange exchange = ((RequestImpl) Request.current()
+                .get()).exchange;
             TryConsumer<Long> action = contentLength -> {
-                Sys.headers.forEach((key, value) -> exchange.getResponseHeaders().set(key, value));
+                Sys.headers.forEach((key, value) -> exchange.getResponseHeaders()
+                    .set(key, value));
                 if (headers != null) {
-                    headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders().add(key, value)));
+                    headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders()
+                        .add(key, value)));
                 }
                 exchange.sendResponseHeaders(status.code, contentLength);
             };
             if (content == null) {
-                Try.c(action).accept(-1L);
+                Try.c(action)
+                    .accept(-1L);
             } else {
                 writeBody.accept(Try.s(() -> {
-                    action.accept(headers == null ? 0L : Tool.getFirst(headers, "Content-Length").flatMap(Tool::longInteger).orElse(0L));
+                    action.accept(headers == null ? 0L
+                            : Tool.getFirst(headers, "Content-Length")
+                                .flatMap(Tool::longInteger)
+                                .orElse(0L));
                     return exchange.getResponseBody();
                 }));
             }
@@ -1071,11 +1155,16 @@ public class Standalone {
 
         @Override
         public String toString() {
-            return Request.current().map(i -> ((RequestImpl) i).exchange)
-                    .map(request -> "-> " + request.getProtocol() + " "
-                            + Status.of(request.getResponseCode()).map(Object::toString).orElseGet(() -> String.valueOf(request.getResponseCode()))
-                            + Tool.string(request.getResponseHeaders().getFirst("Content-Type")).map(type -> " (" + type + ")").orElse(""))
-                    .orElse("");
+            return Request.current()
+                .map(i -> ((RequestImpl) i).exchange)
+                .map(request -> "-> " + request.getProtocol() + " " + Status.of(request.getResponseCode())
+                    .map(Object::toString)
+                    .orElseGet(() -> String.valueOf(request.getResponseCode()))
+                        + Tool.string(request.getResponseHeaders()
+                            .getFirst("Content-Type"))
+                            .map(type -> " (" + type + ")")
+                            .orElse(""))
+                .orElse("");
         }
     }
 }

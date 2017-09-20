@@ -2946,8 +2946,9 @@ public class Tool {
         // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
         // Log.info(Session.currentLocale().toString());
         // Log.info(camelToSnake("LoginURL"));
-        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
-            .format(java.time.chrono.JapaneseDate.now()));
+//        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
+//            .format(java.time.chrono.JapaneseDate.now()));
+        enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
     }
 
     /**
@@ -2990,5 +2991,23 @@ public class Tool {
      */
     public static int nendo(int year, int month) {
         return month < Sys.nendo_start_month ? year - 1 : year;
+    }
+
+    /**
+     * @param <T> Enum type
+     * @param <U> Comparing type
+     * @param get Comparing value getter
+     * @param value Value
+     * @param clazz Enum class
+     * @return Enum value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T extends Enum<T>, U> Optional<T> enumOf(Function<T, U> get, U value, T... clazz) {
+        return Stream.of((T[]) clazz.getClass()
+            .getComponentType()
+            .getEnumConstants())
+            .filter(i -> get.apply(i)
+                .equals(value))
+            .findFirst();
     }
 }
