@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -673,8 +672,7 @@ public class Standalone {
             if (!hasNew && !hasRemove) {
                 return;
             }
-            try (SessionStore store = factory.get();
-                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            try (SessionStore store = factory.get()) {
                 store.save(id, hasNew ? newAttributes : Collections.emptyMap(), hasRemove ? removeAttributes : Collections.emptySet());
                 if (hasNew) {
                     newAttributes.forEach(oldAttributes::put);
@@ -1119,10 +1117,11 @@ public class Standalone {
 
         @Override
         void flush() {
+            super.flush();
             Session.current()
                 .filter(s -> s instanceof SessionImpl)
-                .ifPresent(s -> ((SessionImpl) s).save());
-            super.flush();
+                .map(SessionImpl.class::cast)
+                .ifPresent(SessionImpl::save);
         }
 
         @Override

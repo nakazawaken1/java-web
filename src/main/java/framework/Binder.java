@@ -298,25 +298,25 @@ public class Binder implements ErrorAppender {
                 .toArray(n -> (Object[]) Array.newInstance(component, n));
         }
 
-        if (clazz == List.class) {
+        if (List.class.isAssignableFrom(clazz)) {
             return sub.stream()
                 .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
                 .collect(Collectors.toList());
         }
 
-        if (clazz == Set.class) {
+        if (Set.class.isAssignableFrom(clazz)) {
             return sub.stream()
                 .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
                 .collect(Collectors.toSet());
         }
 
-        if (clazz == Map.class) {
+        if (Map.class.isAssignableFrom(clazz)) {
             String prefix = name + ".";
             return parameters.entrySet()
                 .stream()
                 .filter(e -> e.getKey()
                     .startsWith(prefix))
-                .collect(LinkedHashMap::new, (map, e) -> map.put(e.getKey()
+                .collect(Attributes.Impl::new, (map, e) -> map.put(e.getKey()
                     .substring(prefix.length()), bind(parameters, nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1]
                             : Object.class)), Map::putAll);
         }

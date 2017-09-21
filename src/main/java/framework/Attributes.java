@@ -1,6 +1,8 @@
 package framework;
 
+import java.io.Serializable;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -12,7 +14,7 @@ import java.util.stream.Stream;
  * 
  * @param <ValueType> value type
  */
-public interface Attributes<ValueType> extends Map<String, ValueType> {
+public interface Attributes<ValueType> extends Map<String, ValueType>, Serializable {
     /**
      * @return attribute names
      */
@@ -53,7 +55,8 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
      */
     @Override
     default boolean isEmpty() {
-        return !names().findAny().isPresent();
+        return !names().findAny()
+            .isPresent();
     }
 
     /*
@@ -147,7 +150,8 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
      */
     @Override
     default Collection<ValueType> values() {
-        return names().map(i -> getAttr(i).orElse(null)).collect(Collectors.toList());
+        return names().map(i -> getAttr(i).orElse(null))
+            .collect(Collectors.toList());
     }
 
     /*
@@ -157,7 +161,8 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
      */
     @Override
     default Set<java.util.Map.Entry<String, ValueType>> entrySet() {
-        return names().map(i -> Tuple.of(i, getAttr(i).orElse(null))).collect(Collectors.toSet());
+        return names().map(i -> Tuple.of(i, getAttr(i).orElse(null)))
+            .collect(Collectors.toSet());
     }
 
     /**
@@ -167,8 +172,46 @@ public interface Attributes<ValueType> extends Map<String, ValueType> {
      * @return text
      */
     default String flash(String key) {
-        String value = Tool.string(get(key)).orElse("");
+        String value = Tool.string(get(key))
+            .orElse("");
         removeAttr(key);
         return value;
+    }
+
+    /**
+     * Simple implementation
+     *
+     * @param <V> Value type
+     */
+    @SuppressWarnings("serial")
+    public static class Impl<V> implements Attributes<V> {
+
+        /**
+         * Map
+         */
+        final LinkedHashMap<String, V> map = new LinkedHashMap<>();
+
+        @Override
+        public Stream<String> names() {
+            return map.keySet()
+                .stream();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends V> Optional<T> getAttr(String name) {
+            return Optional.ofNullable((T) map.get(name));
+        }
+
+        @Override
+        public void setAttr(String name, V value) {
+            map.put(name, value);
+        }
+
+        @Override
+        public void removeAttr(String name) {
+            map.remove(name);
+        }
+
     }
 }

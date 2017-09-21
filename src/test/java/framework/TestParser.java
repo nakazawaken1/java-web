@@ -1,5 +1,6 @@
 package framework;
 
+import java.util.Arrays;
 import java.util.function.Function;
 
 /**
@@ -16,7 +17,7 @@ public class TestParser extends Tester {
      * @return json
      */
     Object to(Object... values) {
-        return Tool.json(Tool.map(values));
+        return Tool.json(values.length < 2 ? Tool.map() : Tool.map(values[0], values[1], Arrays.copyOfRange(values, 2, values.length)));
     }
 
     {

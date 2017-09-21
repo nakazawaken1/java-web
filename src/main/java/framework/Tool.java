@@ -1365,6 +1365,22 @@ public class Tool {
         }
         return text.substring(start, end + 1);
     }
+    
+    /**
+     * pad("12", "0000") = 0012
+     * pad("12", "0000", true) = 1200
+     * @param value Value
+     * @param pad Padding
+     * @param right Right join if true
+     * @return Padding value
+     */
+    public static String pad(Object value, String pad, boolean... right) {
+        if(right.length > 0 && right[0]) {
+            return (value + pad).substring(0, pad.length());
+        }
+        String text = pad + value;
+        return text.substring(Math.max(0, text.length() - pad.length()));
+    }
 
     /**
      * MIME type from file extension(using META-INF/mime.types)
@@ -1621,7 +1637,9 @@ public class Tool {
     @SuppressWarnings("unchecked")
     public static <K, V> Map<K, V> map(K key, V value, Object... keyValues) {
         Map<K, V> map = new LinkedHashMap<>();
-        map.put(key, value);
+        if(key != null) {
+            map.put(key, value);
+        }
         if (keyValues != null) {
             for (int i = 0; i + 1 < keyValues.length; i += 2) {
                 map.put((K) keyValues[i], (V) keyValues[i + 1]);
@@ -1636,24 +1654,7 @@ public class Tool {
      * @return map
      */
     public static <K, V> Map<K, V> map() {
-        return new LinkedHashMap<>();
-    }
-
-    /**
-     * @param <K> key type
-     * @param <V> value type
-     * @param keyValues key, value,...
-     * @return map
-     */
-    @SuppressWarnings("unchecked")
-    public static <K, V> Map<K, V> map(Object[] keyValues) {
-        Map<K, V> map = new LinkedHashMap<>();
-        if (keyValues != null) {
-            for (int i = 0; i + 1 < keyValues.length; i += 2) {
-                map.put((K) keyValues[i], (V) keyValues[i + 1]);
-            }
-        }
-        return map;
+        return map(null, null);
     }
 
     /**
