@@ -1969,7 +1969,7 @@ public class Db implements AutoCloseable {
          * from
          *
          * @param table table
-         * @return preparedQuery
+         * @return Self
          */
         public Query from(String table) {
             this.table = table;
@@ -1980,17 +1980,29 @@ public class Db implements AutoCloseable {
          * from
          *
          * @param table table
-         * @return preparedQuery
+         * @return Self
          */
         public Query from(Class<?> table) {
             this.table = Reflector.mappingClassName(table);
+            return this;
+        }
+        
+        /**
+         * @param condition Condition
+         * @param action Action if condition is true
+         * @return Self
+         */
+        public Query peekIf(boolean condition, Consumer<Query> action) {
+            if(condition) {
+                action.accept(this);
+            }
             return this;
         }
 
         /**
          * use row lock
          *
-         * @return preparedQuery
+         * @return Self
          */
         public Query forUpdate() {
             forUpdate = true;
@@ -2001,7 +2013,7 @@ public class Db implements AutoCloseable {
          * condition
          *
          * @param condition condition
-         * @return preparedQuery
+         * @return Self
          */
         public Query where(String condition) {
             if (wheres == null) {
@@ -2016,7 +2028,7 @@ public class Db implements AutoCloseable {
          *
          * @param field field
          * @param value value
-         * @return preparedQuery
+         * @return Self
          */
         public Query where(String field, Object value) {
             final String separator = ", ";
@@ -2050,7 +2062,7 @@ public class Db implements AutoCloseable {
          *
          * @param field field
          * @param value value
-         * @return preparedQuery
+         * @return Self
          */
         public Query where(Enum<?> field, Object value) {
             return where(toColumn.apply(field), value);
@@ -2062,7 +2074,7 @@ public class Db implements AutoCloseable {
          * @param field field
          * @param operator operator
          * @param value value
-         * @return preparedQuery
+         * @return Self
          */
         public Query where(String field, String operator, Object value) {
             if (value == null) {
@@ -2077,7 +2089,7 @@ public class Db implements AutoCloseable {
          * @param field field
          * @param operator operator
          * @param value value
-         * @return preparedQuery
+         * @return Self
          */
         public Query where(Enum<?> field, String operator, Object value) {
             return where(toColumn.apply(field), operator, value);
@@ -2091,7 +2103,7 @@ public class Db implements AutoCloseable {
          * @param prefix prefix
          * @param value Value
          * @param suffix Suffix
-         * @return Query
+         * @return Self
          */
         public Query where(String field, String operator, String prefix, Object value, String suffix) {
             if (value == null) {
@@ -2108,7 +2120,7 @@ public class Db implements AutoCloseable {
          * @param prefix prefix
          * @param value Value
          * @param suffix Suffix
-         * @return Query
+         * @return Self
          */
         public Query where(Enum<?> field, String operator, String prefix, Object value, String suffix) {
             return where(toColumn.apply(field), operator, prefix, value, suffix);
@@ -2118,7 +2130,7 @@ public class Db implements AutoCloseable {
          * set begin offset
          *
          * @param offset offset
-         * @return preparedQuery
+         * @return Self
          */
         public Query offset(long offset) {
             this.offset = offset;
@@ -2129,7 +2141,7 @@ public class Db implements AutoCloseable {
          * set max fetch count
          *
          * @param limit max fetch count
-         * @return preparedQuery
+         * @return Self
          */
         public Query limit(long limit) {
             this.limit = limit;
@@ -2140,7 +2152,7 @@ public class Db implements AutoCloseable {
          * Ascending orders
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query orderBy(String... fields) {
             if (orders == null) {
@@ -2156,7 +2168,7 @@ public class Db implements AutoCloseable {
          * Ascending orders
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query orderBy(Enum<?>... fields) {
             return orderBy(Stream.of(fields)
@@ -2168,7 +2180,7 @@ public class Db implements AutoCloseable {
          * Descending orders
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query orderByDesc(String... fields) {
             if (orders == null) {
@@ -2184,7 +2196,7 @@ public class Db implements AutoCloseable {
          * Descending orders
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query orderByDesc(Enum<?>... fields) {
             return orderBy(Stream.of(fields)
@@ -2196,7 +2208,7 @@ public class Db implements AutoCloseable {
          * grouping
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query groupBy(String... fields) {
             if (groups == null) {
@@ -2212,7 +2224,7 @@ public class Db implements AutoCloseable {
          * grouping
          *
          * @param fields fields
-         * @return preparedQuery
+         * @return Self
          */
         public Query groupBy(Enum<?>... fields) {
             return groupBy(Stream.of(fields)
@@ -2224,7 +2236,7 @@ public class Db implements AutoCloseable {
          * condition after grouping
          *
          * @param condition condition
-         * @return preparedQuery
+         * @return Self
          */
         public Query having(String condition) {
             if (havings == null) {
