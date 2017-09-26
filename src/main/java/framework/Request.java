@@ -31,6 +31,7 @@ import framework.annotation.Route;
 /**
  * request scoped object
  */
+@SuppressWarnings("serial")
 public abstract class Request implements Attributes<Object> {
 
     /**

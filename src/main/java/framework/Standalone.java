@@ -250,6 +250,7 @@ public class Standalone {
     /**
      * Application implementation
      */
+    @SuppressWarnings("serial")
     static class ApplicationImpl extends Application {
         /**
          * Context path
@@ -384,7 +385,7 @@ public class Standalone {
                     return Tool.array(id, removeKeys);
                 });
             }
-            if (Sys.session_timeout_minutes > 0) {
+            if (Sys.session_timeout_minutes > 0 && !(keyValues.isEmpty() && removeKeys.isEmpty())) {
                 db.prepare("UPDATE t_session SET last_access = ? WHERE id = ?", p -> {
                     p.setTimestamp(1, now);
                     p.setString(2, id);
@@ -489,6 +490,7 @@ public class Standalone {
     /**
      * Session implementation
      */
+    @SuppressWarnings("serial")
     public static class SessionImpl extends Session {
 
         /**
@@ -693,6 +695,7 @@ public class Standalone {
     /**
      * Request implementation
      */
+    @SuppressWarnings("serial")
     static class RequestImpl extends Request {
 
         /**
@@ -1117,11 +1120,12 @@ public class Standalone {
 
         @Override
         void flush() {
-            super.flush();
-            Session.current()
+            Optional<SessionImpl> session = Session.current()
                 .filter(s -> s instanceof SessionImpl)
-                .map(SessionImpl.class::cast)
-                .ifPresent(SessionImpl::save);
+                .map(SessionImpl.class::cast);
+            session.ifPresent(SessionImpl::save);
+            super.flush();
+            session.ifPresent(SessionImpl::save);
         }
 
         @Override

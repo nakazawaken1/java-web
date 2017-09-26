@@ -541,6 +541,9 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                         @SuppressWarnings("unchecked")
                         Optional<Object> o = (Optional<Object>) base;
                         switch ((String) method) {
+                        case "filter":
+                            context.setPropertyResolved(true);
+                            return o.filter(e -> (boolean)lambda.invoke(context, e));
                         case "map":
                             context.setPropertyResolved(true);
                             return o.map(e -> lambda.invoke(context, e));

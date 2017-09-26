@@ -103,6 +103,7 @@ public class ServletImpl implements javax.servlet.Servlet {
     /**
      * Application implementation
      */
+    @SuppressWarnings("serial")
     static class ApplicationImpl extends Application {
 
         /**
@@ -174,6 +175,7 @@ public class ServletImpl implements javax.servlet.Servlet {
     /**
      * Session implementation
      */
+    @SuppressWarnings("serial")
     static class SessionImpl extends Session {
 
         /**
@@ -277,6 +279,7 @@ public class ServletImpl implements javax.servlet.Servlet {
     /**
      * Request implementation
      */
+    @SuppressWarnings("serial")
     static class RequestImpl extends Request {
 
         /**

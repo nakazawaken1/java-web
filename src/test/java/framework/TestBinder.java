@@ -1,7 +1,5 @@
 package framework;
 
-import static framework.TestBinder.User.Factory.F.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

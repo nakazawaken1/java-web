@@ -43,6 +43,7 @@ import framework.annotation.Validator;
 /**
  * application scoped object
  */
+@SuppressWarnings("serial")
 public abstract class Application implements Attributes<Object> {
 
     /**

@@ -14,6 +14,7 @@ import framework.annotation.Only.Administrator;
 /**
  * session scoped object
  */
+@SuppressWarnings("serial")
 public abstract class Session implements Attributes<Serializable> {
 
     /**
