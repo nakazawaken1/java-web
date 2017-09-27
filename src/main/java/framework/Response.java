@@ -101,8 +101,10 @@ public abstract class Response {
         public String toString() {
             // _ -> space, AbcDef -> Abc-Def
             IntFunction<IntStream> m = c -> (Letters.ALPHABET_UPPERS.indexOf(c) >= 0 ? IntStream.of('-', c) : IntStream.of(c));
-            Function<String, StringBuilder> mapper = i -> IntStream.concat(IntStream.of(i.charAt(0)), i.chars().skip(1).flatMap(m)).collect(StringBuilder::new,
-                    (s, c) -> s.append((char) c), StringBuilder::append);
+            Function<String, StringBuilder> mapper = i -> IntStream.concat(IntStream.of(i.charAt(0)), i.chars()
+                .skip(1)
+                .flatMap(m))
+                .collect(StringBuilder::new, (s, c) -> s.append((char) c), StringBuilder::append);
             String name = name();
             int max = name.length();
             int skip = 0;
@@ -110,7 +112,10 @@ public abstract class Response {
                 skip++;
             }
             skip--;
-            return code + " " + name.substring(0, skip) + Stream.of(name.substring(skip).split("_")).map(mapper).collect(Collectors.joining(" "));
+            return code + " " + name.substring(0, skip) + Stream.of(name.substring(skip)
+                .split("_"))
+                .map(mapper)
+                .collect(Collectors.joining(" "));
         }
 
         /**
@@ -118,7 +123,9 @@ public abstract class Response {
          * @return Status
          */
         public static Optional<Status> of(int code) {
-            return Stream.of(values()).filter(i -> i.code == code).findAny();
+            return Stream.of(values())
+                .filter(i -> i.code == code)
+                .findAny();
         }
 
         /**
@@ -185,7 +192,9 @@ public abstract class Response {
      * @return response
      */
     public static Response redirect(String path, Status status) {
-        return factory.get().status(status).addHeader("Location", path);
+        return factory.get()
+            .status(status)
+            .addHeader("Location", path);
     }
 
     /**
@@ -201,7 +210,8 @@ public abstract class Response {
      * @return response
      */
     public static Response error(Status status) {
-        return factory.get().status(status);
+        return factory.get()
+            .status(status);
     }
 
     /**
@@ -340,7 +350,7 @@ public abstract class Response {
      * @return self
      */
     public Response contentTypeIfEmpty(String contentType) {
-        return headers.containsKey("Content-Type") ? this : setHeader("Content-Type", contentType);
+        return headers != null && headers.containsKey("Content-Type") ? this : setHeader("Content-Type", contentType);
     }
 
     /**
@@ -381,18 +391,22 @@ public abstract class Response {
      * @return contentType with charset
      */
     public static String setCharset(String contentType, Charset charset) {
-        if (!Tool.string(contentType).isPresent() || charset == null) {
+        if (!Tool.string(contentType)
+            .isPresent() || charset == null) {
             return contentType;
         }
         boolean[] unset = { true };
-        String result = Stream.of(contentType.split("\\s*;\\s*")).map(part -> {
-            if (Tool.splitAt(part, "\\s*=\\s*", 0).equalsIgnoreCase("charset")) {
-                unset[0] = false;
-                return "charset=" + charset.name();
-            } else {
-                return part;
-            }
-        }).collect(Collectors.joining("; "));
+        String result = Stream.of(contentType.split("\\s*;\\s*"))
+            .map(part -> {
+                if (Tool.splitAt(part, "\\s*=\\s*", 0)
+                    .equalsIgnoreCase("charset")) {
+                    unset[0] = false;
+                    return "charset=" + charset.name();
+                } else {
+                    return part;
+                }
+            })
+            .collect(Collectors.joining("; "));
         return unset[0] ? result + "; charset=" + charset.name() : result;
     }
 
@@ -467,7 +481,8 @@ public abstract class Response {
         public static Render of(String file, Function<Xml, Xml>... renders) {
             Render r = new Render();
             r.file = file;
-            r.renders = Stream.of(renders).collect(LinkedHashMap::new, (map, render) -> map.put(String.valueOf(map.size()), render), Map::putAll);
+            r.renders = Stream.of(renders)
+                .collect(LinkedHashMap::new, (map, render) -> map.put(String.valueOf(map.size()), render), Map::putAll);
             return r;
         }
 
@@ -525,170 +540,202 @@ public abstract class Response {
      */
     @SuppressWarnings("unchecked")
     public <T extends Traverser> T traverser(Class<T> clazz) {
-        return Tool.of(traverserMap).map(i -> (T) i.get(clazz)).orElseGet(Try.s(clazz::newInstance));
+        return Tool.of(traverserMap)
+            .map(i -> (T) i.get(clazz))
+            .orElseGet(Try.s(clazz::newInstance));
     }
 
     /**
      * body writer
      */
     public static final List<Tuple<Class<?>, TryTriConsumer<Response, Supplier<OutputStream>, boolean[]>>> writers = Tool.list(//
-            Tuple.of(Writer.class, (response, out, cancel) -> {
-                response.contentTypeIfEmpty(Content.TEXT, response.charset());
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                    ((Writer) response.content).accept(writer);
-                }
-            }), //
-            Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).accept(out.get())), //
-            Tuple.of(Path.class, (response, out, cancel) -> {
-                BiConsumer<String, URL> load = (file, url) -> {
-                    Log.config("[static load] " + Tool.or(Try.s(url::toURI).get().getPath(), () -> url).get());
-                    try (InputStream in = url.openStream()) {
-                        response.contentTypeIfEmpty(Tool.getContentType(file),
-                                response.charset.orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
-                        if (Sys.format_include_regex.matcher(file).matches() && !Sys.format_exclude_regex.matcher(file).matches()) {
-                            try (Stream<String> lines = Tool.lines(in);
-                                    PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
-                                Function<Formatter, Formatter.Result> exclude;
-                                Function<Object, String> escape;
-                                if (file.endsWith(".js")) {
-                                    exclude = Formatter::excludeForScript;
-                                    escape = Formatter::scriptEscape;
-                                } else if (file.endsWith(".css")) {
-                                    exclude = Formatter::excludeForStyle;
-                                    escape = null;
-                                } else {
-                                    exclude = Formatter::excludeForHtml;
-                                    escape = Tool::htmlEscape;
-                                }
-                                try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map,
-                                        Tool.of(response.values).map(List::toArray).orElseGet(Tool::array))) {
-                                    lines.forEach(line -> writer.println(formatter.format(line)));
-                                }
+        Tuple.of(Writer.class, (response, out, cancel) -> {
+            response.contentTypeIfEmpty(Content.TEXT, response.charset());
+            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                ((Writer) response.content).accept(writer);
+            }
+        }), //
+        Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).accept(out.get())), //
+        Tuple.of(Path.class, (response, out, cancel) -> {
+            BiConsumer<String, URL> load = (file, url) -> {
+                Log.config("[static load] " + Tool.or(Try.s(url::toURI)
+                    .get()
+                    .getPath(), () -> url)
+                    .get());
+                try (InputStream in = url.openStream()) {
+                    response.contentTypeIfEmpty(Tool.getContentType(file), response.charset
+                        .orElseGet(() -> Tool.isTextContent(file) ? StandardCharsets.UTF_8 : null));
+                    if (Sys.format_include_regex.matcher(file)
+                        .matches()
+                            && !Sys.format_exclude_regex.matcher(file)
+                                .matches()) {
+                        try (Stream<String> lines = Tool.lines(in);
+                             PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()))) {
+                            Function<Formatter, Formatter.Result> exclude;
+                            Function<Object, String> escape;
+                            if (file.endsWith(".js")) {
+                                exclude = Formatter::excludeForScript;
+                                escape = Formatter::scriptEscape;
+                            } else if (file.endsWith(".css")) {
+                                exclude = Formatter::excludeForStyle;
+                                escape = null;
+                            } else {
+                                exclude = Formatter::excludeForHtml;
+                                escape = Tool::htmlEscape;
                             }
-                        } else {
-                            Tool.copy(in, out.get(), new byte[1024]);
+                            try (Formatter formatter = new Formatter(exclude, escape, response.locale(), response.map, Tool.of(response.values)
+                                .map(List::toArray)
+                                .orElseGet(Tool::array))) {
+                                lines.forEach(line -> writer.println(formatter.format(line)));
+                            }
                         }
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    } else {
+                        Tool.copy(in, out.get(), new byte[1024]);
                     }
-                };
-                String file = ((Path) response.content).toString().replace('\\', '/');
-                URL url = Tool.toURL(file).orElse(null);
-                if (url != null) {
-                    if (Tool.isDirectory(url)) { // Is Folder
-                        if (!Request.current().map(Request::getPath).orElse("").endsWith("/")) {
-                            String path = Tool.suffix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
-                            Log.info("folder redirect: " + path);
-                            response.status(Status.Moved_Permamently).addHeader("Location", path);
-                            out.get();
-                            return;
-                        }
-                        String folder = Tool.suffix(file, "/");
-                        for (String page : Sys.default_pages) {
-                            if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
-                                response.status(Status.Moved_Permamently).addHeader("Location", page);
-                                out.get();
-                            }, () -> {
-                            })) {
-                                return;
-                            }
-                        }
-                    } else { // Is File
-                        load.accept(file, url);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            };
+            String file = ((Path) response.content).toString()
+                .replace('\\', '/');
+            URL url = Tool.toURL(file)
+                .orElse(null);
+            if (url != null) {
+                if (Tool.isDirectory(url)) { // Is Folder
+                    if (!Request.current()
+                        .map(Request::getPath)
+                        .orElse("")
+                        .endsWith("/")) {
+                        String path = Tool.suffix(file.substring(Tool.trim(null, Sys.document_root_folder, "/")
+                            .length()), "/");
+                        Log.info("folder redirect: " + path);
+                        response.status(Status.Moved_Permamently)
+                            .addHeader("Location", path);
+                        out.get();
                         return;
                     }
-                }
-
-                /* no content */
-                if (Tool.list(".css", ".js").contains(Tool.getExtension(file))) {
-                    response.status(Status.No_Content);
-                } else {
-                    String path = Tool.prefix(file.substring(Tool.trim(null, Sys.document_root_folder, "/").length()), "/");
-                    String aliase = Sys.aliases.get(path);
-                    if (aliase != null) {
-                        Log.info("aliase redirect: " + path + " -> " + aliase);
-                        response.status(Status.Moved_Permamently).addHeader("Location", aliase.startsWith("http") ? aliase : Tool.path(Application.CURRENT.getContextPath(), aliase).apply("/"));
-                    } else {
-                        Log.info("not found: " + Tool.trim("/", file, null));
-                        response.status(Status.Not_Found);
+                    String folder = Tool.suffix(file, "/");
+                    for (String page : Sys.default_pages) {
+                        if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
+                            response.status(Status.Moved_Permamently)
+                                .addHeader("Location", page);
+                            out.get();
+                        }, () -> {
+                        })) {
+                            return;
+                        }
                     }
+                } else { // Is File
+                    load.accept(file, url);
+                    return;
                 }
-                out.get();
-            }), //
-            Tuple.of(Template.class, (response, out, cancel) -> {
-                Template template = (Template) response.content;
-                response.contentTypeIfEmpty(Tool.getContentType(template.name), response.charset());
-                URL url = (template.name.startsWith("/") ? Tool.toURL(template.name) : Tool.toURL(Sys.template_folder, template.name)).get();
-                try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
-                        Stream<String> lines = Tool.lines(url.openStream());
-                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
-                    lines.map(formatter::format).forEach(line -> {
+            }
+
+            /* no content */
+            if (Tool.list(".css", ".js")
+                .contains(Tool.getExtension(file))) {
+                response.status(Status.No_Content)
+                    .contentTypeIfEmpty(Tool.getContentType(file));
+            } else {
+                String path = Tool.prefix(file.substring(Tool.trim(null, Sys.document_root_folder, "/")
+                    .length()), "/");
+                String aliase = Sys.aliases.get(path);
+                if (aliase != null) {
+                    Log.info("aliase redirect: " + path + " -> " + aliase);
+                    response.status(Status.Moved_Permamently)
+                        .addHeader("Location", aliase.startsWith("http") ? aliase
+                                : Tool.path(Application.CURRENT.getContextPath(), aliase)
+                                    .apply("/"));
+                } else {
+                    Log.info("not found: " + Tool.trim("/", file, null));
+                    response.status(Status.Not_Found);
+                }
+            }
+            out.get();
+        }), //
+        Tuple.of(Template.class, (response, out, cancel) -> {
+            Template template = (Template) response.content;
+            response.contentTypeIfEmpty(Tool.getContentType(template.name), response.charset());
+            URL url = (template.name.startsWith("/") ? Tool.toURL(template.name) : Tool.toURL(Sys.template_folder, template.name)).get();
+            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(out.get(), response.charset()));
+                 Stream<String> lines = Tool.lines(url.openStream());
+                 Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
+                lines.map(formatter::format)
+                    .forEach(line -> {
                         Tool.printReplace(writer, line, template.replacer, "#{", "}", "${", "}", "<!--{", "}-->", "/*{", "}*/", "{/*", "*/}");
                         writer.println();
                     });
-                }
-            }), //
-            Tuple.of(Render.class, (response, out, cancel) -> {
-                Render render = (Render) response.content;
-                response.contentTypeIfEmpty(Tool.getContentType(render.file), response.charset());
-                URL url = (render.file.startsWith("/") ? Tool.toURL(render.file) : Tool.toURL(Sys.template_folder, render.file)).get();
-                try (InputStream in = url.openStream();
-                        Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
-                    out.get().write(Xml.parseMap(formatter.format(Tool.loadText(in)), render.renders).toString().getBytes(response.charset()));
-                }
-            }), //
-            Tuple.of(Object.class, (response, out, cancel) -> {
-                Runnable other = Try.r(() -> {
-                    response.contentTypeIfEmpty(Content.TEXT, response.charset());
-                    Tool.csv(response.content, out.get(), response.charset());
-                });
-                Tool.ifPresentOr(Tool.of(response.headers).flatMap(map -> map.getOrDefault("Content-Type", Tool.list()).stream().findFirst()),
-                        Try.c(contentType -> {
-                            switch (Tool.splitAt(contentType, "\\s*;", 0)) {
-                            case Content.JSON:
-                            case Content.YML:
-                                Tool.traverse(response.content, Tool.peek(response.traverser(JsonTraverser.class), t -> {
-                                    t.out = out.get();
-                                    t.charset = response.charset();
-                                }));
-                                break;
-                            case Content.XML:
-                                Tool.traverse(response.content, Tool.peek(response.traverser(XmlTraverser.class), t -> {
-                                    t.out = out.get();
-                                    t.charset = response.charset();
-                                }));
-                                break;
-                            case Content.CSV:
-                                OutputStream o = out.get();
-                                o.write(Tool.BOM);
-                                Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
-                                    t.out = o;
-                                    t.charset = response.charset();
-                                }));
-                                break;
-                            case Content.TSV:
-                                Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
-                                    t.out = out.get();
-                                    t.charset = response.charset();
-                                    t.separator = '\t';
-                                    t.clouser = '\0';/* none */
-                                    t.innerSeparator = ",";
-                                }));
-                                break;
-                            case Content.HTML:
-                                out.get().write(response.content.toString().getBytes(response.charset()));
-                                break;
-                            default:
-                                other.run();
-                                break;
-                            }
-                        }), other);
-            }));
+            }
+        }), //
+        Tuple.of(Render.class, (response, out, cancel) -> {
+            Render render = (Render) response.content;
+            response.contentTypeIfEmpty(Tool.getContentType(render.file), response.charset());
+            URL url = (render.file.startsWith("/") ? Tool.toURL(render.file) : Tool.toURL(Sys.template_folder, render.file)).get();
+            try (InputStream in = url.openStream();
+                 Formatter formatter = new Formatter(Formatter::excludeForHtml, Tool::htmlEscape, response.locale(), response.map)) {
+                out.get()
+                    .write(Xml.parseMap(formatter.format(Tool.loadText(in)), render.renders)
+                        .toString()
+                        .getBytes(response.charset()));
+            }
+        }), //
+        Tuple.of(Object.class, (response, out, cancel) -> {
+            Runnable other = Try.r(() -> {
+                response.contentTypeIfEmpty(Content.TEXT, response.charset());
+                Tool.csv(response.content, out.get(), response.charset());
+            });
+            Tool.ifPresentOr(Tool.of(response.headers)
+                .flatMap(map -> map.getOrDefault("Content-Type", Tool.list())
+                    .stream()
+                    .findFirst()), Try.c(contentType -> {
+                        switch (Tool.splitAt(contentType, "\\s*;", 0)) {
+                        case Content.JSON:
+                        case Content.YML:
+                            Tool.traverse(response.content, Tool.peek(response.traverser(JsonTraverser.class), t -> {
+                                t.out = out.get();
+                                t.charset = response.charset();
+                            }));
+                            break;
+                        case Content.XML:
+                            Tool.traverse(response.content, Tool.peek(response.traverser(XmlTraverser.class), t -> {
+                                t.out = out.get();
+                                t.charset = response.charset();
+                            }));
+                            break;
+                        case Content.CSV:
+                            OutputStream o = out.get();
+                            o.write(Tool.BOM);
+                            Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                                t.out = o;
+                                t.charset = response.charset();
+                            }));
+                            break;
+                        case Content.TSV:
+                            Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
+                                t.out = out.get();
+                                t.charset = response.charset();
+                                t.separator = '\t';
+                                t.clouser = '\0';/* none */
+                                t.innerSeparator = ",";
+                            }));
+                            break;
+                        case Content.HTML:
+                            out.get()
+                                .write(response.content.toString()
+                                    .getBytes(response.charset()));
+                            break;
+                        default:
+                            other.run();
+                            break;
+                        }
+                    }), other);
+        }));
 
     /**
      * @param args Not use
      */
     public static void main(String[] args) {
-        Stream.of(Status.values()).forEach(System.out::println);
+        Stream.of(Status.values())
+            .forEach(System.out::println);
     }
 }
