@@ -1365,17 +1365,17 @@ public class Tool {
         }
         return text.substring(start, end + 1);
     }
-    
+
     /**
-     * pad("12", "0000") = 0012
-     * pad("12", "0000", true) = 1200
+     * pad("12", "0000") = 0012 pad("12", "0000", true) = 1200
+     * 
      * @param value Value
      * @param pad Padding
      * @param right Right join if true
      * @return Padding value
      */
     public static String pad(Object value, String pad, boolean... right) {
-        if(right.length > 0 && right[0]) {
+        if (right.length > 0 && right[0]) {
             return (value + pad).substring(0, pad.length());
         }
         String text = pad + value;
@@ -1637,7 +1637,7 @@ public class Tool {
     @SuppressWarnings("unchecked")
     public static <K, V> Map<K, V> map(K key, V value, Object... keyValues) {
         Map<K, V> map = new LinkedHashMap<>();
-        if(key != null) {
+        if (key != null) {
             map.put(key, value);
         }
         if (keyValues != null) {
@@ -2947,8 +2947,8 @@ public class Tool {
         // Log.info("base128decoded: " + base128Decode(base128Encode(text)));
         // Log.info(Session.currentLocale().toString());
         // Log.info(camelToSnake("LoginURL"));
-//        System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
-//            .format(java.time.chrono.JapaneseDate.now()));
+        // System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
+        // .format(java.time.chrono.JapaneseDate.now()));
         enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
     }
 
@@ -3010,5 +3010,26 @@ public class Tool {
             .filter(i -> get.apply(i)
                 .equals(value))
             .findFirst();
+    }
+
+    /**
+     * Build attribute(name="value")
+     * 
+     * @param name Attribute name
+     * @param value Attribute value
+     * @return Attribute text
+     */
+    public static String attr(String name, String value) {
+        return ' ' + name + "=\"" + value + '"';
+    }
+
+    /**
+     * Build attribute(name="name")
+     * 
+     * @param name Attribute name
+     * @return Attribute text
+     */
+    public static String attr(String name) {
+        return attr(name, name);
     }
 }

@@ -299,12 +299,14 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             }
             if (eat("{")) {
                 int prefix = 1;
-                if (prev("<!--{")) {
-                    prefix = 5;
+                if(prev("data-el=\"{")) {
+                    prefix = "data-el=\"{".length();
+                } else if (prev("<!--{")) {
+                    prefix = "<!--{".length();
                 } else if (prev("/*{") || eat("/*")) {
-                    prefix = 3;
+                    prefix = "/*{".length();
                 } else if (prev("${") || prev("#{")) {
-                    prefix = 2;
+                    prefix = "${".length();
                 }
                 braces.push(index - prefix);
                 continue;
@@ -315,6 +317,11 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 int prefix = first == '$' || first == '#' ? 2 : 1;
                 int suffix = 1;
                 switch (first) {
+                case 'd':
+                    eat("\"");
+                    prefix = "data-el=\"{".length();
+                    suffix = "}\"".length();
+                    break;
                 case '<':
                     eat("-->");
                     prefix = "<!--{".length();
