@@ -1986,14 +1986,23 @@ public class Db implements AutoCloseable {
             this.table = Reflector.mappingClassName(table);
             return this;
         }
-        
+
+        /**
+         * @param action Action
+         * @return Self
+         */
+        public Query peek(Consumer<Query> action) {
+            action.accept(this);
+            return this;
+        }
+
         /**
          * @param condition Condition
          * @param action Action if condition is true
          * @return Self
          */
         public Query peekIf(boolean condition, Consumer<Query> action) {
-            if(condition) {
+            if (condition) {
                 action.accept(this);
             }
             return this;
@@ -2021,6 +2030,18 @@ public class Db implements AutoCloseable {
             }
             wheres.add(condition);
             return this;
+        }
+
+        /**
+         * condition
+         *
+         * @param condition condition
+         * @param map key value map(${key} to value)
+         * @param values values(replace {0}, {1}... to value)
+         * @return Self
+         */
+        public Query where(String condition, Map<String, Object> map, Object... values) {
+            return where(db.sql(condition, map, values));
         }
 
         /**
@@ -2398,8 +2419,9 @@ public class Db implements AutoCloseable {
     public long preparedQuery(String sql, TryFunction<PreparedStatement, Object[]> prepare, TryConsumer<ResultSet> fetch) {
         long count = 0;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            Object[] values = prepare == null ? Tool.array() : Try.f(prepare)
-                .apply(ps);
+            Object[] values = prepare == null ? Tool.array()
+                    : Try.f(prepare)
+                        .apply(ps);
             if (values != null) {
                 Log.info(() -> preparedSQL(sql, values));
             }
