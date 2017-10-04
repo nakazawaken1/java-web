@@ -235,9 +235,19 @@ public class Db implements AutoCloseable {
     public static final TryFunction<ResultSet, Integer> toInt = rs -> rs.getInt(1);
 
     /**
+     * ResultSet to int
+     */
+    public static final Function<ResultSet, Integer> tryToInt = Try.f(toInt);
+
+    /**
      * ResultSet to String
      */
     public static final TryFunction<ResultSet, String> toString = rs -> rs.getString(1);
+
+    /**
+     * ResultSet to String
+     */
+    public static final Function<ResultSet, String> tryToString = Try.f(toString);
 
     /**
      * ResultSet to array

@@ -495,7 +495,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             if (key.matches("^[0-9]+$")) {
                 int i = Integer.parseInt(key);
                 if (values != null && i < values.length) {
-                    return getResult.apply(values[i] == null ? null : values[i].toString(), "values");
+                    return getResult.apply(values[i], "values");
                 } else {
                     return s;
                 }
