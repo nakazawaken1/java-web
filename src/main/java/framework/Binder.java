@@ -97,6 +97,20 @@ public class Binder implements ErrorAppender {
         if (clazz == String.class) {
             return text == null ? error == null ? "" : error.apply(null) : text;
         }
+        if (clazz == boolean.class || clazz == Boolean.class) {
+            if (text != null) {
+                Optional<Integer> n = Tool.integer(text);
+                if (text.equalsIgnoreCase("false") || n.filter(i -> i == 0)
+                    .isPresent()) {
+                    return false;
+                }
+                if (text.equalsIgnoreCase("true") || n.filter(i -> i != 0)
+                    .isPresent()) {
+                    return true;
+                }
+            }
+            return error == null ? false : error.apply(null);
+        }
         if (clazz == byte.class || clazz == Byte.class) {
             return toNumber.apply(Byte::valueOf);
         }
@@ -169,7 +183,7 @@ public class Binder implements ErrorAppender {
                     }));
                 return instance;
             }
-            return convert((String)i, type, null);
+            return convert((String) i, type, null);
         };
     }
 
@@ -201,7 +215,7 @@ public class Binder implements ErrorAppender {
             }
             if (start >= 0 && (dot == -1 || start < dot)) {
                 int end = key.indexOf(']');
-                if(start + 1 < end) {
+                if (start + 1 < end) {
                     int index = Integer.parseInt(key.substring(start + 1, end));
                     while (sub.size() <= index) {
                         sub.add(null);
@@ -215,8 +229,8 @@ public class Binder implements ErrorAppender {
                     }
                 } else {
                     key = key.substring(end + 1);
-                    if(key.isEmpty()) {
-                        for(String i : value) {
+                    if (key.isEmpty()) {
+                        for (String i : value) {
                             sub.add(i);
                         }
                     } else {
@@ -225,7 +239,8 @@ public class Binder implements ErrorAppender {
                 }
             }
         });
-        String first = sub.isEmpty() ? Tool.getFirst(parameters, name).orElse(null)
+        String first = sub.isEmpty() ? Tool.getFirst(parameters, name)
+            .orElse(null)
                 : sub.get(0)
                     .toString();
         if (sub.size() == 1 && "".equals(first)) {
