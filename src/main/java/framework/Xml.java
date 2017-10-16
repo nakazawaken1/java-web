@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
@@ -829,6 +830,27 @@ public class Xml {
             children.stream()
                 .forEach(i -> i.parent = null);
             children = null;
+        }
+        return this;
+    }
+
+    /**
+     * @param consumer Consumer
+     * @return Self
+     */
+    public Xml peek(Consumer<Xml> consumer) {
+        consumer.accept(this);
+        return this;
+    }
+
+    /**
+     * @param condition Consume if true
+     * @param consumer Consumer
+     * @return Self
+     */
+    public Xml peekIf(boolean condition, Consumer<Xml> consumer) {
+        if(condition) {
+            consumer.accept(this);
         }
         return this;
     }
