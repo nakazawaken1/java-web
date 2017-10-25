@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
@@ -2015,6 +2016,17 @@ public class Db implements AutoCloseable {
             if (condition) {
                 action.accept(this);
             }
+            return this;
+        }
+
+        /**
+         * @param <T> Value type
+         * @param optional Optional
+         * @param action Action if condition is true
+         * @return Self
+         */
+        public <T> Query peekIf(Optional<T> optional, BiConsumer<Query, T> action) {
+            optional.ifPresent(i -> action.accept(this, i));
             return this;
         }
 
