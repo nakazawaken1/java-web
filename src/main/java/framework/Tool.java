@@ -271,7 +271,7 @@ public class Tool {
      * @return integer
      */
     public static Optional<Integer> integer(Object value) {
-        return optional(value, Integer::parseInt);
+        return value instanceof Number ? Optional.of(((Number)value).intValue()) : optional(value, Integer::parseInt);
     }
 
     /**
@@ -281,7 +281,7 @@ public class Tool {
      * @return long integer
      */
     public static Optional<Long> longInteger(Object value) {
-        return optional(value, Long::parseLong);
+        return value instanceof Number ? Optional.of(((Number)value).longValue()) : optional(value, Long::parseLong);
     }
 
     /**

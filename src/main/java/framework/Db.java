@@ -744,6 +744,7 @@ public class Db implements AutoCloseable {
      * @return updated rows
      */
     public int update(Consumer<Map<String, Object>> prepare, String table, String[] names, int primary, Object... values) {
+        String separator = ", ";
         StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(table);
         String pad = " SET ";
@@ -767,9 +768,33 @@ public class Db implements AutoCloseable {
         pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
             sql.append(pad)
-                .append(names[i])
-                .append(" = ")
-                .append(builder.escape(values[i]));
+                .append(names[i]);
+            Object value = values[i];
+            StringBuilder s = null;
+            if (value == null) {
+                sql.append(" IS NULL");
+            } else {
+                if (value.getClass()
+                    .isArray()) {
+                    s = new StringBuilder();
+                    for (int j = 0, j2 = Array.getLength(value); j < j2; j++) {
+                        s.append(separator)
+                            .append(builder.escape(Array.get(value, j)));
+                    }
+                } else if (value instanceof Iterable) {
+                    s = new StringBuilder();
+                    for (Object j : (Iterable<?>) value) {
+                        s.append(separator)
+                            .append(builder.escape(j));
+                    }
+                }
+                if (s != null) {
+                    sql.append(" IN(" + s.substring(separator.length()) + ")");
+                } else {
+                    sql.append(" = ")
+                        .append(builder.escape(value));
+                }
+            }
             pad = " AND ";
         }
         return execute(sql.toString(), null);
@@ -2084,14 +2109,14 @@ public class Db implements AutoCloseable {
                 s = new StringBuilder();
                 for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
                     s.append(separator)
-                        .append(Array.get(value, i));
+                        .append(db.builder.escape(Array.get(value, i)));
                 }
             }
             if (value instanceof Iterable) {
                 s = new StringBuilder();
                 for (Object i : (Iterable<?>) value) {
                     s.append(separator)
-                        .append(i);
+                        .append(db.builder.escape(i));
                 }
             }
             if (s != null) {
