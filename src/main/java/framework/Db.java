@@ -2195,6 +2195,13 @@ public class Db implements AutoCloseable {
         }
 
         /**
+         * @return True if exists where
+         */
+        public boolean hasWhere() {
+            return wheres != null && !wheres.isEmpty();
+        }
+
+        /**
          * set begin offset
          *
          * @param offset offset
