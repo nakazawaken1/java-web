@@ -744,7 +744,6 @@ public class Db implements AutoCloseable {
      * @return updated rows
      */
     public int update(Consumer<Map<String, Object>> prepare, String table, String[] names, int primary, Object... values) {
-        String separator = ", ";
         StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(table);
         String pad = " SET ";
@@ -765,7 +764,21 @@ public class Db implements AutoCloseable {
                     .append(builder.escape(value));
             });
         }
-        pad = " WHERE ";
+        buildWhere(sql, names, primary, values);
+        return execute(sql.toString(), null);
+    }
+
+    /**
+     * Build where
+     * 
+     * @param sql SQL
+     * @param names Column names
+     * @param primary Primary key count
+     * @param values Values
+     */
+    private void buildWhere(StringBuilder sql, String[] names, int primary, Object[] values) {
+        String separator = ", ";
+        String pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
             sql.append(pad)
                 .append(names[i]);
@@ -789,7 +802,14 @@ public class Db implements AutoCloseable {
                     }
                 }
                 if (s != null) {
-                    sql.append(" IN(" + s.substring(separator.length()) + ")");
+                    if (s.length() <= separator.length()) {
+                        sql.append(" <> ")
+                            .append(names[i]);
+                    } else {
+                        sql.append(" IN(")
+                            .append(s.substring(separator.length()))
+                            .append(")");
+                    }
                 } else {
                     sql.append(" = ")
                         .append(builder.escape(value));
@@ -797,7 +817,6 @@ public class Db implements AutoCloseable {
             }
             pad = " AND ";
         }
-        return execute(sql.toString(), null);
     }
 
     /**
@@ -848,7 +867,7 @@ public class Db implements AutoCloseable {
         boolean first = true;
         for (Object value : valueList) {
             sql.append(first ? ") VALUES(" : ", ");
-            if (first && primary == 1 && value == null) {
+            if (first && primary == 1 && (value == null || value == Optional.empty())) {
                 /* auto id if primary key is single and null */
                 sql.append("(SELECT COALESCE(MAX(" + names[0] + "), 0) + 1 FROM " + table + ")");
             } else {
@@ -872,14 +891,7 @@ public class Db implements AutoCloseable {
     public int delete(String table, String[] names, int primary, Object... values) {
         StringBuilder sql = new StringBuilder("DELETE FROM ");
         sql.append(table);
-        String pad = " WHERE ";
-        for (int i = 0; i < primary; i++) {
-            sql.append(pad)
-                .append(names[i])
-                .append(" = ")
-                .append(builder.escape(values[i]));
-            pad = " AND ";
-        }
+        buildWhere(sql, names, primary, values);
         return execute(sql.toString(), null);
     }
 
