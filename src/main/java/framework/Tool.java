@@ -42,6 +42,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -271,7 +272,7 @@ public class Tool {
      * @return integer
      */
     public static Optional<Integer> integer(Object value) {
-        return value instanceof Number ? Optional.of(((Number)value).intValue()) : optional(value, Integer::parseInt);
+        return value instanceof Number ? Optional.of(((Number) value).intValue()) : optional(value, Integer::parseInt);
     }
 
     /**
@@ -281,7 +282,7 @@ public class Tool {
      * @return long integer
      */
     public static Optional<Long> longInteger(Object value) {
-        return value instanceof Number ? Optional.of(((Number)value).longValue()) : optional(value, Long::parseLong);
+        return value instanceof Number ? Optional.of(((Number) value).longValue()) : optional(value, Long::parseLong);
     }
 
     /**
@@ -2545,7 +2546,9 @@ public class Tool {
     /**
      * year4, month2, day2, hour2, minute2, second2, millisecond3
      */
-    public static final DateTimeFormatter uuuuMMddHHmmssSSS = DateTimeFormatter.ofPattern("uuuuMMddHHmmssSSS");
+    public static final DateTimeFormatter uuuuMMddHHmmssSSS = new DateTimeFormatterBuilder().appendPattern("uuuuMMddHHmmss")
+        .appendValue(ChronoField.MILLI_OF_SECOND, 3)
+        .toFormatter();//for java8 bug
 
     /**
      * @param pattern Pattern

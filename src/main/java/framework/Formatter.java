@@ -229,7 +229,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     /**
      * map
      */
-    Map<String, Object> map;
+    Map<String, ?> map;
 
     /**
      * values
@@ -245,7 +245,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @param map map
      * @param values values
      */
-    Formatter(Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map, Object... values) {
+    Formatter(Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, ?> map, Object... values) {
         this.exclude = exclude;
         this.escape = escape;
         this.locale = locale;
@@ -373,7 +373,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @param values {0}, {1}... replace to value
      * @return result text
      */
-    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, Object> map,
+    public static String format(String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, ?> map,
             Object... values) {
         try (Formatter formatter = new Formatter(exclude, escape, locale, map, values)) {
             for(;;) {

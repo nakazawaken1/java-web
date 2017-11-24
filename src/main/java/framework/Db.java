@@ -554,7 +554,7 @@ public class Db implements AutoCloseable {
      * @param values values(replace {0}, {1}... to value)
      * @return raw sql
      */
-    public String sql(String sql, Map<String, Object> map, Object... values) {
+    public String sql(String sql, Map<String, ?> map, Object... values) {
         return Formatter.format(sql, Formatter::excludeForSql, builder::escape, Session.currentLocale(), map, values);
     }
 
@@ -602,7 +602,7 @@ public class Db implements AutoCloseable {
      * @param values values({0}, {1}...)
      * @return affected rows
      */
-    public int execute(String sql, Map<String, Object> map, Object... values) {
+    public int execute(String sql, Map<String, ?> map, Object... values) {
         int total = 0;
         for (String s : sql.split(";[ \t\r]*\n\\s*")) {
             s = sql(Tool.trim("", s, ";"), map, values);
