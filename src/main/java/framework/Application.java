@@ -125,8 +125,12 @@ public abstract class Application implements Attributes<Object> {
                 .peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c))
                 .collect(Collectors.toList());
         }
-        Log.startup();
 
+        /* load system properties */
+        Config.Injector.loadSystemProperties();
+
+        /* setup log */
+        Log.startup();
         Log.info(Application.current()
             .get()::toString);
 

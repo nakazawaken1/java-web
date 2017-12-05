@@ -74,53 +74,81 @@ public @interface Config {
             Properties sourceProperties = inject(clazz, new Properties(), "");
 
             /* load config files form Config or classname.config */
-            String[] fs = Tool.of(clazz.getAnnotation(Config.class)).map(Config::value).filter(a -> a.length > 0)
-                    .orElse(Tool.array(Tool.fullName(clazz).toLowerCase(Locale.ENGLISH) + ".config"));
+            String[] fs = Tool.of(clazz.getAnnotation(Config.class))
+                .map(Config::value)
+                .filter(a -> a.length > 0)
+                .orElse(Tool.array(Tool.fullName(clazz)
+                    .toLowerCase(Locale.ENGLISH) + ".config"));
             for (String f : fs) {
                 sourceProperties.putAll(getProperties(f));
             }
-
-            /* add system properties */
-            System.getProperties().forEach((k, v) -> {
-                String key = (String) k;
-                if (key.startsWith("Sys.Db.") || sourceProperties.containsKey(key)) {
-                    sourceProperties.setProperty(key, (String) v);
-                }
-            });
 
             /* resolve variables */
             for (;;) {
                 boolean[] loop = { false };
                 Set<String> missings = new LinkedHashSet<>();
-                sourceProperties.entrySet().forEach(pair -> {
-                    resolve((String) pair.getValue(), sourceProperties, value -> {
-                        sourceProperties.setProperty((String) pair.getKey(), value);
-                        loop[0] = true;
-                    }, missings::add);
-                });
+                sourceProperties.entrySet()
+                    .forEach(pair -> {
+                        resolve((String) pair.getValue(), sourceProperties, value -> {
+                            sourceProperties.setProperty((String) pair.getKey(), value);
+                            loop[0] = true;
+                        }, missings::add);
+                    });
                 if (!loop[0]) {
-                    missings.stream().map(key -> BEGIN + key + END + " cannot resolve.").forEach(Log::warning);
+                    missings.stream()
+                        .map(key -> BEGIN + key + END + " cannot resolve.")
+                        .forEach(Log::warning);
                     break;
                 }
             }
 
             defaultMap.put(clazz, String.join(Letters.CRLF, dumpConfig(clazz, true)));
             Map<String, Properties> propertiesMap = Tool.map("", sourceProperties);
-            Stream.of(fs).map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s))).collect(Collectors.groupingBy(t -> t.l)).entrySet()
-                    .forEach(entry -> {
-                        String folder = entry.getKey();
-                        List<Tuple<String, String>> nameExtension = entry.getValue().stream().map(t -> Tuple.of(t.r.l, t.r.r)).collect(Collectors.toList());
-                        try (Stream<String> list = Tool.getResources(folder)) {
-                            list.map(i -> Tuple.of(i, nameExtension.stream().filter(ne -> i.startsWith(ne.l) && i.endsWith(ne.r)).findFirst().orElse(null)))
-                                    .filter(t -> t.r != null).map(t -> Tuple.of(t.l, folder.length() + t.r.l.length() + 1, t.l.length() - t.r.r.length()))
-                                    .filter(t -> t.r.l < t.r.r)
-                                    .forEach(t -> propertiesMap.compute(t.l.substring(t.r.l, t.r.r), (k, v) -> v == null ? getProperties(t.l)
-                                            : Tool.peek(v, vv -> vv.putAll(getProperties(t.l)))));
-                        }
-                    });
+            Stream.of(fs)
+                .map(s -> Tuple.of(Tool.getFolder(s), Tool.getName(s), Tool.getExtension(s)))
+                .collect(Collectors.groupingBy(t -> t.l))
+                .entrySet()
+                .forEach(entry -> {
+                    String folder = entry.getKey();
+                    List<Tuple<String, String>> nameExtension = entry.getValue()
+                        .stream()
+                        .map(t -> Tuple.of(t.r.l, t.r.r))
+                        .collect(Collectors.toList());
+                    try (Stream<String> list = Tool.getResources(folder)) {
+                        list.map(i -> Tuple.of(i, nameExtension.stream()
+                            .filter(ne -> i.startsWith(ne.l) && i.endsWith(ne.r))
+                            .findFirst()
+                            .orElse(null)))
+                            .filter(t -> t.r != null)
+                            .map(t -> Tuple.of(t.l, folder.length() + t.r.l.length() + 1, t.l.length() - t.r.r.length()))
+                            .filter(t -> t.r.l < t.r.r)
+                            .forEach(t -> propertiesMap.compute(t.l
+                                .substring(t.r.l, t.r.r), (k, v) -> v == null ? getProperties(t.l) : Tool.peek(v, vv -> vv.putAll(getProperties(t.l)))));
+                    }
+                });
             sourceMap.put(clazz, propertiesMap);
 
             inject(clazz, getSource(clazz, Session.currentLocale()), "");
+        }
+
+        /**
+         * Set configuration value
+         * 
+         * @param name Name
+         * @param value Value
+         * @param locale Locale
+         */
+        public static void set(String name, String value, String locale) {
+            Tool.of(getField(name))
+                .ifPresent(field -> {
+                    if (locale.isEmpty() && !Message.class.isAssignableFrom(field.getDeclaringClass())) {
+                        set(field, name, value);
+                    }
+                });
+            Tool.of(classCache.get(Tool.splitAt(name, "[.]", 0)))
+                .map(clazz -> sourceMap.get(clazz)
+                    .computeIfAbsent(locale, k -> new Properties()))
+                .ifPresent(map -> map.put(name, value));
         }
 
         /**
@@ -129,20 +157,36 @@ public @interface Config {
         public static void loadDb() {
             try (Db db = Db.connect()) {
                 String now = Tool.now(14);
-                db.from("t_config").where("start_at", "<=", now).where("end_at", ">", now).rows(rs -> {
-                    String name = rs.getString("name");
-                    String value = Tool.of(rs.getString("value")).orElse("").replace("\\n", "\n").replace("\\r", "\r");
-                    String locale = Tool.of(rs.getString("locale")).orElse("");
-                    Tool.of(getField(name)).ifPresent(field -> {
-                        if (locale.isEmpty() && !Message.class.isAssignableFrom(field.getDeclaringClass())) {
-                            set(field, name, value);
-                        }
+                db.from("t_config")
+                    .where("start_at", "<=", now)
+                    .where("end_at", ">", now)
+                    .rows(rs -> {
+                        String name = Tool.string(rs.getString("name"))
+                            .orElse("");
+                        String value = Tool.string(rs.getString("value"))
+                            .map(s -> s.replace("\\n", "\n")
+                                .replace("\\r", "\r"))
+                            .orElse("");
+                        String locale = Tool.string(rs.getString("locale"))
+                            .orElse("");
+                        set(name, value, locale);
                     });
-                    Tool.of(classCache.get(Tool.splitAt(name, "[.]", 0))).map(clazz -> sourceMap.get(clazz).computeIfAbsent(locale, k -> new Properties()))
-                            .ifPresent(map -> map.put(name, value));
-                });
                 sourceCache.clear();
             }
+        }
+
+        /**
+         * Load system properties
+         */
+        public static void loadSystemProperties() {
+            System.getProperties()
+                .forEach((name, value) -> {
+                    if (!configKeys.contains(name)) { // overwrite only
+                        return;
+                    }
+                    set((String) name, (String) value, "");
+                });
+            sourceCache.clear();
         }
 
         /**
@@ -160,11 +204,19 @@ public @interface Config {
          * @return message dump
          */
         public static String[] dumpMessage() {
-            Set<Locale> locales = sourceMap.entrySet().stream().flatMap(entry -> entry.getValue().keySet().stream()).map(Locale::forLanguageTag)
-                    .collect(Collectors.toSet());
+            Set<Locale> locales = sourceMap.entrySet()
+                .stream()
+                .flatMap(entry -> entry.getValue()
+                    .keySet()
+                    .stream())
+                .map(Locale::forLanguageTag)
+                .collect(Collectors.toSet());
             Set<Class<?>> classes = sourceMap.keySet();
-            return locales.stream().flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale).orElse("default") + "]"),
-                    classes.stream().flatMap(clazz -> dumpMessage(getSource(clazz, locale), true).stream()))).toArray(String[]::new);
+            return locales.stream()
+                .flatMap(locale -> Stream.concat(Stream.of("[" + Tool.string(locale)
+                    .orElse("default") + "]"), classes.stream()
+                        .flatMap(clazz -> dumpMessage(getSource(clazz, locale), true).stream())))
+                .toArray(String[]::new);
         }
 
         /**
@@ -181,11 +233,15 @@ public @interface Config {
                 Class<?> clazz = classCache.computeIfAbsent(fullName.substring(0, fieldIndex), className -> {
                     Class<?> c = classCache.get(fullName.substring(0, classIndex));
                     if (classIndex < fieldIndex) {
-                        for (String i : fullName.substring(classIndex + 1, fieldIndex).split("[.]")) {
+                        for (String i : fullName.substring(classIndex + 1, fieldIndex)
+                            .split("[.]")) {
                             if (c == null) {
                                 return null;
                             }
-                            c = Stream.of(c.getClasses()).filter(j -> i.equals(j.getSimpleName())).findAny().orElse(null);
+                            c = Stream.of(c.getClasses())
+                                .filter(j -> i.equals(j.getSimpleName()))
+                                .findAny()
+                                .orElse(null);
                         }
                     }
                     return c;
@@ -216,7 +272,8 @@ public @interface Config {
                 return Optional.empty();
             }
             try {
-                return Tool.of(field.get(null)).map(i -> (T) (i instanceof Message ? ((Message) i).message(locale) : i));
+                return Tool.of(field.get(null))
+                    .map(i -> (T) (i instanceof Message ? ((Message) i).message(locale) : i));
             } catch (IllegalArgumentException | IllegalAccessException e) {
                 return Optional.empty();
             }
@@ -239,8 +296,14 @@ public @interface Config {
             Map<String, Properties> map = Objects.requireNonNull(sourceMap.get(clazz));
             return sourceCache.computeIfAbsent(Tuple.of(clazz, locale), t -> {
                 Properties p = new Properties();
-                map.entrySet().stream().filter(pair -> locale.toString().startsWith(pair.getKey())).sorted((a, b) -> a.getKey().compareTo(b.getKey()))
-                        .map(Map.Entry::getValue).forEach(p::putAll);
+                map.entrySet()
+                    .stream()
+                    .filter(pair -> locale.toString()
+                        .startsWith(pair.getKey()))
+                    .sorted((a, b) -> a.getKey()
+                        .compareTo(b.getKey()))
+                    .map(Map.Entry::getValue)
+                    .forEach(p::putAll);
                 return p;
             });
         }
@@ -314,28 +377,32 @@ public @interface Config {
             classCache.put(newPrefix.substring(0, newPrefix.length() - 1), clazz);
             if (!Enum.class.isAssignableFrom(clazz) || Message.class.isAssignableFrom(clazz)) {
                 if (Message.class.isAssignableFrom(clazz)) {
-                    Stream.of(clazz.getEnumConstants()).forEach(i -> realProperties.put(newPrefix + ((Enum<?>) i).name(), ((Message) i).defaultMessage()));
+                    Stream.of(clazz.getEnumConstants())
+                        .forEach(i -> realProperties.put(newPrefix + ((Enum<?>) i).name(), ((Message) i).defaultMessage()));
                 } else {
-                    Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
-                        f.setAccessible(true);
-                        String key = newPrefix + f.getName();
-                        String raw = properties.getProperty(key);
-                        Object value;
-                        try {
-                            value = f.get(null);
-                        } catch (IllegalArgumentException | IllegalAccessException e) {
-                            throw new InternalError(e);
-                        }
-                        if (!Modifier.isFinal(f.getModifiers()) && (properties.containsKey(key) || value == null)) {
-                            set(f, key, raw);
-                        } else {
-                            configKeys.add(key);
-                        }
-                        realProperties.setProperty(key, toString(f, value));
-                    });
+                    Stream.of(clazz.getDeclaredFields())
+                        .filter(f -> Modifier.isStatic(f.getModifiers()))
+                        .forEach(f -> {
+                            f.setAccessible(true);
+                            String key = newPrefix + f.getName();
+                            String raw = properties.getProperty(key);
+                            Object value;
+                            try {
+                                value = f.get(null);
+                            } catch (IllegalArgumentException | IllegalAccessException e) {
+                                throw new InternalError(e);
+                            }
+                            if (!Modifier.isFinal(f.getModifiers()) && (properties.containsKey(key) || value == null)) {
+                                set(f, key, raw);
+                            } else {
+                                configKeys.add(key);
+                            }
+                            realProperties.setProperty(key, toString(f, value));
+                        });
                 }
             }
-            Stream.of(clazz.getClasses()).forEach(c -> realProperties.putAll(inject(c, properties, newPrefix)));
+            Stream.of(clazz.getClasses())
+                .forEach(c -> realProperties.putAll(inject(c, properties, newPrefix)));
             return realProperties;
         }
 
@@ -349,10 +416,12 @@ public @interface Config {
             Class<?> type = field.getType();
             Object value;
             if (type == Optional.class) {
-                value = Tool.string(text).map(s -> getValue(field, Reflector.getGenericParameter(field, 0), s));
+                value = Tool.string(text)
+                    .map(s -> getValue(field, Reflector.getGenericParameter(field, 0), s));
             } else if (type.isArray()) {
                 Class<?> componentType = type.getComponentType();
-                Object[] array = split(text, field.getAnnotation(Separator.class)).map(i -> getValue(field, componentType, i)).toArray();
+                Object[] array = split(text, field.getAnnotation(Separator.class)).map(i -> getValue(field, componentType, i))
+                    .toArray();
                 value = Array.newInstance(componentType, array.length);
                 int i = 0;
                 for (Object v : array) {
@@ -361,17 +430,18 @@ public @interface Config {
                 }
             } else if (type == List.class) {
                 value = split(text, field.getAnnotation(Separator.class)).map(i -> getValue(field, Reflector.getGenericParameter(field, 0), i))
-                        .collect(Collectors.toList());
+                    .collect(Collectors.toList());
             } else if (type == Set.class) {
                 value = split(text, field.getAnnotation(Separator.class)).map(i -> getValue(field, Reflector.getGenericParameter(field, 0), i))
-                        .collect(LinkedHashSet::new, (set, v) -> set.add(v), Set::addAll);
+                    .collect(LinkedHashSet::new, (set, v) -> set.add(v), Set::addAll);
             } else if (type == Map.class) {
                 value = split(text, field.getAnnotation(Separator.class)).map(i -> {
-                    String[] pair = i.split(Tool.val(field.getAnnotation(Separator.class),
-                            s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
-                    return Tuple.of(getValue(field, Reflector.getGenericParameter(field, 0), pair[0]),
-                            getValue(field, Reflector.getGenericParameter(field, 1), pair[1]));
-                }).collect(LinkedHashMap::new, (map, tuple) -> map.put(tuple.l, tuple.r), Map::putAll);
+                    String[] pair = i.split(Tool.val(field
+                        .getAnnotation(Separator.class), s -> s == null ? prefixDefault + pairDefault + suffixDefault : s.prefix() + s.pair() + s.suffix()));
+                    return Tuple.of(getValue(field, Reflector.getGenericParameter(field, 0), pair[0]), getValue(field, Reflector
+                        .getGenericParameter(field, 1), pair[1]));
+                })
+                    .collect(LinkedHashMap::new, (map, tuple) -> map.put(tuple.l, tuple.r), Map::putAll);
             } else {
                 value = getValue(field, type, text);
             }
@@ -391,31 +461,40 @@ public @interface Config {
          * @return lines
          */
         static List<String> dumpConfig(Class<?> clazz, String prefix, boolean sort) {
-            String newPrefix = prefix + clazz.getSimpleName().replace('$', '.') + '.';
+            String newPrefix = prefix + clazz.getSimpleName()
+                .replace('$', '.') + '.';
             List<String> lines = new ArrayList<>();
             if (!Enum.class.isAssignableFrom(clazz)) {
-                Stream.of(clazz.getDeclaredFields()).filter(f -> Modifier.isStatic(f.getModifiers())).forEach(f -> {
-                    try {
-                        String key = newPrefix + f.getName();
-                        Object value = f.get(null);
-                        List<String> comments = Tool.of(f.getAnnotation(Help.class)).map(Help::value).map(Arrays::asList).orElse(null);
-                        if (comments != null) {
-                            Collections.reverse(comments);
+                Stream.of(clazz.getDeclaredFields())
+                    .filter(f -> Modifier.isStatic(f.getModifiers()))
+                    .forEach(f -> {
+                        try {
+                            String key = newPrefix + f.getName();
+                            Object value = f.get(null);
+                            List<String> comments = Tool.of(f.getAnnotation(Help.class))
+                                .map(Help::value)
+                                .map(Arrays::asList)
+                                .orElse(null);
+                            if (comments != null) {
+                                Collections.reverse(comments);
+                            }
+                            lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
+                        } catch (IllegalArgumentException | IllegalAccessException e) {
+                            throw new InternalError(e);
                         }
-                        lines.add('\b' + key + " = " + toString(f, value) + (comments == null ? "" : "\b# " + String.join("\b# ", comments)));
-                    } catch (IllegalArgumentException | IllegalAccessException e) {
-                        throw new InternalError(e);
-                    }
-                });
+                    });
             }
-            Stream.of(clazz.getClasses()).forEach(c -> lines.addAll(dumpConfig(c, newPrefix, false)));
+            Stream.of(clazz.getClasses())
+                .forEach(c -> lines.addAll(dumpConfig(c, newPrefix, false)));
             if (sort) {
                 Collections.sort(lines);
-                return lines.stream().flatMap(line -> {
-                    List<String> reverse = Tool.list(line.split("\b"));
-                    Collections.reverse(reverse);
-                    return reverse.stream();
-                }).collect(Collectors.toList());
+                return lines.stream()
+                    .flatMap(line -> {
+                        List<String> reverse = Tool.list(line.split("\b"));
+                        Collections.reverse(reverse);
+                        return reverse.stream();
+                    })
+                    .collect(Collectors.toList());
             }
             return lines;
         }
@@ -447,7 +526,9 @@ public @interface Config {
          * @return DateTimeFormatter or empty
          */
         static Optional<DateTimeFormatter> getFormat(Field field) {
-            return Tool.of(field.getAnnotation(Format.class)).map(Format::value).map(DateTimeFormatter::ofPattern);
+            return Tool.of(field.getAnnotation(Format.class))
+                .map(Format::value)
+                .map(DateTimeFormatter::ofPattern);
         }
 
         /**
@@ -520,7 +601,9 @@ public @interface Config {
             } else if (type == Charset.class) {
                 return raw == null ? Charset.defaultCharset() : Charset.forName(raw);
             } else if (type == URL.class) {
-                return raw == null ? null : Try.<String, URL>f(URL::new).apply(raw);
+                return raw == null ? null
+                        : Try.<String, URL>f(URL::new)
+                            .apply(raw);
             } else {
                 return raw;
             }
@@ -543,7 +626,8 @@ public @interface Config {
             } else {
                 pattern = separator.prefix() + separator.value() + separator.suffix();
             }
-            return Stream.of(String.valueOf(text).split(pattern));
+            return Stream.of(String.valueOf(text)
+                .split(pattern));
         }
 
         /**
@@ -559,31 +643,45 @@ public @interface Config {
             }
             Class<?> clazz = field.getType();
             if (clazz == Optional.class) {
-                return ((Optional<?>) value).map(String::valueOf).orElse("");
+                return ((Optional<?>) value).map(String::valueOf)
+                    .orElse("");
             }
-            char separator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::value).orElse(valueDefault);
+            char separator = Tool.of(field.getAnnotation(Separator.class))
+                .map(Separator::value)
+                .orElse(valueDefault);
             if (clazz.isArray()) {
                 StringBuilder s = new StringBuilder();
                 for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
-                    s.append(separator).append(Array.get(value, i));
+                    s.append(separator)
+                        .append(Array.get(value, i));
                 }
                 return s.length() > 0 ? s.substring(1) : "";
             }
             if (clazz == List.class) {
-                return ((List<?>) value).stream().map(String::valueOf).collect(Collectors.joining(String.valueOf(separator)));
+                return ((List<?>) value).stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(String.valueOf(separator)));
             }
             if (clazz == Set.class) {
-                return ((Set<?>) value).stream().map(String::valueOf).collect(Collectors.joining(String.valueOf(separator)));
+                return ((Set<?>) value).stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(String.valueOf(separator)));
             }
             if (clazz == Map.class) {
-                char pairSeparator = Tool.of(field.getAnnotation(Separator.class)).map(Separator::pair).orElse(pairDefault);
-                return Tool.peek(new StringBuilder(), s -> ((Map<?, ?>) value).forEach((k, v) -> s.append(separator).append(k).append(pairSeparator).append(v)))
-                        .substring(1);
+                char pairSeparator = Tool.of(field.getAnnotation(Separator.class))
+                    .map(Separator::pair)
+                    .orElse(pairDefault);
+                return Tool.peek(new StringBuilder(), s -> ((Map<?, ?>) value).forEach((k, v) -> s.append(separator)
+                    .append(k)
+                    .append(pairSeparator)
+                    .append(v)))
+                    .substring(1);
             }
             if (value instanceof Temporal) {
                 Optional<DateTimeFormatter> formatter = getFormat(field);
                 if (formatter.isPresent()) {
-                    return formatter.get().format((Temporal) value);
+                    return formatter.get()
+                        .format((Temporal) value);
                 }
             }
             if (value instanceof DateTimeFormatter) {

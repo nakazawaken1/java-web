@@ -33,8 +33,8 @@ public class Sys {
         @Help("log filename pattern(DateTimeFormatter format, 'll' replace to level)")
         public static DateTimeFormatter file_pattern = Tool.getFormat("'ll_'uuuuMMdd'.log'", Locale.JAPAN);
 
-        @Help("log line format(1: timestamp, 2: called method, 3: logger name, 4: level, 5: message, 6: exception, 7: request id, 8: session id, 9: application id)")
-        public static String format = "%1$tY/%1$tm/%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-6s %9$08X|%8$08X|%7$08X@%10$s [%3$s] %5$s %6$s%n";
+        @Help("log line format(1: timestamp, 2: called method, 3: logger name, 4: level, 5: message, 6: exception, 7: request id, 8: session id, 9: application id, 10:remote address and port)")
+        public static String format = "%9$08X|%8$08X|%7$08X@%10$s %1$tY-%1$tm-%1$tdT%1$tH:%1$tM:%1$tS.%1$tL %4$-6s[%3$s] %5$s %6$s%n";
 
         @Help("output file log level")
         public static Level level = Level.CONFIG;

@@ -276,7 +276,7 @@ public class Reflector {
         try {
             return (T) annotation.getMethod(methodName).getDefaultValue();
         } catch (NoSuchMethodException | SecurityException e) {
-            throw new InternalError(e);
+            return null;
         }
     }
 
