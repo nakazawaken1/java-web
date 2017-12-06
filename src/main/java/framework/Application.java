@@ -384,7 +384,7 @@ public abstract class Application implements Attributes<Object> {
                         if (binder.errors.isEmpty()) {
                             response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l), args);
                         } else {
-                            response = Response.of(Tool.array(Sys.Alert.inputError, binder.errors));
+                            response = Response.of(Tool.array(Sys.Alert.inputError, binder.errors)).contentType(Content.JSON);
                         }
                         Consumer<Response> setContentType = r -> {
                             Content content = method.getAnnotation(Content.class);

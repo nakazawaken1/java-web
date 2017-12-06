@@ -4,7 +4,7 @@
   <groupId>jp.qpg</groupId>
   <artifactId>java-web</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.38</version>
+  <version>1.0.39</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -60,11 +60,6 @@
             </goals>
             <configuration>
               <failOnMissingWebXml>false</failOnMissingWebXml>
-              <webResources>
-                <resource>
-                  <directory>src/main/webapp</directory>
-                </resource>
-              </webResources>
             </configuration>
           </execution>
         </executions>

@@ -88,7 +88,7 @@ public abstract class Session implements Attributes<Serializable> {
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
             Job.Scheduler.trigger(Job.OnLoggedIn);
-            Log.info("logged in : " + loginId + Arrays.toString(i.roles));
+            Log.info("logged in : " + i.id + Arrays.toString(i.roles));
         }, () -> Log.info("login failed: " + loginId));
     }
 
