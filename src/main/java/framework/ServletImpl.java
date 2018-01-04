@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +22,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -34,6 +37,7 @@ import framework.annotation.Route.Method;
  * Servlet implementation
  */
 @WebServlet("/")
+@MultipartConfig
 public class ServletImpl implements javax.servlet.Servlet {
 
     /**
@@ -293,6 +297,16 @@ public class ServletImpl implements javax.servlet.Servlet {
         final HttpServletResponse response;
 
         /**
+         * parameters
+         */
+        final Map<String, List<String>> parameters;
+
+        /**
+         * parameters
+         */
+        final Map<String, Tuple<byte[], File>> files;
+
+        /**
          * request path
          */
         final String path;
@@ -315,10 +329,25 @@ public class ServletImpl implements javax.servlet.Servlet {
             String uri = request.getRequestURI();
             int rootLength = request.getContextPath().length() + 1;
             path = rootLength > uri.length() ? null : Tool.prefix(Tool.string(uri.substring(rootLength)).orElse("/"), "/");
-            method = Try.<String, Method>f(m -> Method.valueOf(m.toUpperCase()), (e, m) -> {
+            method = Try.<String, Method> f(m -> Method.valueOf(m.toUpperCase()), (e, m) -> {
                 Log.info(e, () -> "Invalid method: " + m);
                 return null;
             }).apply(Tool.of(request.getParameter(Sys.request_method_key)).orElseGet(request::getMethod));
+            parameters = request.getParameterMap().entrySet().stream().collect(LinkedHashMap::new,
+                    (m, e) -> m.put(e.getKey(), new ArrayList<>(Arrays.asList(e.getValue()))), Map::putAll);
+            files = new LinkedHashMap<>();
+            if (Tool.of(request.getHeader("Content-Type")).filter(i -> i.startsWith("multipart/")).isPresent()) {
+                Try.s(request::getParts).get().forEach(part -> {
+                    List<String> values = parameters.computeIfAbsent(part.getName(), k -> new ArrayList<>());
+                    Optional<String> filename = Tool.of(part.getHeader("Content-Disposition"))
+                            .flatMap(s -> Stream.of(s.split("\\s*;\\s*")).filter(i -> i.toLowerCase().startsWith("filename")).findFirst()
+                                    .map(i -> i.substring(i.indexOf('=') + 1).trim().replace("\"", "")).filter(i -> !i.isEmpty()));
+                    Tool.ifPresentOr(filename, i -> {
+                        values.add(i);
+                        files.put(i, Tuple.of(Tool.using(part::getInputStream, Tool::loadBytes), null));
+                    }, () -> values.add(Tool.using(part::getInputStream, Tool::loadText)));
+                });
+            }
         }
 
         /**
@@ -377,7 +406,7 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public Map<String, Tuple<byte[], File>> getFiles() {
-            return Collections.emptyMap();
+            return files;
         }
 
         @Override
@@ -409,29 +438,7 @@ public class ServletImpl implements javax.servlet.Servlet {
 
         @Override
         public Map<String, List<String>> getParameters() {
-            return new Attributes<List<String>>() {
-
-                @Override
-                public Stream<String> names() {
-                    return Tool.stream(request.getParameterNames());
-                }
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends List<String>> Optional<T> getAttr(String name) {
-                    return (Optional<T>) Tool.of(request.getParameterValues(name)).map(a -> Tool.list(a));
-                }
-
-                @Override
-                public void setAttr(String name, List<String> value) {
-                    throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public void removeAttr(String name) {
-                    throw new UnsupportedOperationException();
-                }
-            };
+            return parameters;
         }
 
         @Override
