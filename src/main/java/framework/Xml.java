@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -67,7 +68,7 @@ public class Xml {
     /**
      * Node type
      */
-    enum Type {
+    public enum Type {
         /**
          * tag
          */
@@ -844,14 +845,24 @@ public class Xml {
     }
 
     /**
-     * @param condition Consume if true
-     * @param consumer Consumer
+     * @param condition Condition
+     * @param action Action if condition is true
      * @return Self
      */
-    public Xml peekIf(boolean condition, Consumer<Xml> consumer) {
+    public Xml peekIf(boolean condition, Consumer<Xml> action) {
         if(condition) {
-            consumer.accept(this);
+            action.accept(this);
         }
+        return this;
+    }
+
+    /**
+     * @param optional Optional
+     * @param action Action if optional is not empty
+     * @return Self
+     */
+    public <T> Xml peekIf(Optional<T> optional, BiConsumer<Xml, T> action) {
+        optional.ifPresent(i -> action.accept(this, i));
         return this;
     }
 
@@ -918,7 +929,8 @@ public class Xml {
      * @param args No use
      */
     public static void main(String[] args) {
-        System.out.println(parse("<td>あ<br/>い<br/>う<br/>え<br/>お</td>"));
+        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root></root>").findRoot().get().content);
+        //System.out.println(parse("<td>あ<br/>い<br/>う<br/>え<br/>お</td>"));
         // Xml xml = Xml.of("b");
         // System.out.println(xml.child("i").text("test"));
         // System.out.println(xml.copy().clear().child("a").text("test2"));
@@ -941,5 +953,12 @@ public class Xml {
          * "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + // "</table>" + // "</body>", a, b, c)
          * .stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text) .collect(Collectors.joining(System.lineSeparator())) );
          */ // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
+    }
+
+    /**
+     * @return Root node
+     */
+    public Optional<Xml> findRoot() {
+        return stream().filter(x -> x.content != null && x.type == Xml.Type.tag).findFirst();
     }
 }

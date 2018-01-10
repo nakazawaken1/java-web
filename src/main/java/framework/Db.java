@@ -2059,7 +2059,7 @@ public class Db implements AutoCloseable {
         /**
          * @param <T> Value type
          * @param optional Optional
-         * @param action Action if condition is true
+         * @param action Action if optional is not empty
          * @return Self
          */
         public <T> Query peekIf(Optional<T> optional, BiConsumer<Query, T> action) {
