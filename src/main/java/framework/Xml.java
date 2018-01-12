@@ -564,7 +564,7 @@ public class Xml {
      * @return Parent node
      */
     public Optional<Xml> parent() {
-        return Optional.ofNullable(parent);
+        return Tool.of(parent);
     }
 
     /**
@@ -894,23 +894,27 @@ public class Xml {
     }
 
     /**
-     * @return Traversal stream
+     * @return All node stream
      */
     public Stream<Xml> stream() {
         Stream.Builder<Xml> builder = Stream.builder();
         streamInner(builder);
         return builder.build();
     }
-
+    
     /**
-     * @param attr Attribute name
-     * @param matcher Matcher of attribute value
-     * @return Matches nodes
+     * @return Ancestor stream
      */
-    public Stream<Xml> findBy(String attr, Predicate<String> matcher) {
-        return stream().filter(xml -> xml.attributes()
-            .containsKey(attr))
-            .filter(xml -> matcher.test(xml.attributes.get(attr)));
+    public Stream<Xml> ancestors() {
+        Stream.Builder<Xml> builder = Stream.builder();
+        for(Xml xml = this;;) {
+            builder.add(xml);
+            if(xml.parent == null) {
+                break;
+            }
+            xml = xml.parent;
+        }
+        return builder.build();
     }
 
     /**
@@ -924,12 +928,90 @@ public class Xml {
     }
 
     /**
+     * @return Root node
+     */
+    public Optional<Xml> findRoot() {
+        return stream().filter(x -> x.content != null && x.type == Xml.Type.tag).findFirst();
+    }
+
+    /**
+     * @param filter Child filter
+     * @return First found child
+     */
+    public Optional<Xml> findChild(Predicate<Xml> filter) {
+        return children().stream().filter(filter).findFirst();
+    }
+
+    /**
+     * @param filter Child filter
+     * @return All found children
+     */
+    public Stream<Xml> findChildren(Predicate<Xml> filter) {
+        return children().stream().filter(filter);
+    }
+
+    /**
+     * @param filter Node filter
+     * @return First found node
+     */
+    public Optional<Xml> findOne(Predicate<Xml> filter) {
+        return stream().filter(filter).findFirst();
+    }
+
+    /**
+     * @param filter Node filter
+     * @return All found node
+     */
+    public Stream<Xml> findAll(Predicate<Xml> filter) {
+        return stream().filter(filter);
+    }
+
+    /**
+     * @param filter Child filter
+     * @return First found child
+     */
+    public Optional<Xml> findAncestor(Predicate<Xml> filter) {
+        return ancestors().filter(filter).findFirst();
+    }
+
+    /**
+     * @param filter Child filter
+     * @return All found children
+     */
+    public Stream<Xml> findAncestors(Predicate<Xml> filter) {
+        return ancestors().filter(filter);
+    }
+    
+    /**
+     * @param matcher Tag matcher
+     * @return Node filter
+     */
+    public static Predicate<Xml> tagIs(Predicate<String> matcher) {
+        return xml -> xml.type == Xml.Type.tag && matcher.test(xml.content);
+    }
+    
+    /**
+     * @param attr Attribute name
+     * @param matcher Attribute matcher
+     * @return Node filter
+     */
+    public static Predicate<Xml> attrIs(String attr, Predicate<String> matcher) {
+        return xml -> Tool.of(xml.attributes).map(a -> a.get(attr)).filter(x -> matcher.test(x)).isPresent();
+    }
+
+    /**
+     * Tag filter
+     */
+    public static final Predicate<Xml> TAG_ONLY = xml -> xml.content != null && xml.type == Xml.Type.tag;
+
+
+    /**
      * Example
      * 
      * @param args No use
      */
     public static void main(String[] args) {
-        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root></root>").findRoot().get().content);
+        System.out.println(parse("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root><a a=\"aaa\">aa</a><b>bb</b>c</root>").findRoot().flatMap(x -> x.findChild(attrIs("a", "aaa"::equals))).get().text());
         //System.out.println(parse("<td>あ<br/>い<br/>う<br/>え<br/>お</td>"));
         // Xml xml = Xml.of("b");
         // System.out.println(xml.child("i").text("test"));
@@ -953,12 +1035,5 @@ public class Xml {
          * "  <tr data-render=\"2\"><th class=\"number\">1</th><td>Jon</td><td class=\"number\">22</td></tr>" + // "</table>" + // "</body>", a, b, c)
          * .stream().filter(xml -> "number".equals(xml.attributes().get("class"))).map(Xml::text) .collect(Collectors.joining(System.lineSeparator())) );
          */ // System.out.println(Xml.get("http://www.htmq.com/html5/colgroup.shtml"));
-    }
-
-    /**
-     * @return Root node
-     */
-    public Optional<Xml> findRoot() {
-        return stream().filter(x -> x.content != null && x.type == Xml.Type.tag).findFirst();
     }
 }
