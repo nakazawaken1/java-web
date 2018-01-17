@@ -286,6 +286,8 @@ public abstract class Application implements Attributes<Object> {
             return;
         }
 
+        Job.Scheduler.trigger(Job.OnRequest);
+
         /* action */
         final Optional<String> mime = Tool.string(Tool.getExtension(path))
             .map(Tool::getContentType);

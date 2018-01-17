@@ -35,7 +35,6 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -339,58 +338,29 @@ public class Standalone {
          */
         @Override
         public void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys) {
-            Timestamp now = Timestamp.valueOf(LocalDateTime.now());
             if (!keyValues.isEmpty()) {
                 db.prepare("UPDATE t_session SET value = ? WHERE id = ? AND name = ?", update -> {
-                    update.setString(2, id);
-                    List<String> namesUpdate = new ArrayList<>();
-                    List<String> valuesUpdate = new ArrayList<>();
                     db.prepare("INSERT INTO t_session(id, name, value, last_access) VALUES(?, ?, ?, ?)", insert -> {
-                        insert.setString(1, id);
-                        List<String> namesInsert = new ArrayList<>();
-                        List<String> valuesInsert = new ArrayList<>();
-                        ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        keyValues.forEach(Try.biC((name, value) -> {
-                            if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? AND name = ? FOR UPDATE", select -> {
-                                select.setString(1, id);
-                                select.setString(2, name);
-                                return Tool.array(id, name);
-                            }, rs -> {
-                                namesUpdate.add(name);
-                                valuesUpdate.add(Objects.toString(value));
-                                update.setBytes(1, Tool.serialize(value, out));
-                                update.setString(3, name);
-                                update.executeUpdate();
-                            }) <= 0) {
-                                namesInsert.add(name);
-                                valuesInsert.add(Objects.toString(value));
-                                insert.setString(2, name);
-                                insert.setBytes(3, Tool.serialize(value, out));
-                                insert.setTimestamp(4, now);
-                                insert.executeUpdate();
-                            }
-                        }));
-                        return namesInsert.isEmpty() ? null : Tool.array(id, namesInsert, valuesInsert, now);
+                        Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                        if (db.preparedQuery("SELECT * FROM t_session WHERE id = ? AND name = ? FOR UPDATE", select -> {
+                            select.setString(1, id);
+                            select.setString(2, "*");
+                            return Tool.array(id, "*");
+                        }, rs -> {
+                            update.setBytes(1, Tool.serialize((Serializable)keyValues));
+                            update.setString(2, id);
+                            update.setString(3, "*");
+                            update.executeUpdate();
+                        }) <= 0) {
+                            insert.setString(1, id);
+                            insert.setString(2, "*");
+                            insert.setBytes(3, Tool.serialize((Serializable)keyValues));
+                            insert.setTimestamp(4, now);
+                            insert.executeUpdate();
+                        }
+                        return null;
                     });
-                    return namesUpdate.isEmpty() ? null : Tool.array(valuesUpdate, id, namesUpdate);
-                });
-            }
-            if (!removeKeys.isEmpty()) {
-                db.prepare("DELETE FROM t_session WHERE id = ? AND name = ?", delete -> {
-                    delete.setString(1, id);
-                    removeKeys.forEach(Try.c(name -> {
-                        delete.setString(2, name);
-                        delete.executeUpdate();
-                    }));
-                    return Tool.array(id, removeKeys);
-                });
-            }
-            if (Sys.session_timeout_minutes > 0 && !(keyValues.isEmpty() && removeKeys.isEmpty())) {
-                db.prepare("UPDATE t_session SET last_access = ? WHERE id = ?", p -> {
-                    p.setTimestamp(1, now);
-                    p.setString(2, id);
-                    p.executeUpdate();
-                    return Tool.array(now, id);
+                    return null;
                 });
             }
         }
@@ -410,9 +380,9 @@ public class Standalone {
          * 
          * @see framework.Standalone.SessionStore#load(java.lang.String)
          */
+        @SuppressWarnings("unchecked")
         @Override
         public Map<String, Serializable> load(String id) {
-            Map<String, Serializable> map = new ConcurrentHashMap<>();
             int timeout = Sys.session_timeout_minutes;
             if (timeout > 0) {
                 long current = System.currentTimeMillis();
@@ -424,18 +394,19 @@ public class Standalone {
                         .delete();
                 }
             }
-            db.select("name", "value")
+            return db.select("value")
                 .from("t_session")
                 .where("id", id)
-                .rows(rs -> {
-                    try (InputStream in = rs.getBinaryStream(2);
+                .where("name", "*")
+                .one(rs -> {
+                    try (InputStream in = rs.getBinaryStream(1);
                          ObjectInputStream i = new ObjectInputStream(in)) {
                         if (in != null) {
-                            map.put(rs.getString(1), (Serializable) i.readObject());
+                            return (Map<String, Serializable>) i.readObject();
                         }
                     }
-                });
-            return map;
+                    return null;
+                }).orElseGet(ConcurrentHashMap::new);
         }
     }
 
@@ -671,19 +642,16 @@ public class Standalone {
         public void save() {
             boolean hasNew = newAttributes != null && !newAttributes.isEmpty();
             boolean hasRemove = removeAttributes != null && !removeAttributes.isEmpty();
-            if (!hasNew && !hasRemove) {
-                return;
-            }
             try (SessionStore store = factory.get()) {
-                store.save(id, hasNew ? newAttributes : Collections.emptyMap(), hasRemove ? removeAttributes : Collections.emptySet());
+                oldAttributes();
                 if (hasNew) {
                     newAttributes.forEach(oldAttributes::put);
                     newAttributes = null;
                 }
                 if (hasRemove) {
                     removeAttributes.forEach(oldAttributes::remove);
-                    removeAttributes = null;
                 }
+                store.save(id, oldAttributes, hasRemove ? removeAttributes : Collections.emptySet());
             } catch (IOException e) {
                 Log.severe(e, () -> "session save error");
             } catch (Exception e) {

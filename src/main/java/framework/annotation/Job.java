@@ -53,6 +53,7 @@ import framework.Tuple;
 @Target({ ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Job {
+
     /**
      * @return schedule
      */
@@ -79,9 +80,14 @@ public @interface Job {
     static String OnLoggedOut = "OnLoggedOut";
 
     /**
+     * Job on request
+     */
+    static String OnRequest = "OnRequest";
+
+    /**
      * Events
      */
-    static List<String> events = Tool.list(OnApplicationStart, OnApplicationEnd, OnLoggedIn, OnLoggedOut);
+    static List<String> events = Tool.list(OnApplicationStart, OnApplicationEnd, OnLoggedIn, OnLoggedOut, OnRequest);
 
     /**
      * Job scheduler
