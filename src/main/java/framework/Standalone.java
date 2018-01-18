@@ -298,28 +298,30 @@ public class Standalone {
     }
 
     /**
-     * Session store interface
+     * Session store with database
      */
-    interface SessionStore extends AutoCloseable {
+    public static class StoreMemory implements Session.Store {
 
-        /**
-         * @param id Session id
-         * @return Key values
-         */
-        Map<String, Serializable> load(String id);
+        @Override
+        public void close() throws Exception {
+        }
 
-        /**
-         * @param id Session id
-         * @param keyValues Save key-values
-         * @param removeKeys Remove keys
-         */
-        void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys);
+        @SuppressWarnings("unchecked")
+        @Override
+        public Map<String, Serializable> load(String id) {
+            return Application.current().map(a -> a.get("$SESSION$" + id + "$")).map(Map.class::cast).orElseGet(ConcurrentHashMap::new);
+        }
+
+        @Override
+        public void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys) {
+            Application.current().ifPresent(a -> a.put("$SESSION$" + id + "$", keyValues));
+        }
     }
 
     /**
      * Session store with database
      */
-    public static class SessionStoreDb implements SessionStore {
+    public static class StoreDb implements Session.Store {
 
         /**
          * Last Load millis
@@ -413,7 +415,7 @@ public class Standalone {
     /**
      * Session store with Redis
      */
-    public static class SessionStoreRedis implements SessionStore {
+    public static class StoreRedis implements Session.Store {
 
         /**
          * Redis client
@@ -468,7 +470,7 @@ public class Standalone {
          * Session store factory
          */
         @SuppressFBWarnings("MS_SHOULD_BE_FINAL")
-        public static Supplier<SessionStore> factory = "redis".equals(Sys.session_store) ? SessionStoreRedis::new : SessionStoreDb::new;
+        public static Supplier<Session.Store> factory = () -> (Session.Store)Reflector.instance(Sys.session_store);
 
         /**
          * session id
@@ -513,7 +515,7 @@ public class Standalone {
          */
         Map<String, Serializable> oldAttributes() {
             if (oldAttributes == null) {
-                try (SessionStore store = factory.get()) {
+                try (Session.Store store = factory.get()) {
                     oldAttributes = store.load(id);
                 } catch (Exception e) {
                     Log.warning(e, () -> "close error");
@@ -642,7 +644,7 @@ public class Standalone {
         public void save() {
             boolean hasNew = newAttributes != null && !newAttributes.isEmpty();
             boolean hasRemove = removeAttributes != null && !removeAttributes.isEmpty();
-            try (SessionStore store = factory.get()) {
+            try (Session.Store store = factory.get()) {
                 oldAttributes();
                 if (hasNew) {
                     newAttributes.forEach(oldAttributes::put);
@@ -691,6 +693,10 @@ public class Standalone {
          */
         final String path;
         /**
+         * query
+         */
+        final String query;
+        /**
          * Request method
          */
         final Method method;
@@ -716,7 +722,7 @@ public class Standalone {
             this.path = path.length() <= contextPath.length() ? "/" : Tool.prefix(path.substring(contextPath.length()), "/");
 
             // query parameter
-            String query = exchange.getRequestURI()
+            query = exchange.getRequestURI()
                 .getRawQuery();
             if (query != null) {
                 parse(parameters, new Scanner(query));
@@ -1078,6 +1084,11 @@ public class Standalone {
         protected String getRemoteAddr() {
             return Tool.trim("/", exchange.getRemoteAddress()
                 .toString(), null);
+        }
+
+        @Override
+        public String getQuery() {
+            return query;
         }
     }
 

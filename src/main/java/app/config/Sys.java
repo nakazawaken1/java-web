@@ -221,8 +221,8 @@ public class Sys {
     @Help("Initial vector for Tool.enctypt and decrypt")
     public static String IV = "CYKJRWWIYWJHSLEU";
 
-    @Help("Session store(db or redis)")
-    public static Object session_store = "db";
+    @Help("Session store(StoreMemory or StoreDb or StoreRedis)")
+    public static String session_store = "framework.Standalone$StoreMemory";
 
     @Help("host if use redis")
     public static String session_redis_host = "127.0.0.1";

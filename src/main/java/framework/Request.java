@@ -25,7 +25,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import app.config.Sys;
 import framework.annotation.Route;
 
 /**
@@ -78,6 +77,18 @@ public abstract class Request implements Attributes<Object> {
     public String getFile() {
         return getName() + getExtension();
     }
+    
+    /**
+     * @return Query string
+     */
+    public abstract String getQuery();
+
+    /**
+     * @return path
+     */
+    public String getURL() {
+        return Application.current().map(Application::getContextPath).orElse("/") + Tool.trim("/", getPath(), null) + Tool.string(getQuery()).map(s -> '?' + s).orElse("");
+    }
 
     /**
      * @return http method
@@ -86,13 +97,7 @@ public abstract class Request implements Attributes<Object> {
 
     @Override
     public String toString() {
-        return "<- " + getMethod() + " " + getPath() + Tool.string(getParameters().entrySet()
-            .stream()
-            .map(pair -> pair.getKey() + "=" + Tool.cut(pair.getValue()
-                .toString(), Sys.Log.parameter_max_letters, " ..."))
-            .collect(Collectors.joining("&")))
-            .map(s -> '?' + s)
-            .orElse("");
+        return "<- " + getMethod() + " " + getURL();
     }
 
     /**

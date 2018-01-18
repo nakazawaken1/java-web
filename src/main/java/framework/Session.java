@@ -3,8 +3,10 @@ package framework;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import app.config.Sys;
 import app.model.Account;
@@ -16,6 +18,25 @@ import framework.annotation.Only.Administrator;
  */
 @SuppressWarnings("serial")
 public abstract class Session implements Attributes<Serializable> {
+
+    /**
+     * Session store interface
+     */
+    public interface Store extends AutoCloseable {
+
+        /**
+         * @param id Session id
+         * @return Key values
+         */
+        Map<String, Serializable> load(String id);
+
+        /**
+         * @param id Session id
+         * @param keyValues Save key-values
+         * @param removeKeys Remove keys
+         */
+        void save(String id, Map<String, Serializable> keyValues, Set<String> removeKeys);
+    }
 
     /**
      * Locale
