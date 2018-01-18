@@ -683,7 +683,7 @@ public class Db implements AutoCloseable {
         }
         if (empty) {
             insert(insert, table, names, primary, values);
-        } else if (names.length > primary) {
+        } else {
             update(update, table, names, primary, values);
         }
         return empty;
@@ -714,7 +714,7 @@ public class Db implements AutoCloseable {
         }
         if (empty) {
             insert(table, names, primary, values);
-        } else if (names.length > primary) {
+        } else {
             update(table, names, primary, values);
         }
         return empty;
@@ -746,22 +746,23 @@ public class Db implements AutoCloseable {
     public int update(Consumer<Map<String, Object>> prepare, String table, String[] names, int primary, Object... values) {
         StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(table);
-        String pad = " SET ";
+        String[] pad = {" SET "};
         for (int i = primary; i < values.length; i++) {
-            sql.append(pad)
+            sql.append(pad[0])
                 .append(names[i])
                 .append(" = ")
                 .append(builder.escape(values[i]));
-            pad = ", ";
+            pad[0] = ", ";
         }
         if (prepare != null) {
             Map<String, Object> map = new LinkedHashMap<>();
             prepare.accept(map);
             map.forEach((name, value) -> {
-                sql.append(", ")
+                sql.append(pad[0])
                     .append(name)
                     .append(" = ")
                     .append(builder.escape(value));
+                pad[0] = ", ";
             });
         }
         buildWhere(sql, names, primary, values);
