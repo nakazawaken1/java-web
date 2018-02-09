@@ -45,7 +45,7 @@ public class TestTool extends Tester {
             expect(g + "all null", n -> Tool.nextMillis(null, null)).toThrow(NullPointerException.class);
             expect(g + "text null", n -> Tool.nextMillis(null, now)).toThrow(NullPointerException.class);
             expect(g + "from null", n -> Tool.nextMillis("", null)).toThrow(NullPointerException.class);
-            expect(g + "", from).toEqual(now);
+            expect(g + "", from).toEqual(now.minusNanos(1000000));
             expect(g + "Fri 12:34",
                     from).toEqual(
                             to.apply(d -> (d.getDayOfWeek().getValue() < DayOfWeek.FRIDAY.getValue()

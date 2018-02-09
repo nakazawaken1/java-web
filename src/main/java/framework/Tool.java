@@ -1758,11 +1758,18 @@ public class Tool {
      * @param from start point
      * @return milliseconds
      */
-    public static long nextMillis(final String text, final ZonedDateTime from) {
+    public static long nextMillis(String text, final ZonedDateTime from) {
         Objects.requireNonNull(from);
         if (Objects.requireNonNull(text)
             .length() <= 0) {
-            return 0;
+            return -1;
+        }
+        //eval
+        if(text.indexOf('{') >= 0) {
+            text = Formatter.format(text, Formatter::excludeForScript, Tool::scriptEscape, Locale.getDefault(), null);
+        }
+        if(text == null || text.length() <= 0) {
+            return -1;
         }
         String value = text.trim()
             .toUpperCase(Locale.ENGLISH);

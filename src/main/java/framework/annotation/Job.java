@@ -18,6 +18,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -123,13 +124,17 @@ public @interface Job {
                                     .<String>map(
                                             j -> j.startsWith("job.") ? Config.Injector.getSource(Sys.class, Session.currentLocale()).getProperty(j, "") : j)
                                     .filter(Tool.notEmpty).forEach(text -> {
+                                        long first = Tool.nextMillis(text, now);
+                                        String name = c.getName() + '.' + method.getName();
+                                        if(first < 0) {
+                                            Log.info(name + " : job is not scheduled");
+                                            return;
+                                        }
                                         if (scheduler.get() == null) {
                                             int n = Sys.job_threads;
                                             scheduler.set(Executors.newScheduledThreadPool(n));
                                             Log.info(n + " job threads created");
                                         }
-                                        String name = c.getName() + '.' + method.getName();
-                                        long first = Tool.nextMillis(text, now);
                                         ZonedDateTime firstStart = now.plus(first, ChronoUnit.MILLIS);
                                         Log.info(name + " : job next start at " + firstStart);
                                         scheduler.get().schedule(new Runnable() {
@@ -155,8 +160,41 @@ public @interface Job {
                                                                 if (type == Date.class) {
                                                                     return Date.from(start.toInstant());
                                                                 }
+                                                                if (Application.class.isAssignableFrom(type)) {
+                                                                    return Application.current().orElse(null);
+                                                                }
+                                                                if (Session.class.isAssignableFrom(type)) {
+                                                                    return Session.current().orElse(null);
+                                                                }
+                                                                if (Request.class.isAssignableFrom(type)) {
+                                                                    return Request.current().orElse(null);
+                                                                }
                                                                 if (Db.class.isAssignableFrom(type)) {
                                                                     return db.get();
+                                                                }
+                                                                if (Optional.class.isAssignableFrom(type)) {
+                                                                    return Optional.empty();
+                                                                }
+                                                                if (boolean.class.isAssignableFrom(type)) {
+                                                                    return false;
+                                                                }
+                                                                if (byte.class.isAssignableFrom(type)) {
+                                                                    return (byte)0;
+                                                                }
+                                                                if (short.class.isAssignableFrom(type)) {
+                                                                    return (short)0;
+                                                                }
+                                                                if (int.class.isAssignableFrom(type)) {
+                                                                    return 0;
+                                                                }
+                                                                if (long.class.isAssignableFrom(type)) {
+                                                                    return 0L;
+                                                                }
+                                                                if (float.class.isAssignableFrom(type)) {
+                                                                    return .0F;
+                                                                }
+                                                                if (double.class.isAssignableFrom(type)) {
+                                                                    return .0;
                                                                 }
                                                                 return null;
                                                             }).toArray());
@@ -204,6 +242,30 @@ public @interface Job {
                         }
                         if (Db.class.isAssignableFrom(type)) {
                             return db.get();
+                        }
+                        if (Optional.class.isAssignableFrom(type)) {
+                            return Optional.empty();
+                        }
+                        if (boolean.class.isAssignableFrom(type)) {
+                            return false;
+                        }
+                        if (byte.class.isAssignableFrom(type)) {
+                            return (byte)0;
+                        }
+                        if (short.class.isAssignableFrom(type)) {
+                            return (short)0;
+                        }
+                        if (int.class.isAssignableFrom(type)) {
+                            return 0;
+                        }
+                        if (long.class.isAssignableFrom(type)) {
+                            return 0L;
+                        }
+                        if (float.class.isAssignableFrom(type)) {
+                            return .0F;
+                        }
+                        if (double.class.isAssignableFrom(type)) {
+                            return .0;
                         }
                         return null;
                     }).toArray());

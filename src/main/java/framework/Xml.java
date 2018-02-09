@@ -857,6 +857,7 @@ public class Xml {
     }
 
     /**
+     * @param <T> Optional type
      * @param optional Optional
      * @param action Action if optional is not empty
      * @return Self
