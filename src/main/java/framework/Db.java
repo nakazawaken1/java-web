@@ -201,6 +201,30 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * Raw SQL
+     */
+    public static class Raw {
+        /**
+         * Raw SQL
+         */
+        public final String raw;
+        /**
+         * @param raw Raw SQL
+         */
+        Raw(String raw) {
+            this.raw = raw;
+        }
+    }
+
+    /**
+     * @param sql SQL
+     * @return SQL
+     */
+    public static Raw raw(String sql) {
+        return new Raw(sql);
+    }
+
+    /**
      * data sources
      */
     private static final Map<String, DataSource> dataSourceMap = new HashMap<>();
@@ -1384,6 +1408,9 @@ public class Db implements AutoCloseable {
          */
         @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(String prefix, Object value, String suffix) {
+            if(value instanceof Raw) {
+                return ((Raw)value).raw;
+            }
             if (value instanceof Optional) {
                 value = ((Optional<?>) value).orElse(null);
             }
@@ -1575,7 +1602,7 @@ public class Db implements AutoCloseable {
          */
         @Override
         @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
-        public String escape(Object value) {
+        public String escape(String prefix, Object value, String suffix) {
             if (value != null && value instanceof Date) {
                 return "'" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value) + "'";
             }
@@ -1587,7 +1614,7 @@ public class Db implements AutoCloseable {
                 return "'" + DateTimeFormatter.ofPattern("yyyy-MM-dd")
                     .format((TemporalAccessor) value) + "'";
             }
-            return super.escape(value);
+            return super.escape(prefix, value, suffix);
         }
 
         /*
