@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -248,11 +249,18 @@ public abstract class Response {
 
     /**
      * @param status status
-     * @return status
+     * @return self
      */
     public Response status(Status status) {
         this.status = status;
         return this;
+    }
+
+    /**
+     * @return status
+     */
+    public Status status() {
+        return status;
     }
 
     /**
@@ -291,6 +299,27 @@ public abstract class Response {
             this.map.putAll(map);
         }
         return this;
+    }
+    
+    /**
+     * @return map
+     */
+    public Map<String, Object> map() {
+        return map == null ? Collections.emptyMap() : map;
+    }
+    
+    /**
+     * @return map
+     */
+    public List<Object> values() {
+        return values == null ? Collections.emptyList() : values;
+    }
+    
+    /**
+     * @return headers
+     */
+    public Map<String, List<String>> headers() {
+        return headers == null ? Collections.emptyMap() : headers;
     }
 
     /**

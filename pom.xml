@@ -4,7 +4,7 @@
   <groupId>jp.qpg</groupId>
   <artifactId>java-web</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.47</version>
+  <version>1.0.48</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
