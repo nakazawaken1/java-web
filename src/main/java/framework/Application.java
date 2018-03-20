@@ -429,6 +429,12 @@ public abstract class Application implements Attributes<Object> {
                         throw new RuntimeException(e);
                     } catch (RuntimeException e) {
                         db.ifGot(Db::rollback);
+                    }
+                } catch(Exception e) {
+                    Throwable t = e.getCause();
+                    if ("ClientAbortException".equals(t.getClass().getSimpleName())) {
+                        Log.warning(t.toString());
+                    } else {
                         throw e;
                     }
                 }
@@ -436,7 +442,15 @@ public abstract class Application implements Attributes<Object> {
         }
 
         /* static file */
-        Response.file(path)
-            .flush();
+        try {
+            Response.file(path).flush();
+        } catch(Exception e) {
+            Throwable t = e.getCause();
+            if ("ClientAbortException".equals(t.getClass().getSimpleName())) {
+                Log.warning(t.toString());
+            } else {
+                throw e;
+            }
+        }
     }
 }

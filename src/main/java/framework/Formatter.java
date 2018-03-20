@@ -483,7 +483,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 try {
                     return getResult.apply(Tool.string(el().eval(key)).orElse(""), "el");
                 } catch(PropertyNotFoundException e) {
-                    Log.warning(e, () -> key);
+                    Log.warning(e.toString());
                     return null;
                 } catch (Exception e) {
                     Log.warning(e, () -> "el error");
