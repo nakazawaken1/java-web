@@ -2959,7 +2959,8 @@ public class Tool {
         // Log.info(camelToSnake("LoginURL"));
         // System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
         // .format(java.time.chrono.JapaneseDate.now()));
-        enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
+        //enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
+        System.out.println(Tool.in("id", IntStream.rangeClosed(1, 1001).toArray()));
     }
 
     /**
@@ -3041,5 +3042,36 @@ public class Tool {
      */
     public static String attr(String name) {
         return attr(name, name);
+    }
+
+    /**
+     * IN句を作成(中身を1000単位で分ける)
+     * @param field 列名
+     * @param ids 値
+     * @return IN句
+     */
+    public static String in(String field, int... ids) {
+        List<String> items = Tool.list();
+        for(int i = 0; i < ids.length; i += 1000) {
+            items.add(field + " IN(" + IntStream.of(ids).skip(i).limit(1000)
+            .mapToObj(String::valueOf)
+            .collect(Collectors.joining(", ")) + ")");
+        }
+        return items.size() == 1 ? items.get(0) : "(" + String.join(" OR ", items) + ")";
+    }
+
+    /**
+     * IN句を作成(中身を1000単位で分ける)
+     * @param field 列名
+     * @param ids 値
+     * @return IN句
+     */
+    public static String in(String field, String... ids) {
+        List<String> items = Tool.list();
+        for(int i = 0; i < ids.length; i += 1000) {
+            items.add(field + " IN(" + Stream.of(ids).skip(i).limit(1000)
+            .collect(Collectors.joining(", ")) + ")");
+        }
+        return items.size() == 1 ? items.get(0) : "(" + String.join(" OR ", items) + ")";
     }
 }

@@ -802,38 +802,34 @@ public class Db implements AutoCloseable {
      * @param values Values
      */
     private void buildWhere(StringBuilder sql, String[] names, int primary, Object[] values) {
-        String separator = ", ";
         String pad = " WHERE ";
         for (int i = 0; i < primary; i++) {
             sql.append(pad)
                 .append(names[i]);
             Object value = values[i];
-            StringBuilder s = null;
             if (value == null) {
                 sql.append(" IS NULL");
             } else {
+                List<String> list = null;
                 if (value.getClass()
                     .isArray()) {
-                    s = new StringBuilder();
+                    list = new ArrayList<>();
                     for (int j = 0, j2 = Array.getLength(value); j < j2; j++) {
-                        s.append(separator)
-                            .append(builder.escape(Array.get(value, j)));
+                        list.add(builder.escape(Array.get(value, j)));
                     }
                 } else if (value instanceof Iterable) {
-                    s = new StringBuilder();
+                    list = new ArrayList<>();
                     for (Object j : (Iterable<?>) value) {
-                        s.append(separator)
-                            .append(builder.escape(j));
+                        list.add(builder.escape(j));
                     }
                 }
-                if (s != null) {
-                    if (s.length() <= separator.length()) {
+                if (list != null) {
+                    if (list.isEmpty()) {
                         sql.append(" <> ")
                             .append(names[i]);
                     } else {
-                        sql.append(" IN(")
-                            .append(s.substring(separator.length()))
-                            .append(")");
+                        sql.setLength(sql.length() - names[i].length());
+                        sql.append(Tool.in(names[i], list.toArray(new String[list.size()])));
                     }
                 } else {
                     sql.append(" = ")
