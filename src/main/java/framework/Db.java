@@ -24,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -139,64 +138,67 @@ public class Db implements AutoCloseable {
      * @param args (unuse)
      */
     public static void main(String[] args) {
-        class Example {
-
-            public Example(Db db) {
-                String table = "test_table";
-                Log.info("[tables]");
-                db.tables()
-                    .peek(Log::info)
-                    .filter(table::equals)
-                    .forEach(db::drop);
-                String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday")
-                    .date(), new Column("weight").decimal(4, 1));
-                for (int i = 1; i <= 20; i++) {
-                    Calendar c = Calendar.getInstance();
-                    c.add(Calendar.DATE, -i * 31);
-                    db.insert(table, names, 1, i, "氏名'" + i, c.getTime(), BigDecimal.valueOf(Math.random() * 80 + 40));
-                }
-                Log.info(table + " rows: " + db.from(table)
-                    .count());
-                Query q = db.select("name", "birthday", "weight")
-                    .from(table)
-                    .where(db.builder.fn("MONTH", "birthday") + " > 6")
-                    .orderBy("id");
-                Log.info("querey rows: " + q.count());
-                TryConsumer<ResultSet> printer = row -> {
-                    ResultSetMetaData meta = row.getMetaData();
-                    IntStream.rangeClosed(1, meta.getColumnCount())
-                        .forEach(Try.intC(i -> System.out.println(meta.getColumnName(i) + "=" + row.getObject(i))));
-                };
-                Log.info("7月以降まれ[1-3]");
-                q.limit(3)
-                    .rows(printer);
-                Log.info("7月以降まれ[4-6]");
-                q.offset(3)
-                    .rows(printer);
-                Log.info("7月以降まれ[7-]");
-                q.offset(6)
-                    .limit(0)
-                    .rows(printer);
-                db.truncate(table);
-                Log.info(table + " rows: " + db.from(table)
-                    .count());
-                db.drop(table);
-            }
-        }
-        try (Db db = Db.connect()) {
-            new Example(db);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        class Example {
+//
+//            public Example(Db db) {
+//                String table = "test_table";
+//                Log.info("[tables]");
+//                db.tables()
+//                    .peek(Log::info)
+//                    .filter(table::equals)
+//                    .forEach(db::drop);
+//                String[] names = db.create(table, 1, new Column("id").integer(), new Column("name").text(10), new Column("birthday")
+//                    .date(), new Column("weight").decimal(4, 1));
+//                for (int i = 1; i <= 20; i++) {
+//                    Calendar c = Calendar.getInstance();
+//                    c.add(Calendar.DATE, -i * 31);
+//                    db.insert(table, names, 1, i, "氏名'" + i, c.getTime(), BigDecimal.valueOf(Math.random() * 80 + 40));
+//                }
+//                Log.info(table + " rows: " + db.from(table)
+//                    .count());
+//                Query q = db.select("name", "birthday", "weight")
+//                    .from(table)
+//                    .where(db.builder.fn("MONTH", "birthday") + " > 6")
+//                    .orderBy("id");
+//                Log.info("querey rows: " + q.count());
+//                TryConsumer<ResultSet> printer = row -> {
+//                    ResultSetMetaData meta = row.getMetaData();
+//                    IntStream.rangeClosed(1, meta.getColumnCount())
+//                        .forEach(Try.intC(i -> System.out.println(meta.getColumnName(i) + "=" + row.getObject(i))));
+//                };
+//                Log.info("7月以降まれ[1-3]");
+//                q.limit(3)
+//                    .rows(printer);
+//                Log.info("7月以降まれ[4-6]");
+//                q.offset(3)
+//                    .rows(printer);
+//                Log.info("7月以降まれ[7-]");
+//                q.offset(6)
+//                    .limit(0)
+//                    .rows(printer);
+//                db.truncate(table);
+//                Log.info(table + " rows: " + db.from(table)
+//                    .count());
+//                db.drop(table);
+//            }
+//        }
+//        try (Db db = Db.connect()) {
+//            new Example(db);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        try (Db db = Db.connect(Type.H2, "mem:test")) {
+//            new Example(db);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        try (Db db = Db.connect(Type.H2, "~/test")) {
+//            new Example(db);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
         try (Db db = Db.connect(Type.H2, "mem:test")) {
-            new Example(db);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try (Db db = Db.connect(Type.H2, "~/test")) {
-            new Example(db);
-        } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println(db.from("test").where("id", IntStream.rangeClosed(1, 1001).toArray()).sql());
         }
     }
 
@@ -2135,28 +2137,26 @@ public class Db implements AutoCloseable {
          * @return Self
          */
         public Query where(String field, Object value) {
-            final String separator = ", ";
             if (value == null) {
                 return where(field + " IS NULL");
             }
-            StringBuilder s = null;
-            if (value.getClass()
-                .isArray()) {
-                s = new StringBuilder();
-                for (int i = 0, i2 = Array.getLength(value); i < i2; i++) {
-                    s.append(separator)
-                        .append(db.builder.escape(Array.get(value, i)));
+            List<String> list = null;
+            if (value.getClass().isArray()) {
+                list = new ArrayList<>();
+                for (int j = 0, j2 = Array.getLength(value); j < j2; j++) {
+                    list.add(db.builder.escape(Array.get(value, j)));
+                }
+            } else if (value instanceof Iterable) {
+                list = new ArrayList<>();
+                for (Object j : (Iterable<?>) value) {
+                    list.add(db.builder.escape(j));
                 }
             }
-            if (value instanceof Iterable) {
-                s = new StringBuilder();
-                for (Object i : (Iterable<?>) value) {
-                    s.append(separator)
-                        .append(db.builder.escape(i));
+            if (list != null) {
+                if (list.isEmpty()) {
+                    return where(field + " <> " + field);
                 }
-            }
-            if (s != null) {
-                return where(field + (s.length() > 0 ? " IN (" + s.substring(separator.length()) + ")" : " IS NULL"));
+                return where(Tool.in(field, list.toArray(new String[list.size()])));
             }
             return where(field + " = " + db.builder.escape(value));
         }
