@@ -199,6 +199,7 @@ public class Db implements AutoCloseable {
 //        }
         try (Db db = Db.connect(Type.H2, "mem:test")) {
             System.out.println(db.from("test").where("id", IntStream.rangeClosed(1, 1001).toArray()).sql());
+            System.out.println(db.from("test").where("id", new int[] {}).sql());
         }
     }
 
@@ -826,13 +827,8 @@ public class Db implements AutoCloseable {
                     }
                 }
                 if (list != null) {
-                    if (list.isEmpty()) {
-                        sql.append(" <> ")
-                            .append(names[i]);
-                    } else {
-                        sql.setLength(sql.length() - names[i].length());
-                        sql.append(Tool.in(names[i], list.toArray(new String[list.size()])));
-                    }
+                    sql.setLength(sql.length() - names[i].length());
+                    sql.append(Tool.in(names[i], list.toArray(new String[list.size()])));
                 } else {
                     sql.append(" = ")
                         .append(builder.escape(value));
@@ -2153,9 +2149,6 @@ public class Db implements AutoCloseable {
                 }
             }
             if (list != null) {
-                if (list.isEmpty()) {
-                    return where(field + " <> " + field);
-                }
                 return where(Tool.in(field, list.toArray(new String[list.size()])));
             }
             return where(field + " = " + db.builder.escape(value));

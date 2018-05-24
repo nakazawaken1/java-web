@@ -3051,6 +3051,9 @@ public class Tool {
      * @return IN句
      */
     public static String in(String field, int... ids) {
+        if(ids == null || ids.length <= 0) {
+            return field + " <> " + field;
+        }
         List<String> items = Tool.list();
         for(int i = 0; i < ids.length; i += 1000) {
             items.add(field + " IN(" + IntStream.of(ids).skip(i).limit(1000)
@@ -3067,6 +3070,9 @@ public class Tool {
      * @return IN句
      */
     public static String in(String field, String... ids) {
+        if(ids == null || ids.length <= 0) {
+            return field + " <> " + field;
+        }
         List<String> items = Tool.list();
         for(int i = 0; i < ids.length; i += 1000) {
             items.add(field + " IN(" + Stream.of(ids).skip(i).limit(1000)
