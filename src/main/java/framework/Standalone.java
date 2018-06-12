@@ -1112,12 +1112,8 @@ public class Standalone {
             HttpExchange exchange = ((RequestImpl) Request.current()
                 .get()).exchange;
             TryConsumer<Long> action = contentLength -> {
-                Sys.headers.forEach((key, value) -> exchange.getResponseHeaders()
-                    .set(key, value));
-                if (headers != null) {
-                    headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders()
-                        .add(key, value)));
-                }
+                headers.forEach((key, values) -> values.forEach(value -> exchange.getResponseHeaders()
+                    .add(key, value)));
                 exchange.sendResponseHeaders(status.code, contentLength);
             };
             if (content == null) {
@@ -1125,8 +1121,7 @@ public class Standalone {
                     .accept(-1L);
             } else {
                 writeBody.accept(Try.s(() -> {
-                    action.accept(headers == null ? 0L
-                            : Tool.getFirst(headers, "Content-Length")
+                    action.accept(Tool.getFirst(headers, "Content-Length")
                                 .flatMap(Tool::longInteger)
                                 .orElse(0L));
                     return exchange.getResponseBody();

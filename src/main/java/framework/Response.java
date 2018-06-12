@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -165,7 +166,7 @@ public abstract class Response {
     /**
      * headers
      */
-    Map<String, List<String>> headers;
+    final Map<String, List<String>> headers = Sys.headers.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> Tool.list(e.getValue())));
 
     /**
      * http status code
@@ -328,9 +329,6 @@ public abstract class Response {
      * @return self
      */
     public Response addHeader(String name, String value) {
-        if (headers == null) {
-            headers = new HashMap<>();
-        }
         Tool.addValue(headers, name, value);
         return this;
     }
@@ -341,9 +339,6 @@ public abstract class Response {
      * @return self
      */
     public Response setHeader(String name, String value) {
-        if (headers == null) {
-            headers = new HashMap<>();
-        }
         Tool.setValue(headers, name, value);
         return this;
     }
@@ -363,7 +358,7 @@ public abstract class Response {
      * @return self
      */
     public Response contentTypeIfEmpty(String contentType, Charset charset) {
-        return headers != null && headers.containsKey("Content-Type") ? this : setHeader("Content-Type", setCharset(contentType, charset));
+        return headers.containsKey("Content-Type") ? this : setHeader("Content-Type", setCharset(contentType, charset));
     }
 
     /**
@@ -379,7 +374,7 @@ public abstract class Response {
      * @return self
      */
     public Response contentTypeIfEmpty(String contentType) {
-        return headers != null && headers.containsKey("Content-Type") ? this : setHeader("Content-Type", contentType);
+        return headers.containsKey("Content-Type") ? this : setHeader("Content-Type", contentType);
     }
 
     /**

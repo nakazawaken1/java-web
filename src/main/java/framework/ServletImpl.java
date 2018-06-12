@@ -461,10 +461,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         public void writeResponse(Consumer<Supplier<OutputStream>> writeBody) {
             HttpServletResponse response = ((RequestImpl) Request.current().get()).response;
             Runnable action = () -> {
-                Sys.headers.forEach((key, value) -> response.setHeader(key, value));
-                if (headers != null) {
-                    headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
-                }
+                headers.forEach((key, values) -> values.forEach(value -> response.addHeader(key, value)));
                 charset.ifPresent(c -> response.setCharacterEncoding(c.name()));
                 response.setStatus(status.code);
             };
