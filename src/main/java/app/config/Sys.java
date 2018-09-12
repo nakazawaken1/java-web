@@ -113,10 +113,10 @@ public class Sys {
         public static String mysql = "jdbc:mysql://localhost/test?user=root&password=&characterEncoding=utf8";
 
         @Help("Postgres tcp database connection string(inclucde id and password)")
-        public static String postgres = "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=";
+        public static String postgres = "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=&currentSchema=public";
 
         @Help("SQLServer tcp database connection string(inclucde id and password)")
-        public static String sqlserver = "jdbc:sqlserver://localhost:1433;user=sa;password=";
+        public static String sqlserver = "jdbc:sqlserver://localhost:1433;user=sa;password=;schema=dbo";
     }
 
     @Help("session cookie name")

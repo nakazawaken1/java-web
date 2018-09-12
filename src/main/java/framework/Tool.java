@@ -2969,14 +2969,13 @@ public class Tool {
      * @param key Key
      * @return Value
      */
-    public static <T> T getIgnoreCase(Map<String, T> map, String key) {
+    public static <T> Optional<T> getIgnoreCase(Map<String, T> map, String key) {
         return map.entrySet()
             .stream()
             .filter(e -> e.getKey()
                 .equalsIgnoreCase(key))
             .findFirst()
-            .map(Map.Entry::getValue)
-            .orElse(null);
+            .map(Map.Entry::getValue);
     }
 
     /**

@@ -53,6 +53,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.QuadFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
+import framework.Tuple.Tuple3;
 import framework.annotation.Config;
 import framework.annotation.Factory;
 import framework.annotation.Help;
@@ -228,9 +229,9 @@ public class Db implements AutoCloseable {
     }
 
     /**
-     * data sources
+     * data sources(key: suffix, value: DataSource)
      */
-    private static final Map<String, DataSource> dataSourceMap = new HashMap<>();
+    private static final Map<String, Tuple3<DataSource, Type, String>> dataSourceMap = new HashMap<>();
 
     /**
      * resource for cleanup
@@ -320,14 +321,7 @@ public class Db implements AutoCloseable {
      * @return db
      */
     public static Db connect(String suffix) {
-        try {
-            Connection connection = getDataSource(suffix).getConnection();
-            Type type = Type.fromUrl(Config.Injector.getSource(Sys.class, Session.currentLocale())
-                .getProperty("Sys.Db." + suffix));
-            return new Db(connection, type);
-        } catch (SQLException e) {
-            throw new UncheckedSQLException(e);
-        }
+        return Tool.val(getDataSource(suffix), trio -> new Db(Try.s(trio.l::getConnection).get(), trio.r.l, trio.r.r));
     }
 
     /**
@@ -380,9 +374,26 @@ public class Db implements AutoCloseable {
      * @return db
      */
     public static Db connect(Type type, String name, String user, String password, String host, int port) {
+        return connect(type, name, user, password, host, 0, null);
+    }
+
+    /**
+     * connect direct
+     *
+     * @param type database type
+     * @param name schema
+     * @param user user name
+     * @param password password
+     * @param host host
+     * @param port port
+     * @param schema schema
+     * @return db
+     */
+    public static Db connect(Type type, String name, String user, String password, String host, int port, String schema) {
         String pad = "//";
         String pad2 = "/";
         String url = null;
+        String suffix = "";
         switch (type) {
         case H2:
             url = name;
@@ -390,6 +401,9 @@ public class Db implements AutoCloseable {
         case POSTGRESQL:
             if (port <= 0) {
                 port = 5432;
+            }
+            if(schema != null) {
+            	suffix = "?currentSchema=" + schema;
             }
             break;
         case MYSQL:
@@ -408,17 +422,20 @@ public class Db implements AutoCloseable {
             if (port <= 0) {
                 port = 1433;
             }
+            if(schema != null) {
+            	suffix = ";schema=" + schema;
+            }
             break;
         }
         if (host == null) {
             host = "localhost";
         }
         if (url == null) {
-            url = pad + host + ":" + port + pad2 + name;
+            url = pad + host + ":" + port + pad2 + name + suffix;
         }
         url = "jdbc:" + type + ":" + url;
         try {
-            return new Db(DriverManager.getConnection(url, user, password), type);
+            return new Db(DriverManager.getConnection(url, user, password), type, schema);
         } catch (SQLException e) {
             throw new UncheckedSQLException(e);
         }
@@ -430,9 +447,10 @@ public class Db implements AutoCloseable {
      * @param connection connection
      * @param type database type
      */
-    public Db(Connection connection, Type type) {
+    public Db(Connection connection, Type type, String schema) {
         this.connection = connection;
         this.type = type;
+        this.schema = schema == null ? "" : schema;
         try {
             connection.setAutoCommit(false);
             Log.config("Connection created #" + connection.hashCode() + ", type = " + type + ", autoCommit = " + connection.getAutoCommit());
@@ -442,16 +460,12 @@ public class Db implements AutoCloseable {
         switch (type) {
         case POSTGRESQL:
             builder = new PostgresqlBuilder();
-            schema = "public";
             break;
         case ORACLE:
             builder = new OracleBuilder();
-            schema = Try.s(connection::getSchema)
-                .get();
             break;
         case SQLSERVER:
             builder = new SqlserverBuilder();
-            schema = "dbo";
             break;
         case H2:
         case MYSQL:
@@ -464,14 +478,46 @@ public class Db implements AutoCloseable {
      * get data source
      *
      * @param suffix Config.db_suffix
-     * @return data source
+     * @return data source, database type, schema
      */
-    public static synchronized DataSource getDataSource(String suffix) {
+    public static synchronized Tuple3<DataSource, Type, String> getDataSource(String suffix) {
         return dataSourceMap.computeIfAbsent(suffix, Try.f(key -> {
             Properties p = Config.Injector.getSource(Sys.class, Session.currentLocale());
             String url = p.getProperty("Sys.Db." + key);
             Log.info("Database connect to " + url);
             Type type = Type.fromUrl(url);
+            String schema = "";
+            switch(type) {
+            case ORACLE:
+            	schema = Tool.val(Tool.splitAt(url, ":", 3), i -> i.substring(0, i.indexOf('/'))).toUpperCase();
+            	break;
+			case H2:
+				break;
+			case MYSQL:
+				break;
+			case POSTGRESQL: {
+				int begin = url.indexOf("currentSchema=");
+				if(begin >= 0) {
+					begin +=  + "currentSchema=".length();
+					int end = url.indexOf('&', begin);
+					schema = url.substring(begin, end < 0 ? url.length() : end);
+				} else {
+					schema = "public";
+				}
+				break;
+			}
+			case SQLSERVER: {
+				int begin = url.indexOf("schema=");
+				if(begin >= 0) {
+					begin +=  + "schema=".length();
+					int end = url.indexOf(';', begin);
+					schema = url.substring(begin, end < 0 ? url.length() : end);
+				} else {
+					schema = "dbo";
+				}
+				break;
+			}
+            }
             String name = Tool.string(p.getProperty("Sys.Db.datasource_class." + key))
                 .orElse(type.dataSource);
             Class<DataSource> c = Reflector.<DataSource>clazz(name)
@@ -502,7 +548,7 @@ public class Db implements AutoCloseable {
                 }
             }
             Log.info("DataSource created #" + ds);
-            return ds;
+            return Tuple.of(ds, type, schema);
         }));
     }
 
@@ -540,6 +586,13 @@ public class Db implements AutoCloseable {
      */
     public Type getType() {
         return type;
+    }
+
+    /**
+     * @return database type
+     */
+    public String prefix() {
+        return schema + ".";
     }
 
     /**
@@ -2605,12 +2658,12 @@ public class Db implements AutoCloseable {
         Map<String, Field> map = Reflector.mappingFields(clazz);
         return rs -> {
             ResultSetMetaData meta = rs.getMetaData();
-            return IntStream.rangeClosed(1, meta.getColumnCount())
+            AbstractBuilder<T, ?, ?> builder = Factory.Constructor.instance(clazz);
+            IntStream.rangeClosed(1, meta.getColumnCount())
                 .mapToObj(Try.intF(meta::getColumnName))
-                .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), (b, c) -> Tool.val(Tool.getIgnoreCase(map, c.toLowerCase()), Try
-                    .f(field -> b.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))), (a, b) -> {
-                    })
-                .get();
+                .forEach(columnName -> Tool.getIgnoreCase(map, columnName)
+                	.ifPresent(Try.c(field -> builder.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))));
+            return builder.get();   
         };
     }
 

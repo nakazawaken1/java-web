@@ -16,7 +16,7 @@ Java8 web framework
 	    <dependency>
 	      <groupId>jp.qpg</groupId>
 	      <artifactId>java-web</artifactId>
-	      <version>1.0.54</version>
+	      <version>2.0.0</version>
 	    </dependency>
 	  </dependencies>
 	</project>

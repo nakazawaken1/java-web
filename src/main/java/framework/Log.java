@@ -28,8 +28,6 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 import app.config.Sys;
-import sun.misc.JavaLangAccess;
-import sun.misc.SharedSecrets;
 
 /**
  * log
@@ -37,7 +35,6 @@ import sun.misc.SharedSecrets;
  * <li>log file by level, date</li>
  * </ol>
  */
-@SuppressWarnings("restriction")
 public class Log extends Handler {
 
     /**
@@ -249,11 +246,6 @@ public class Log extends Handler {
      * log handler
      */
     private static volatile Handler handler;
-
-    /**
-     * For access to stack trace
-     */
-    static final JavaLangAccess access = SharedSecrets.getJavaLangAccess();
 
     /**
      * log initialize
@@ -489,11 +481,11 @@ public class Log extends Handler {
         if (thrown != null) {
             record.setThrown(thrown);
         }
-        Throwable throwable = new Throwable();
+        StackTraceElement[] stackTraces = new Throwable().getStackTrace();
         int max = skip;
         int first = skip;
-        for (int i = 0, i2 = access.getStackTraceDepth(throwable); i < i2; i++) {
-            String className = access.getStackTraceElement(throwable, i)
+        for (int i = 0, i2 = stackTraces.length; i < i2; i++) {
+            String className = stackTraces[i]
                 .getClassName();
             if(CLASS_NAME.equals(className) && i + 1 < i2) {
                 first = i;
@@ -509,7 +501,7 @@ public class Log extends Handler {
                 break;
             }
         }
-        StackTraceElement frame = access.getStackTraceElement(throwable, max);
+        StackTraceElement frame = stackTraces[max];
         String className = frame.getClassName();
         String methodName = frame.getMethodName();
         record.setSourceClassName(className);
