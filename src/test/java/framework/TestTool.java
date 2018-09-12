@@ -39,7 +39,7 @@ public class TestTool extends Tester {
 
         group("nextMillis", group -> {
             String g = group + ":";
-            ZonedDateTime now = ZonedDateTime.now();
+            ZonedDateTime now = ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS);
             Function<String, Object> from = s -> now.plus(Tool.nextMillis(s.substring(g.length()), now), ChronoUnit.MILLIS);
             Function<Function<ZonedDateTime, ZonedDateTime>, Object> to = d -> d.apply(now);
             expect(g + "all null", n -> Tool.nextMillis(null, null)).toThrow(NullPointerException.class);
