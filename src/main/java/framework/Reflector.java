@@ -115,7 +115,7 @@ public class Reflector {
         try {
             return Tool.of((Class<T>) Class.forName(clazz));
         } catch (ClassNotFoundException e) {
-            Log.info(e, () -> "class error");
+            Log.info(e.toString());
             return Optional.empty();
         }
     }
@@ -320,13 +320,14 @@ public class Reflector {
      * @param instance instance
      * @param name Property name
      * @param orElse call if not exists property
+	 * @param accessField access field if not exists property
      * @return Property value
      */
     @SuppressWarnings("unchecked")
-    public static <T> T getProperty(Object instance, String name, Supplier<T> orElse) {
+    public static <T> T getProperty(Object instance, String name, Supplier<T> orElse, boolean accessField) {
         if (instance != null) {
             Class<?> clazz = instance.getClass();
-            Method m = method(clazz, "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1))
+            Method m = Tool.string(name).flatMap(i -> method(clazz, "get" + Character.toUpperCase(i.charAt(0)) + i.substring(1)))
                     .orElseGet(() -> name.startsWith("is") ? method(clazz, name).orElse(null) : null);
             if (m != null) {
                 try {
@@ -334,11 +335,36 @@ public class Reflector {
                 } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                     Log.warning(e, () -> "get property error");
                 }
+            } else if(accessField) {
+            	return field(clazz, name).map(Try.f(field -> (T)field.get(instance), (e, field) -> {Log.warning(e, () -> "get property error");return null;})).orElseGet(orElse);
             }
         }
         return orElse.get();
     }
-    
+
+	/**
+	 * @param instance instance
+	 * @param type property type
+	 * @param name property name
+	 * @param value property value
+	 * @param accessField access field if not exists property
+	 */
+	public static void setProperty(Object instance, Class<?> type, String name, Object value, boolean accessField) {
+		if (instance != null) {
+            Class<?> clazz = instance.getClass();
+            Method m = Tool.string(name).flatMap(i -> method(clazz, "set" + Character.toUpperCase(i.charAt(0)) + i.substring(1), type)).orElse(null);
+            if (m != null) {
+                try {
+                    m.invoke(instance, value);
+                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                    Log.warning(e, () -> "set property error");
+                }
+            } else if(accessField) {
+            	field(clazz, name).ifPresent(Try.c(field -> field.set(instance, value), (e, field) -> Log.warning(e, () -> "set property error")));
+            }
+		}
+	}
+
     /**
      * @param <T> Return type
      * @param method Method
@@ -408,5 +434,16 @@ public class Reflector {
     @SuppressWarnings("unchecked")
     public static void chagneAnnotation(Executable executable, Class<? extends Annotation> annotation, Annotation value) {
         method(Executable.class, "declaredAnnotations").map(Try.f(m -> Map.class.cast(m.invoke(executable)))).ifPresent(map -> map.put(annotation, value));
+    }
+
+    /**
+     * @param <T> target class type
+     * @param <R> annotation class type
+     * @param targetClass target class
+     * @param annotationClass annotation class
+     * @return annotation
+     */
+    public <T, R extends Annotation> Optional<R> annotation(Class<T> targetClass, Class<R> annotationClass) {
+    	return Tool.or(targetClass.getAnnotation(annotationClass), () -> Stream.of(targetClass.getAnnotations()).map(i -> i.getClass().getAnnotation(annotationClass)).findFirst().orElse(null));
     }
 }

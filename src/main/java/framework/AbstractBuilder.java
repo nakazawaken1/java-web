@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import framework.Try.TriConsumer;
+
 /**
  * Value object builder base
  * 
@@ -23,7 +25,7 @@ import java.util.stream.Stream;
  * @param <BUILDER> Builder type
  * @param <NAMES> Field names type
  */
-public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VALUE, BUILDER, NAMES>, NAMES extends Enum<?>> implements Supplier<VALUE> {
+public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VALUE, BUILDER, NAMES>, NAMES extends Enum<?>> implements Supplier<VALUE>, TriConsumer<Class<?>, String, Object> {
 
     /**
      * Text in case of "Optional.empty" in "toString"
@@ -90,6 +92,12 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
      */
     @SuppressWarnings("unchecked")
     public AbstractBuilder() {
+    	if(this instanceof PropertyBuilder) {
+    		meta = null;
+    		values = null;
+    		converters = null;
+    		return;
+    	}
         meta = (Meta<VALUE, NAMES>) caches.computeIfAbsent(getClass(), key -> {
             Type[] types = ((ParameterizedType) key.getGenericSuperclass()).getActualTypeArguments();
             Meta<VALUE, NAMES> m = new Meta<>();
@@ -132,13 +140,9 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
         return (BUILDER) this;
     }
 
-    /**
-     * @param name Field name
-     * @param value Field value
-     * @return Self
-     */
-    public BUILDER set(String name, Object value) {
-        return set(Stream.of(meta.names).filter(n -> n.name().equals(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
+    @Override
+    public void accept(Class<?> type, String name, Object value) {
+        set(Stream.of(meta.names).filter(n -> n.name().equals(name)).findFirst().orElseThrow(IllegalArgumentException::new), value);
     }
 
     /**
@@ -236,5 +240,33 @@ public abstract class AbstractBuilder<VALUE, BUILDER extends AbstractBuilder<VAL
             Object v = values[i];
             return meta.names[i] + pairSeparator + (v instanceof Optional ? ((Optional<Object>) v).orElse(empty) : v);
         }).collect(Collectors.joining(entrySeparator));
+    }
+    
+    /**
+     * Property builder
+     * @param <T> Value type
+     */
+    public static class PropertyBuilder<T> extends AbstractBuilder<T, PropertyBuilder<T>, Enum<?>> {
+    	/**
+    	 * instance 
+    	 */
+    	T instance;
+
+    	/**
+    	 * Constructor
+    	 * @param supplier instance supplier
+    	 */
+    	public PropertyBuilder(Supplier<T> supplier) {
+			this.instance = supplier.get();
+		}
+    	@Override
+    	public T get() {
+    		return instance;
+    	}
+    	
+    	@Override
+    	public void accept(Class<?> type, String name, Object value) {
+    		Reflector.setProperty(instance, type, name, value, true);
+    	}
     }
 }

@@ -119,7 +119,7 @@ public class Tool {
     /**
      * not empty string
      */
-    public static final Predicate<String> notEmpty = Tool.not(String::isEmpty);
+    public static final Predicate<String> notEmpty = not(String::isEmpty);
 
     /**
      * @param <T> Value type
@@ -136,9 +136,9 @@ public class Tool {
      */
     public static Optional<URL> toURL(String... relativePath) {
         String path = Stream.of(relativePath)
-            .map(i -> Tool.trim("/", i.replace('\\', '/'), "/"))
+            .map(i -> trim("/", i.replace('\\', '/'), "/"))
             .collect(Collectors.joining("/"));
-        return Tool.of(Thread.currentThread()
+        return of(Thread.currentThread()
             .getContextClassLoader()
             .getResource(path));
     }
@@ -149,9 +149,9 @@ public class Tool {
      */
     public static Stream<URL> toURLs(String... relativePath) {
         String path = Stream.of(relativePath)
-            .map(i -> Tool.trim("/", i.replace('\\', '/'), "/"))
+            .map(i -> trim("/", i.replace('\\', '/'), "/"))
             .collect(Collectors.joining("/"));
-        return Tool.stream(Try.f(Thread.currentThread()
+        return stream(Try.f(Thread.currentThread()
             .getContextClassLoader()::getResources)
             .apply(path));
     }
@@ -209,7 +209,7 @@ public class Tool {
             }
             value = i.get();
         }
-        return Tool.of(value);
+        return of(value);
     }
 
     /**
@@ -455,7 +455,7 @@ public class Tool {
             traverser.start(c);
             Object object = o;
             Stream.of(c.getDeclaredFields())
-                .filter(f -> Tool.val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m)))
+                .filter(f -> val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m)))
                 .forEach(field -> {
                     try {
                         field.setAccessible(true);
@@ -464,7 +464,7 @@ public class Tool {
                         if (isOptional && value == Optional.empty() && traverser.isCompact()) {
                             return;
                         }
-                        traverser.key(Tool.of(field.getAnnotation(Help.class))
+                        traverser.key(of(field.getAnnotation(Help.class))
                             .map(help -> help.value()[0])
                             .orElse(field.getName()));
                         if (value != null) {
@@ -511,7 +511,7 @@ public class Tool {
      * @param charset Charset
      */
     public static void json(Object o, OutputStream out, Charset charset) {
-        traverse(o, Tool.peek(new JsonTraverser(), t -> {
+        traverse(o, peek(new JsonTraverser(), t -> {
             t.out = out;
             t.charset = charset;
         }));
@@ -763,7 +763,7 @@ public class Tool {
      * @param charset Charset
      */
     public static void xml(Object o, OutputStream out, Charset charset) {
-        traverse(o, Tool.peek(new XmlTraverser(), t -> {
+        traverse(o, peek(new XmlTraverser(), t -> {
             t.out = out;
             t.charset = charset;
         }));
@@ -808,11 +808,11 @@ public class Tool {
         /**
          * Class name mapping
          */
-        public final Map<String, String> classMap = Tool.map("Object", "root");
+        public final Map<String, String> classMap = map("Object", "root");
         /**
          * Class to tag name
          */
-        public Function<Class<?>, String> classToTag = clazz -> Tool.val(Tool.of(clazz.getAnnotation(Help.class))
+        public Function<Class<?>, String> classToTag = clazz -> val(of(clazz.getAnnotation(Help.class))
             .map(help -> help.value()[0])
             .orElseGet(clazz::getSimpleName), i -> classMap.getOrDefault(i, i));
         /**
@@ -986,7 +986,7 @@ public class Tool {
      * @param charset Charset
      */
     public static void csv(Object o, OutputStream out, Charset charset) {
-        traverse(o, Tool.peek(new CsvTraverser(), t -> {
+        traverse(o, peek(new CsvTraverser(), t -> {
             t.out = out;
             t.charset = charset;
         }));
@@ -997,7 +997,7 @@ public class Tool {
      * @return text
      */
     public static String tsv(Object o) {
-        return traverse(o, Tool.peek(new CsvTraverser(), t -> {
+        return traverse(o, peek(new CsvTraverser(), t -> {
             t.separator = '\t';
             t.clouser = '\0';/* none */
             t.innerSeparator = ",";
@@ -1010,7 +1010,7 @@ public class Tool {
      * @param charset Charset
      */
     public static void tsv(Object o, OutputStream out, Charset charset) {
-        traverse(o, Tool.peek(new CsvTraverser(), t -> {
+        traverse(o, peek(new CsvTraverser(), t -> {
             t.out = out;
             t.charset = charset;
             t.separator = '\t';
@@ -1441,7 +1441,7 @@ public class Tool {
      * @return class stream(must to close)
      */
     public static Stream<Class<?>> getClasses(String packageName) {
-        String prefix = Tool.string(packageName)
+        String prefix = string(packageName)
             .map(i -> i + '.')
             .orElse("");
         return getResources(packageName.replace('.', '/')).filter(s -> s.endsWith(".class"))
@@ -1456,11 +1456,11 @@ public class Tool {
      * @return file name stream(must to close)
      */
     public static Stream<String> getResources(String location) {
-        if (!Tool.string(location)
+        if (!string(location)
             .isPresent()) {
             Collector<URL, ?, Map<Boolean, List<URL>>> collector = Collectors.partitioningBy(url -> url.toString()
                 .contains(".jar!"));
-            return Tool.toURLs("app")
+            return toURLs("app")
                 .collect(collector)
                 .entrySet()
                 .stream()
@@ -1471,7 +1471,7 @@ public class Tool {
                             : getResourcesFromFolder(new File(Try.s(url::toURI)
                                 .get()).getParentFile()))));
         }
-        return Tool.toURLs(location)
+        return toURLs(location)
             .flatMap(Try.f(i -> {
                 boolean isDirectory = Try.<URL>p(j -> new File(Try.s(j::toURI)
                     .get()).isDirectory(), (e, j) -> false)
@@ -1790,10 +1790,10 @@ public class Tool {
                 List<ChronoField> fields = Arrays.asList(ChronoField.HOUR_OF_DAY, ChronoField.MINUTE_OF_HOUR, ChronoField.SECOND_OF_MINUTE);
                 ChronoUnit[] units = { ChronoUnit.DAYS, ChronoUnit.HOURS, ChronoUnit.MINUTES, ChronoUnit.SECONDS };
                 ChronoField[] field = { null, null };
-                next = Tool.zip(fields.stream(), Stream.of(value.substring(timeIndex)
+                next = zip(fields.stream(), Stream.of(value.substring(timeIndex)
                     .trim()
                     .split("[^0-9]"))
-                    .map(s -> Tool.string(s)
+                    .map(s -> string(s)
                         .map(Long::valueOf)
                         .orElse(-1L)))
                     .peek(i -> {
@@ -1833,7 +1833,7 @@ public class Tool {
                     ChronoUnit[] units = { ChronoUnit.MONTHS, ChronoUnit.YEARS, null };
                     List<String> values = Arrays.asList(value.split("[^0-9]"));
                     Collections.reverse(values);
-                    next = Tool.zip(fields.stream(), values.stream()
+                    next = zip(fields.stream(), values.stream()
                         .map(Long::valueOf))
                         .peek(i -> field[0] = i.l)
                         .reduce(next, (i, pair) -> i.with(pair.l, pair.r), (i, j) -> i);
@@ -1915,7 +1915,15 @@ public class Tool {
      * @return hash
      */
     public static String hash(String text, String algorithm) {
-        return DatatypeConverter.printHexBinary(digest(text.getBytes(StandardCharsets.UTF_8), algorithm));
+        return hex(digest(text.getBytes(StandardCharsets.UTF_8), algorithm));
+    }
+    
+    /**
+     * @param bytes bytes
+     * @return hex string
+     */
+    public static String hex(byte[] bytes) {
+    	return DatatypeConverter.printHexBinary(bytes);
     }
 
     /**
@@ -2336,7 +2344,7 @@ public class Tool {
      * @return First value
      */
     public static <T, U> Optional<U> getFirst(Map<T, List<U>> map, T name) {
-        return Tool.of(map)
+        return of(map)
             .map(m -> m.get(name))
             .filter(a -> !a.isEmpty())
             .map(a -> a.get(0));
@@ -2349,7 +2357,7 @@ public class Tool {
      * @return Cut text
      */
     public static String cut(String text, int max, String suffix) {
-        return Tool.of(text)
+        return of(text)
             .map(i -> {
                 boolean isSuffix = false;
                 int index = i.indexOf('\r');
@@ -2749,11 +2757,11 @@ public class Tool {
         Mail mail = new Mail();
         set.accept(mail);
         MimeMessage message = new MimeMessage(javax.mail.Session.getInstance(mail.properties, mail.authenticator));
-        InternetAddress from = Tool.of(mail.from)
+        InternetAddress from = of(mail.from)
             .orElseGet(Try.s(() -> new InternetAddress(Sys.Mail.user)));
         try {
             message.setFrom(from);
-            message.setReplyTo(mail.replyTo == null ? Tool.array(from) : mail.replyTo);
+            message.setReplyTo(mail.replyTo == null ? array(from) : mail.replyTo);
             mail.users.forEach(Try.biC((type, users) -> message.setRecipients(type, users)));
             message.setSubject(subject, Sys.Mail.charset);
             message.setText(body, Sys.Mail.charset);
@@ -2842,7 +2850,7 @@ public class Tool {
      * @return Full name
      */
     public static String fullName(Class<?> clazz) {
-        return Tool.trim(".", clazz.getCanonicalName()
+        return trim(".", clazz.getCanonicalName()
             .substring(clazz.getPackage()
                 .getName()
                 .length()), null);
@@ -2960,7 +2968,7 @@ public class Tool {
         // System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
         // .format(java.time.chrono.JapaneseDate.now()));
         //enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
-        System.out.println(Tool.in("id", IntStream.rangeClosed(1, 1001).toArray()));
+        System.out.println(in("id", IntStream.rangeClosed(1, 1001).toArray()));
     }
 
     /**
@@ -3053,7 +3061,7 @@ public class Tool {
         if(ids == null || ids.length <= 0) {
             return field + " <> " + field;
         }
-        List<String> items = Tool.list();
+        List<String> items = list();
         for(int i = 0; i < ids.length; i += 1000) {
             items.add(field + " IN(" + IntStream.of(ids).skip(i).limit(1000)
             .mapToObj(String::valueOf)
@@ -3072,7 +3080,7 @@ public class Tool {
         if(ids == null || ids.length <= 0) {
             return field + " <> " + field;
         }
-        List<String> items = Tool.list();
+        List<String> items = list();
         for(int i = 0; i < ids.length; i += 1000) {
             items.add(field + " IN(" + Stream.of(ids).skip(i).limit(1000)
             .collect(Collectors.joining(", ")) + ")");

@@ -446,6 +446,7 @@ public class Db implements AutoCloseable {
      *
      * @param connection connection
      * @param type database type
+     * @param schema schama
      */
     public Db(Connection connection, Type type, String schema) {
         this.connection = connection;
@@ -1341,9 +1342,7 @@ public class Db implements AutoCloseable {
                 .forEach(file -> db.executeFile(file, null));
             modelDatas.stream()
                 .peek(t -> db.truncate(t.l))
-                .forEach(Try.c(t -> t.r.loader()
-                    .newInstance()
-                    .accept(db, t.l, t.r)));
+                .forEach(Try.c(t -> Reflector.instance(t.r.loader()).accept(db, t.l, t.r)));
         }
     }
 
@@ -2626,11 +2625,11 @@ public class Db implements AutoCloseable {
         } else {
             return select(targetColumns).from(clazz)
                 .stream()
-                .map(rs -> instanceFields.stream()
-                    .<AbstractBuilder<T, ?, ?>>collect(() -> Factory.Constructor.instance(clazz), Try
-                        .biC((b, f) -> b.set(f.getName(), resultSetToObject(f, rs, Reflector.mappingFieldName(f)))), (a, b) -> {
-                        })
-                    .get());
+                .map(rs -> {
+                	AbstractBuilder<T, ?, ?> builder = Factory.Constructor.instance(clazz);
+                	instanceFields.forEach(Try.c(field -> builder.accept(field.getType(), field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field)))));
+                    return builder.get();
+                });
         }
     }
 
@@ -2662,7 +2661,7 @@ public class Db implements AutoCloseable {
             IntStream.rangeClosed(1, meta.getColumnCount())
                 .mapToObj(Try.intF(meta::getColumnName))
                 .forEach(columnName -> Tool.getIgnoreCase(map, columnName)
-                	.ifPresent(Try.c(field -> builder.set(field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))));
+                	.ifPresent(Try.c(field -> builder.accept(field.getType(), field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))));
             return builder.get();   
         };
     }

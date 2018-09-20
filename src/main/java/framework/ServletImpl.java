@@ -30,6 +30,7 @@ import javax.servlet.http.HttpSession;
 
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.annotation.Config;
 import framework.annotation.Route;
 import framework.annotation.Route.Method;
 
@@ -52,6 +53,7 @@ public class ServletImpl implements javax.servlet.Servlet {
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
+        Config.Injector.setup(Sys.class.getPackage().getName());
         System.setProperty("Sys.context_path", Tool.suffix(config.getServletContext().getContextPath(), "/"));
         new ApplicationImpl(config.getServletContext()).setup(ResponseImpl::new);
     }
@@ -144,7 +146,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Tool.of(Tool.of((T) context.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Reflector.getProperty(this, name, () -> (T) context.getAttribute(name), false));
         }
 
         /*
@@ -256,7 +258,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends Serializable> Optional<T> getAttr(String name) {
-            return Tool.of(Tool.of((T) session.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Reflector.getProperty(this, name, () -> (T) session.getAttribute(name), false));
         }
 
         /*
@@ -376,7 +378,7 @@ public class ServletImpl implements javax.servlet.Servlet {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Tool.of(Tool.of((T) request.getAttribute(name)).orElseGet(() -> Reflector.getProperty(this, name, () -> null)));
+            return Tool.of(Reflector.getProperty(this, name, () -> (T) request.getAttribute(name), false));
         }
 
         /*

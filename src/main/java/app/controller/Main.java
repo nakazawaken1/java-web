@@ -22,18 +22,19 @@ public class Main {
      * @param extension Extension
      * @param loginId Login id
      * @param password Password
+     * @param url redirect url
      * @return Response
      */
     @Route(value = "login(?<extension>\\.json|)")
     Object login(Application application, Session session, String extension,
-            @Size(min = 4, value = 20) @Letters(Letters.ASCII) Optional<String> loginId, @Letters(Letters.ASCII) Optional<String> password) {
+            @Size(min = 4, value = 20) @Letters(Letters.ASCII) Optional<String> loginId, @Letters(Letters.ASCII) Optional<String> password, Optional<String> url) {
         boolean isJson = ".json".equals(extension);
         if (session.login(loginId.orElse("guest"), password.orElse(""))) {
             session.remove("alert");
             if (isJson) {
-                return Response.of(Tool.array("", application.getContextPath()));
+                return Response.of(Tool.array("", url.orElseGet(application::getContextPath)));
             }
-            return Response.redirect(application.getContextPath());
+            return Response.redirect(url.orElseGet(application::getContextPath));
         } else {
             if (isJson) {
                 return Response.of(Tool.array(Sys.Alert.loginFailed, Tool.map("loginId", null, "password", null)));
@@ -47,13 +48,14 @@ public class Main {
      * @param application Application
      * @param extension Extension
      * @param session Session
+     * @param url redirect url
      * @return Response
      */
     @Route(value = "logout(?<extension>\\.json|)")
-    Object logout(Application application, String extension, Session session) {
+    Object logout(Application application, String extension, Session session, Optional<String> url) {
         session.logout();
         session.put("alert", "");
-        return ".json".equals(extension) ? Response.of(Tool.array("", application.getContextPath())) : Response.redirect(application.getContextPath());
+        return ".json".equals(extension) ? Response.of(Tool.array("", url.orElseGet(application::getContextPath))) : Response.redirect(url.orElseGet(application::getContextPath));
     }
 
     /**

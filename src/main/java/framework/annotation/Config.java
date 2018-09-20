@@ -39,7 +39,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import app.config.Sys;
 import framework.Db;
+import framework.Formatter;
 import framework.Log;
 import framework.Message;
 import framework.Reflector;
@@ -742,5 +744,27 @@ public @interface Config {
                 changed.accept(value);
             }
         }
+        
+        /**
+         * configuration class list
+         */
+        public static final List<Class<?>> classes = Tool.list();
+
+		/**
+		 * @param packages configuration class packages
+		 */
+		public static void setup(String... packages) {
+	        try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage()
+	            .getName())
+	            .filter(c -> Tool.fullName(c)
+	                .indexOf('.') < 0)) {
+	            classes.addAll(cs.peek(Config.Injector::inject)
+	                .peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c))
+	                .collect(Collectors.toList()));
+	        }
+
+	        /* load system properties */
+	        Config.Injector.loadSystemProperties();
+		}
     }
 }

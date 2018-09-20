@@ -109,25 +109,11 @@ public abstract class Application implements Attributes<Object> {
         try {
             if (!"factory".equals(Application.class.getDeclaredMethod("setup", Supplier.class)
                 .getParameters()[0].getName())) {
-                throw new RuntimeException("must to enable compile option `-parameters`");
+                throw new InternalError("must to enable compile option `-parameters`");
             }
         } catch (NoSuchMethodException | SecurityException e) {
             throw new InternalError(e);
         }
-
-        /* load config */
-        List<Class<?>> configClasses;
-        try (Stream<Class<?>> cs = Tool.getClasses(Sys.class.getPackage()
-            .getName())
-            .filter(c -> Tool.fullName(c)
-                .indexOf('.') < 0)) {
-            configClasses = cs.peek(Config.Injector::inject)
-                .peek(c -> Formatter.elClassMap.put(c.getSimpleName(), c))
-                .collect(Collectors.toList());
-        }
-
-        /* load system properties */
-        Config.Injector.loadSystemProperties();
 
         /* setup log */
         Log.startup();
@@ -241,7 +227,7 @@ public abstract class Application implements Attributes<Object> {
         /* load database config */
         Config.Injector.loadDb();
 
-        Log.info(() -> "---- setting ----" + Letters.CRLF + configClasses.stream()
+        Log.info(() -> "---- setting ----" + Letters.CRLF + Config.Injector.classes.stream()
             .map(c -> String.join(Letters.CRLF, Config.Injector.dumpConfig(c, true)))
             .collect(Collectors.joining(Letters.CRLF)));
 
@@ -292,10 +278,11 @@ public abstract class Application implements Attributes<Object> {
         final Optional<String> mime = Tool.string(Tool.getExtension(path))
             .map(Tool::getContentType);
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
+        final String normalizedPath = Tool.trim(null, path, "/");
         final Tuple<Class<?>, Method> pair = routing.entrySet()
             .stream()
             .filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))
-            .map(e -> Tuple.of(e.getKey().r.l.matcher(path), e.getKey().r.r, e.getValue()))
+            .map(e -> Tuple.of(e.getKey().r.l.matcher(normalizedPath), e.getKey().r.r, e.getValue()))
             .filter(p -> p.l.matches())
             .sorted(Comparator.comparing(c -> c.getValue()
                 .getValue()

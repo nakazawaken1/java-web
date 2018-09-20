@@ -71,6 +71,7 @@ import com.sun.net.httpserver.HttpsServer;
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.TryConsumer;
+import framework.annotation.Config;
 import framework.annotation.Route.Method;
 
 /**
@@ -86,8 +87,8 @@ public class Standalone {
     public static void main(String... args) {
 
         // setup
-        String contextPath = Sys.context_path;
-        Application application = new ApplicationImpl(contextPath);
+        Config.Injector.setup(Sys.class.getPackage().getName());
+        Application application = new ApplicationImpl(Sys.context_path = Tool.suffix(Sys.context_path, "/"));
         application.setup(ResponseImpl::new);
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
@@ -106,7 +107,7 @@ public class Standalone {
             try {
                 HttpServer http = HttpServer.create(new InetSocketAddress(port), 0);
                 http.setExecutor(executor);
-                http.createContext(contextPath, handler);
+                http.createContext(Tool.trim(null, application.getContextPath(), "/"), handler);
                 http.start();
                 Log.info("http server started on port " + port);
             } catch (IOException e) {
@@ -122,7 +123,7 @@ public class Standalone {
                 Stream<String> certPaths = Sys.https_cert_files.stream();
                 https.setHttpsConfigurator(new HttpsConfigurator(createSSLContext(keyPath, certPaths)));
                 https.setExecutor(executor);
-                https.createContext(contextPath, handler);
+                https.createContext(Tool.trim(null, application.getContextPath(), "/"), handler);
                 https.start();
                 Log.info("https server started on port " + port);
             } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException
@@ -278,7 +279,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(Reflector.getProperty(this, name, () -> (T) attributes.get(name), false));
         }
 
         @Override
@@ -614,7 +615,7 @@ public class Standalone {
             return Tool.of(newAttributes().containsKey(name) ? (T) newAttributes().get(name)
                     : oldAttributes().containsKey(name) && !Tool.of(removeAttributes)
                         .map(a -> a.contains(name))
-                        .orElse(false) ? (T) oldAttributes().get(name) : Reflector.getProperty(this, name, () -> null));
+                        .orElse(false) ? (T) oldAttributes().get(name) : Reflector.getProperty(this, name, () -> null, false));
         }
 
         @Override
@@ -838,7 +839,7 @@ public class Standalone {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<T> getAttr(String name) {
-            return Tool.of(attributes.containsKey(name) ? (T) attributes.get(name) : Reflector.getProperty(this, name, () -> null));
+            return Tool.of(Reflector.getProperty(this, name, () -> (T) attributes.get(name), false));
         }
 
         @Override

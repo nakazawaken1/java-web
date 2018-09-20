@@ -121,7 +121,7 @@ public class Sys {
 
     @Help("session cookie name")
     public static String session_name = "JavaWebSession";
-
+    
     @Help("session timeout minutes(indefinite if negative value)")
     public static int session_timeout_minutes = 30;
 
@@ -208,7 +208,7 @@ public class Sys {
     @Help("job packages")
     public static List<String> job_packages = Tool.list(Main.class.getPackage()
         .getName());
-
+    
     @Help("separator of array to text")
     public static String array_separator = "\n,\n";
 

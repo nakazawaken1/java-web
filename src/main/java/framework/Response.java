@@ -38,6 +38,7 @@ import framework.Tool.XmlTraverser;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
 import framework.annotation.Letters;
+import framework.annotation.Route;
 
 /**
  * Response
@@ -205,6 +206,14 @@ public abstract class Response {
      */
     public static Response redirect(String path) {
         return redirect(path, Status.Found);
+    }
+
+    /**
+     * @param clazz route class
+     * @return response
+     */
+    public static Response redirect(Class<?> clazz) {
+        return redirect(Application.current().map(a -> a.getContextPath()).orElse("/") + clazz.getAnnotation(Route.class).value(), Status.Found);
     }
 
     /**
@@ -580,6 +589,7 @@ public abstract class Response {
             }
         }), //
         Tuple.of(Output.class, (response, out, cancel) -> ((Output) response.content).accept(out.get())), //
+        Tuple.of(byte[].class, (response, out, cancel) -> out.get().write((byte[]) response.content)), //
         Tuple.of(Path.class, (response, out, cancel) -> {
             BiConsumer<String, URL> load = (file, url) -> {
                 Log.config("[static load] " + Tool.or(Try.s(url::toURI)
@@ -642,7 +652,7 @@ public abstract class Response {
                     for (String page : Sys.default_pages) {
                         if (Tool.ifPresentOr(Tool.toURL(folder + page), p -> {
                             response.status(Status.Moved_Permamently)
-                                .addHeader("Location", page);
+                                .addHeader("Location", Tool.path(Application.current().map(Application::getContextPath).orElse("/"), page).apply("/"));
                             out.get();
                         }, () -> {
                         })) {
