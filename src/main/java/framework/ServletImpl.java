@@ -54,7 +54,7 @@ public class ServletImpl implements javax.servlet.Servlet {
     @Override
     public void init(ServletConfig config) throws ServletException {
         Config.Injector.setup(Sys.class.getPackage().getName());
-        System.setProperty("Sys.context_path", Tool.suffix(config.getServletContext().getContextPath(), "/"));
+        Sys.context_path = Tool.suffix(config.getServletContext().getContextPath(), "/");
         new ApplicationImpl(config.getServletContext()).setup(ResponseImpl::new);
     }
 

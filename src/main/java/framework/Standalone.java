@@ -88,7 +88,7 @@ public class Standalone {
 
         // setup
         Config.Injector.setup(Sys.class.getPackage().getName());
-        Application application = new ApplicationImpl(Sys.context_path = Tool.suffix(Sys.context_path, "/"));
+        Application application = new ApplicationImpl(Sys.context_path = Tool.prefix(Tool.suffix(Sys.context_path, "/"), "/"));
         application.setup(ResponseImpl::new);
         Executor executor = Executors.newWorkStealingPool();
         HttpHandler handler = exchange -> {
@@ -107,7 +107,7 @@ public class Standalone {
             try {
                 HttpServer http = HttpServer.create(new InetSocketAddress(port), 0);
                 http.setExecutor(executor);
-                http.createContext(Tool.trim(null, application.getContextPath(), "/"), handler);
+                http.createContext(Tool.prefix(Tool.trim(null, application.getContextPath(), "/"), "/"), handler);
                 http.start();
                 Log.info("http server started on port " + port);
             } catch (IOException e) {
@@ -123,7 +123,7 @@ public class Standalone {
                 Stream<String> certPaths = Sys.https_cert_files.stream();
                 https.setHttpsConfigurator(new HttpsConfigurator(createSSLContext(keyPath, certPaths)));
                 https.setExecutor(executor);
-                https.createContext(Tool.trim(null, application.getContextPath(), "/"), handler);
+                https.createContext(Tool.prefix(Tool.trim(null, application.getContextPath(), "/"), "/"), handler);
                 https.start();
                 Log.info("https server started on port " + port);
             } catch (IOException | KeyManagementException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException
