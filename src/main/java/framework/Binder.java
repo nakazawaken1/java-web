@@ -175,8 +175,7 @@ public class Binder implements ErrorAppender {
                         .stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, e -> Tool.<List<String>, String>val(e.getValue(), j -> j.isEmpty() ? "" : j.get(0))));
                 }
-                Object instance = Try.s(type::newInstance)
-                    .get();
+                Object instance = Reflector.instance(type);
                 Reflector.fields(type)
                     .forEach(Try.biC((n, field) -> {
                         field.set(instance, bind((Map<String, List<String>>) i, nest + 1, n, field.getType(), Reflector.getGenericParameters(field)));

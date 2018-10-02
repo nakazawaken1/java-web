@@ -373,7 +373,7 @@ public class Reflector {
      */
     @SuppressWarnings("unchecked")
     public static <T> T invoke(Method method, Object... args) {
-        return (T)Try.s(() -> method.invoke(Modifier.isStatic(method.getModifiers()) ? null : method.getDeclaringClass().newInstance(), args)).get();
+        return (T)Try.s(() -> method.invoke(Modifier.isStatic(method.getModifiers()) ? null : instance(method.getDeclaringClass()), args)).get();
     }
 
     /**

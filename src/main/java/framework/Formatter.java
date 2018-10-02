@@ -11,7 +11,6 @@ import java.text.MessageFormat;
 import java.time.chrono.JapaneseDate;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,17 +46,12 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     /**
      * elClass entries
      */
-    public static Map<String, Class<?>> elClassMap = Tool.map("Sys", Sys.class, "Tool", Tool.class, "JapaneseDate", JapaneseDate.class);
-
-    /**
-     * cache enabled
-     */
-    boolean isCache = true;
+    public static final Map<String, Class<?>> elClassMap = Tool.map("Sys", Sys.class, "Tool", Tool.class, "JapaneseDate", JapaneseDate.class);
 
     /**
      * index of {
      */
-    Deque<Integer> braces = new LinkedList<>();
+    final Deque<Integer> braces = new LinkedList<>();
 
     /**
      * result action
@@ -260,10 +254,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @return formatter
      */
     Formatter copy() {
-        Formatter result = new Formatter(exclude, escape, locale, map, values);
-        // result.el = el;
-        result.cache = cache;
-        return result;
+        return new Formatter(exclude, escape, locale, map, values);
     }
 
     /*
@@ -357,10 +348,6 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * el processor
      */
     ELProcessor el = null;
-    /**
-     * evaluate cache
-     */
-    Map<String, String> cache = new HashMap<>();
 
     /**
      * format
@@ -417,14 +404,11 @@ public class Formatter extends AbstractParser implements AutoCloseable {
         return Tool.toURL(path).map(url -> {
             String text = Tool.using(url::openStream, Tool::loadText);
             Formatter formatter = current.get().copy();
-            boolean backup = formatter.isCache;
-            formatter.isCache = false;
             StringBuilder s = new StringBuilder();
             list.forEach(i -> {
                 formatter.el().setValue("I", i);
                 s.append(formatter.format(text));
             });
-            formatter.isCache = backup;
             return s.toString();
         }).orElse("((not found: " + path + "))");
     }
@@ -438,10 +422,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
         return Tool.toURL(path).map(url -> {
             if (condition) {
                 Formatter formatter = current.get().copy();
-                boolean backup = formatter.isCache;
-                formatter.isCache = false;
                 String result = formatter.format(Tool.using(url::openStream, Tool::loadText));
-                formatter.isCache = backup;
                 return result;
             }
             return "";
@@ -455,67 +436,64 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @return result
      */
     String eval(String expression, int prefix, int suffix) {
-        Function<String, String> get = s -> {
-            boolean isEl = !(s.startsWith("{") && prefix == 1);
-            boolean isEscape = !isEl || s.startsWith("${") && prefix == 2;
-            BiFunction<Object, String, String> getResult = (result, type) -> {
-                String value;
-                if (escape != null && isEscape) {
-                    value = escape.apply(result);
-                } else {
-                    value = Tool.string(result).orElse(null);
-                    type = "raw " + type;
-                }
-                if (value != null && !isEl) {
-                    value = value.replaceAll("\n", "<br/>\n");
-                }
-                Log.config("[" + type + "] " + s + " -> " + Tool.cut(value, Sys.Log.eval_max_letters, " ..."));
-                return value;
-            };
-            String key = s.substring(prefix, s.length() - suffix);
-            if (isEl) {
-                /* bind map */
-                if (map != null && map.containsKey(key)) {
-                    return getResult.apply(map.get(key), "map");
-                }
-
-                /* bind el */
-                try {
-                    return getResult.apply(Tool.string(el().eval(key)).orElse(""), "el");
-                } catch(PropertyNotFoundException e) {
-                    Log.warning(e.toString());
-                    return null;
-                } catch (Exception e) {
-                    Log.warning(e, () -> "el error");
-                    return s;
-                }
+        boolean isEl = !(expression.startsWith("{") && prefix == 1);
+        boolean isEscape = !isEl || expression.startsWith("${") && prefix == 2;
+        BiFunction<Object, String, String> getResult = (result, type) -> {
+            String value;
+            if (escape != null && isEscape) {
+                value = escape.apply(result);
+            } else {
+                value = Tool.string(result).orElse(null);
+                type = "raw " + type;
             }
-
-            /* bind values {0}... */
-            if (key.matches("^[0-9]+$")) {
-                int i = Integer.parseInt(key);
-                if (values != null && i < values.length) {
-                    return getResult.apply(values[i], "values");
-                } else {
-                    return s;
-                }
+            if (value != null && !isEl) {
+                value = value.replaceAll("\n", "<br/>\n");
             }
-
-            /* bind config {key:parameter1:...} */
-            if (key.indexOf('\n') < 0) {
-                String[] keys = key.split("\\s*:\\s*");
-                boolean hasParameter = keys.length > 1;
-                String realKey = hasParameter ? keys[0] : key;
-                Optional<String> message = Config.Injector.getValue(realKey, locale);
-                if (message.isPresent()) {
-                    return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
-                            "config");
-                }
-                Log.info("not found config: " + realKey);
-            }
-            return s;
+            Log.config("[" + type + "] " + expression + " -> " + Tool.cut(value, Sys.Log.eval_max_letters, " ..."));
+            return value;
         };
-        return isCache ? cache.computeIfAbsent(expression, get) : Tool.of(cache.get(expression)).orElseGet(() -> get.apply(expression));
+        String key = expression.substring(prefix, expression.length() - suffix);
+        if (isEl) {
+            /* bind map */
+            if (map != null && map.containsKey(key)) {
+                return getResult.apply(map.get(key), "map");
+            }
+
+            /* bind el */
+            try {
+                return getResult.apply(Tool.string(el().eval(key)).orElse(""), "el");
+            } catch(PropertyNotFoundException e) {
+                Log.warning(e.toString());
+                return null;
+            } catch (Exception e) {
+                Log.warning(e, () -> "el error");
+                return expression;
+            }
+        }
+
+        /* bind values {0}... */
+        if (key.matches("^[0-9]+$")) {
+            int i = Integer.parseInt(key);
+            if (values != null && i < values.length) {
+                return getResult.apply(values[i], "values");
+            } else {
+                return expression;
+            }
+        }
+
+        /* bind config {key:parameter1:...} */
+        if (key.indexOf('\n') < 0) {
+            String[] keys = key.split("\\s*:\\s*");
+            boolean hasParameter = keys.length > 1;
+            String realKey = hasParameter ? keys[0] : key;
+            Optional<String> message = Config.Injector.getValue(realKey, locale);
+            if (message.isPresent()) {
+                return getResult.apply(hasParameter ? new MessageFormat(message.get()).format(Arrays.copyOfRange(keys, 1, keys.length)) : message.get(),
+                        "config");
+            }
+            Log.info("not found config: " + realKey);
+        }
+        return expression;
     }
 
     /**

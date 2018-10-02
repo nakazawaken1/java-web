@@ -562,7 +562,7 @@ public abstract class Response {
         if (traverserMap == null) {
             traverserMap = new HashMap<>();
         }
-        setup.accept((T) traverserMap.computeIfAbsent(clazz, Try.f(Class::newInstance)));
+        setup.accept((T) traverserMap.computeIfAbsent(clazz, Reflector::instance));
         return this;
     }
 
@@ -575,7 +575,7 @@ public abstract class Response {
     public <T extends Traverser> T traverser(Class<T> clazz) {
         return Tool.of(traverserMap)
             .map(i -> (T) i.get(clazz))
-            .orElseGet(Try.s(clazz::newInstance));
+            .orElseGet(() -> Reflector.instance(clazz));
     }
 
     /**

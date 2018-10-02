@@ -51,6 +51,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -75,6 +76,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.logging.Logger;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -85,7 +87,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import javax.activation.MimetypesFileTypeMap;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
@@ -99,7 +100,6 @@ import javax.mail.PasswordAuthentication;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import javax.xml.bind.DatatypeConverter;
 
 import app.config.Sys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -1383,6 +1383,26 @@ public class Tool {
         return text.substring(Math.max(0, text.length() - pad.length()));
     }
 
+    
+    /**
+     * MIME type map
+     */
+    public static Map<String, String> mimeTypeMap;
+    static {
+    	mimeTypeMap = new HashMap<>();
+    	toURL("META-INF/mime.types").ifPresent(url -> {
+    		try(BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+    			reader.lines().forEach(line -> {
+    				final String[] items = line.split("\\s");
+    				final String type = items[0];
+    				Stream.of(items).skip(1).map(String::trim).filter(i -> !i.isEmpty() && !i.startsWith("#")).map(String::toLowerCase).forEach(extension -> mimeTypeMap.put(extension, type));
+    			});
+    		} catch (IOException e) {
+                Logger.getGlobal().warning("cannot read: " + e);
+			}
+    	});
+    }
+    
     /**
      * MIME type from file extension(using META-INF/mime.types)
      *
@@ -1390,8 +1410,10 @@ public class Tool {
      * @return MIME type
      */
     public static String getContentType(String file) {
-        return MimetypesFileTypeMap.getDefaultFileTypeMap()
-            .getContentType(file);
+    	if(file == null) {
+    		return null;
+    	}
+        return mimeTypeMap.getOrDefault(trim(".", getExtension(file).toLowerCase(), null), "application/octet-stream");
     }
 
     /**
@@ -1917,13 +1939,26 @@ public class Tool {
     public static String hash(String text, String algorithm) {
         return hex(digest(text.getBytes(StandardCharsets.UTF_8), algorithm));
     }
+ 
+    /**
+     * Hexadecimal letters
+     */
+    public static final char[] hexLetters = "0123456789ABCDEF".toCharArray();
     
     /**
+     * bytes to hex string
      * @param bytes bytes
      * @return hex string
      */
-    public static String hex(byte[] bytes) {
-    	return DatatypeConverter.printHexBinary(bytes);
+    public static String hex(final byte[] bytes) {
+    	final int l = bytes.length;
+    	final char[] out = new char[l + l];
+   	    int j = 0;
+   	    for (final byte b : bytes) {
+    	    out[j++] = hexLetters[(b >>> 4) & 0x0F];
+    	    out[j++] = hexLetters[b & 0x0F];
+    	}
+    	return new String(out);
     }
 
     /**
@@ -1987,7 +2022,7 @@ public class Tool {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return DatatypeConverter.printHexBinary(bytes.toByteArray());
+        return hex(bytes.toByteArray());
     }
 
     /**
@@ -2783,7 +2818,7 @@ public class Tool {
         try (T resource = supplier.get()) {
             return function.apply(resource);
         } catch (Exception e) {
-            Log.warning(e, () -> "resource error");
+            Logger.getGlobal().warning("resource error: " + e);
             return null;
         }
     }
@@ -2968,7 +3003,14 @@ public class Tool {
         // System.out.println(java.time.format.DateTimeFormatter.ofPattern("Gy/M/d(E)", Locale.JAPAN)
         // .format(java.time.chrono.JapaneseDate.now()));
         //enumOf(java.time.Month::getValue, 1).ifPresent(System.out::println);
-        System.out.println(in("id", IntStream.rangeClosed(1, 1001).toArray()));
+        //System.out.println(in("id", IntStream.rangeClosed(1, 1001).toArray()));
+    	System.out.println(hex(new byte[] {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17}));
+    	System.out.println(getContentType("a.txt"));
+    	System.out.println(getContentType(".txt"));
+    	System.out.println(getContentType(".Txt"));
+    	System.out.println(getContentType(""));
+    	System.out.println(getContentType(".n3"));
+    	System.out.println(getContentType(null));
     }
 
     /**
