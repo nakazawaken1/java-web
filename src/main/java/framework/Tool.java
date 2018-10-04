@@ -167,8 +167,7 @@ public class Tool {
         try {
             if ("jar".equals(url.getProtocol())) {
                 JarURLConnection c = (JarURLConnection) url.openConnection();
-                return using(() -> c.getJarFile()
-                    .getInputStream(c.getJarEntry()), in -> in == null);
+                return c.getJarEntry().isDirectory();
             } else {
                 return new File(url.toURI()).isDirectory();
             }
