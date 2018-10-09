@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.TreeSet;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -1033,8 +1034,7 @@ public class Db implements AutoCloseable {
         try {
             return stream(connection.getMetaData()
                 .getTables(null, schema, null, new String[] { "TABLE" })).map(Try
-                    .f(rs -> rs.getString(3)
-                        .toLowerCase()));
+			    .f(rs -> rs.getString(3)));
         } catch (SQLException e) {
             Try.r(connection::rollback)
                 .run();
@@ -1118,10 +1118,8 @@ public class Db implements AutoCloseable {
      * @param table table
      * @return Query
      */
-    public Query from(String table) {
-        Query q = new Query(this);
-        q.table = table;
-        return q;
+    public Query from(String... table) {
+	return new Query(this).from(table);
     }
 
     /**
@@ -1131,9 +1129,7 @@ public class Db implements AutoCloseable {
      * @return Query
      */
     public Query from(Class<?> table) {
-        Query q = new Query(this);
-        q.table = Reflector.mappingClassName(table);
-        return q;
+	return new Query(this).from(table);
     }
 
     /**
@@ -1295,7 +1291,7 @@ public class Db implements AutoCloseable {
 
             /* get exists tables */
             Set<String> existTables = db.tables()
-                .collect(Collectors.toSet());
+		    .collect(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER), Set::add, Set::addAll);
 
             Set<String> reloadTables;
             if (create) {
@@ -2093,8 +2089,8 @@ public class Db implements AutoCloseable {
          * @param table table
          * @return Self
          */
-        public Query from(String table) {
-            this.table = table;
+	public Query from(String... table) {
+	    this.table = String.join(" ", table);
             return this;
         }
 

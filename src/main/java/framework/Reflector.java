@@ -11,7 +11,6 @@ import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -161,7 +160,13 @@ public class Reflector {
      * @return name
      */
     public static String mappingFieldName(Field field) {
-        return Tool.of(field.getAnnotation(Mapping.class)).map(Mapping::value).flatMap(Tool::string).orElseGet(field::getName);
+	Mapping fieldAnnotation = field.getAnnotation(Mapping.class);
+	Class<?> clazz = field.getDeclaringClass();
+	return Tool.or(fieldAnnotation, () -> clazz.getAnnotation(Mapping.class)).map(mapping -> {
+	    return Reflector.<String>invoke(Reflector.constInstance(mapping.mapper()), "map",
+		    Tool.array(Class.class, Field.class, String.class),
+		    clazz, field, fieldAnnotation == null ? null : mapping.value());
+	}).orElseGet(field::getName);
     }
 
     /**
@@ -171,15 +176,14 @@ public class Reflector {
     public static String mappingClassName(Object clazz) {
         Class<?> start = clazz instanceof Class ? (Class<?>) clazz : clazz.getClass();
         for (Class<?> c = start; c != Object.class; c = c.getSuperclass()) {
-            Mapping name = c.getAnnotation(Mapping.class);
-            if (name != null) {
-                String value = name.value();
-                if (Tool.string(value).isPresent()) {
-                    return value;
-                }
+            Mapping mapping = c.getAnnotation(Mapping.class);
+            if (mapping != null) {
+		return Reflector.invoke(Reflector.constInstance(mapping.mapper()), "map",
+			Tool.array(Class.class, Field.class, String.class),
+			clazz, null, mapping.value());
             }
         }
-        return start.getSimpleName().toLowerCase(Locale.ENGLISH);
+	return start.getSimpleName();
     }
 
     /**
@@ -298,16 +302,16 @@ public class Reflector {
             return (short) value != (short) 0;
         }
         if (value instanceof Integer) {
-            return (int) value != (int) 0;
+            return (int) value != 0;
         }
         if (value instanceof Long) {
-            return (long) value != (long) 0;
+            return (long) value != 0;
         }
         if (value instanceof Float) {
-            return (float) value != (float) 0;
+            return (float) value != 0;
         }
         if (value instanceof Double) {
-            return (double) value != (double) 0;
+            return (double) value != 0;
         }
         if (value instanceof Character) {
             return (char) value != (char) 0;
@@ -394,11 +398,11 @@ public class Reflector {
     }
 
     /**
-     * @param <T> Return type
-     * @param instance Instance
-     * @param name Method name
+     * @param            <T> Return type
+     * @param instance   Instance
+     * @param name       Method name
      * @param argClasses Argument classes
-     * @param args Arguments
+     * @param args       Arguments
      * @return Return value
      */
     @SuppressWarnings("unchecked")
@@ -413,7 +417,7 @@ public class Reflector {
      */
     @SuppressWarnings("unchecked")
     public static void chagneAnnotation(Class<?> clazz, Class<? extends Annotation> annotation, Annotation value) {
-        Object data = invoke(clazz, "annotationData", Tool.array());
+	Object data = invoke(clazz, "annotationData", Tool.array());
         field(data.getClass(), "annotations").map(Try.f(f -> Map.class.cast(f.get(data)))).ifPresent(map -> map.put(annotation, value));
     }
 
