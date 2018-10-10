@@ -114,7 +114,7 @@ public class Reflector {
         try {
             return Tool.of((Class<T>) Class.forName(clazz));
         } catch (ClassNotFoundException e) {
-            Log.info(e.toString());
+	    Log.config(e.toString());
             return Optional.empty();
         }
     }

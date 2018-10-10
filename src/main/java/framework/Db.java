@@ -2705,6 +2705,24 @@ public class Db implements AutoCloseable {
         } else if (type == LocalDateTime.class) {
             optional = Tool.val(rs.getTimestamp(name), v -> Tool.of(v)
                 .map(java.sql.Timestamp::toLocalDateTime));
+	} else if (type == int.class || type == Integer.class) {
+	    int n = rs.getInt(name);
+	    optional = type == Integer.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+	} else if (type == long.class || type == Long.class) {
+	    long n = rs.getLong(name);
+	    optional = type == Long.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+	} else if (type == short.class || type == Short.class) {
+	    short n = rs.getShort(name);
+	    optional = type == Short.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+	} else if (type == float.class || type == Float.class) {
+	    float n = rs.getFloat(name);
+	    optional = type == Float.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+	} else if (type == double.class || type == Double.class) {
+	    double n = rs.getDouble(name);
+	    optional = type == Double.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+	} else if (type == boolean.class || type == Boolean.class) {
+	    boolean n = rs.getBoolean(name);
+	    optional = type == Boolean.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
         return isOptional ? Tool.of(value) : value;
