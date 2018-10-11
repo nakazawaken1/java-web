@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -2696,6 +2697,13 @@ public class Db implements AutoCloseable {
             } else {
                 optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
+        } else if (type == Date.class) {
+            optional = Tool.val(rs.getDate(name), v -> Tool.of(v)
+                .map(d -> new Date(d.getTime())));
+        } else if (type == java.sql.Date.class) {
+            optional = Tool.of(rs.getDate(name));
+        } else if (type == Timestamp.class) {
+            optional = Tool.of(rs.getTimestamp(name));
         } else if (type == LocalDate.class) {
             optional = Tool.val(rs.getDate(name), v -> Tool.of(v)
                 .map(java.sql.Date::toLocalDate));

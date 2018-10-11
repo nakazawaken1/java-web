@@ -40,7 +40,7 @@ public class Reflector {
     /**
      * field cache{class : {field name : field}}
      */
-    static Map<Class<?>, Map<String, Field>> fields = new ConcurrentHashMap<>();
+    static Map<Tuple<Class<?>, Function<Field, String>>, Map<String, Field>> fields = new ConcurrentHashMap<>();
 
     /**
      * instance cache{class : instance}
@@ -147,16 +147,17 @@ public class Reflector {
      * @return Stream of field name and instance
      */
     public static Map<String, Field> fields(Class<?> clazz, Function<Field, String> getName) {
-		return fields.computeIfAbsent(clazz, c -> {
-			Map<String, Field> map = new LinkedHashMap<>();
-			while (c != Object.class) {
-				Stream.of(c.getDeclaredFields()).map(f -> Tuple.of(getName.apply(f), f))
-						.filter(t -> !map.containsKey(t.l)).peek(t -> t.r.setAccessible(true))
-						.forEach(f -> map.put(f.l, f.r));
-				c = c.getSuperclass();
-			}
-			return map;
-		});
+	return fields.computeIfAbsent(Tuple.of(clazz, getName), pair -> {
+	    Class<?> c = pair.l;
+	    Map<String, Field> map = new LinkedHashMap<>();
+	    while (c != Object.class) {
+		Stream.of(c.getDeclaredFields()).map(f -> Tuple.of(getName.apply(f), f))
+			.filter(t -> !map.containsKey(t.l)).peek(t -> t.r.setAccessible(true))
+			.forEach(f -> map.put(f.l, f.r));
+		c = c.getSuperclass();
+	    }
+	    return map;
+	});
     }
 
     /**
