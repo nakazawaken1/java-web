@@ -662,6 +662,29 @@ public class Try {
     }
 
     /**
+     * Penta function
+     *
+     * @param <T> object type
+     * @param <U> other object type
+     * @param <V> other object type
+     * @param <W> other object type
+     * @param <X> other object type
+     * @param <R> return object type
+     */
+    @FunctionalInterface
+    public interface PentaFunction<T, U, V, W, X, R> {
+        /**
+         * @param t object
+         * @param u other object
+         * @param v other object
+         * @param w other object
+         * @param x other object
+         * @return return object
+         */
+        R apply(T t, U u, V v, W w, X x);
+    }
+
+    /**
      * R(T, int) function
      * 
      * @param <T> first argument type

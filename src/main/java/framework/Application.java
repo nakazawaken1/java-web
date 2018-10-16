@@ -416,6 +416,7 @@ public abstract class Application implements Attributes<Object> {
                         throw new RuntimeException(e);
                     } catch (RuntimeException e) {
                         db.ifGot(Db::rollback);
+                        throw e;
                     }
                 } catch(Exception e) {
                     Throwable t = e.getCause();

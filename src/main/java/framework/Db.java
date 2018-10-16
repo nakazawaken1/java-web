@@ -52,7 +52,9 @@ import javax.sql.DataSource;
 import app.config.Sys;
 import app.model.Account;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import framework.Try.PentaFunction;
 import framework.Try.QuadFunction;
+import framework.Try.TriConsumer;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Tuple.Tuple3;
@@ -782,6 +784,33 @@ public class Db implements AutoCloseable {
      * @return true: inserted、 false: updated
      */
     public boolean save(String table, String[] names, int primary, Object... values) {
+    	return save(table, null, names, primary, values);
+    }
+    
+    /**
+     * @param prepare Prepare(names, values, true if insert)
+     * @param names row names(arrange primary key in left)
+     * @param values save values
+     * @param insert True if insert else update
+     * @return names, values
+     */
+    static Tuple<String[], Object[]> prepare(TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, Object[] values, boolean insert) {
+    	List<String> nameList = Tool.list(names);
+    	List<Object> valueList = Tool.list(values);
+    	prepare.accept(nameList, valueList, insert);
+    	return Tuple.of(nameList.toArray(new String[nameList.size()]), valueList.toArray(new Object[valueList.size()]));
+    }
+    
+    /**
+     * update if exists row, else insert
+     * @param prepare Prepare(names, values, true if insert)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return true: inserted、 false: updated
+     */
+    public boolean save(String table, TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, int primary, Object... values) {
         Query q = from(table);
         boolean empty = false;
         for (int i = 0; i < primary; i++) {
@@ -794,6 +823,11 @@ public class Db implements AutoCloseable {
         if (!empty) {
             empty = !q.forUpdate()
                 .exists();
+        }
+        if(prepare != null) {
+        	Tuple<String[], Object[]> pair = prepare(prepare, names, values, empty);
+        	names = pair.l;
+        	values = pair.r;
         }
         if (empty) {
             insert(table, names, primary, values);
@@ -814,6 +848,25 @@ public class Db implements AutoCloseable {
      */
     public int update(String table, String[] names, int primary, Object... values) {
         return update(null, table, names, primary, values);
+    }
+
+    /**
+     * update row
+     *
+     * @param table table name
+     * @param prepare Prepare
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int update(String table, TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, int primary, Object... values) {
+    	if(prepare != null) {
+    		Tuple<String[], Object[]> pair = prepare(prepare, names, values, false);
+    		names = pair.l;
+    		values = pair.r;
+    	}
+    	return update(null, table, names, primary, values);
     }
 
     /**
@@ -905,6 +958,25 @@ public class Db implements AutoCloseable {
      */
     public int insert(String table, String[] names, int primary, Object... values) {
         return insert(null, table, names, primary, values);
+    }
+
+    /**
+     * insert row
+     *
+     * @param table table name
+     * @param prepare Prepare
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int insert(String table, TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, int primary, Object... values) {
+    	if(prepare != null) {
+    		Tuple<String[], Object[]> pair = prepare(prepare, names, values, true);
+    		names = pair.l;
+    		values = pair.r;
+    	}
+    	return insert(null, table, names, primary, values);
     }
 
     /**
@@ -2773,13 +2845,55 @@ public class Db implements AutoCloseable {
     }
 
     /**
+     * @param prepare Pre-action
+     * @param model insert target
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return inserted rows
+     */
+    public int insert(TriConsumer<List<String>, List<Object>, Boolean> prepare, Object model, String... targetColumns) {
+        return modelAction(prepare, this::insert, model, targetColumns);
+    }
+
+    /**
+     * @param prepare Pre-action
+     * @param model update target
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return updated rows
+     */
+    public int update(TriConsumer<List<String>, List<Object>, Boolean> prepare, Object model, String... targetColumns) {
+        return modelAction(prepare, this::update, model, targetColumns);
+    }
+
+    /**
+     * @param prepare Pre-action
+     * @param model save target
+     * @param targetColumns save column names(primary key is automatic inclusion)
+     * @return true: inserted、 false: updated
+     */
+    public boolean save(TriConsumer<List<String>, List<Object>, Boolean> prepare, Object model, String... targetColumns) {
+        return modelAction(prepare, this::save, model, targetColumns);
+    }
+
+    /**
      * @param <T> model type
      * @param action action
      * @param model target model
      * @param targetColumns target column names(primary key is automatic inclusion)
      * @return action result
      */
-    static <T> T modelAction(QuadFunction<String, String[], Integer, Object[], T> action, Object model, String... targetColumns) {
+    public static <T> T modelAction(QuadFunction<String, String[], Integer, Object[], T> action, Object model, String... targetColumns) {
+    	return modelAction(null, (a, b, c, d, e) -> action.apply(a, c, d, e), model, targetColumns);
+    }
+    
+    /**
+     * @param <T> model type
+     * @param prepare Pre-action
+     * @param action action
+     * @param model target model
+     * @param targetColumns target column names(primary key is automatic inclusion)
+     * @return action result
+     */
+    public static <T> T modelAction(TriConsumer<List<String>, List<Object>, Boolean> prepare, PentaFunction<String, TriConsumer<List<String>, List<Object>, Boolean>, String[], Integer, Object[], T> action, Object model, String... targetColumns) {
         Class<?> clazz = model.getClass();
         List<String> names = new ArrayList<>();
         List<Object> values = new ArrayList<>();
@@ -2827,7 +2941,7 @@ public class Db implements AutoCloseable {
                 }
             }
         }
-        return action.apply(Reflector.mappingClassName(model), names.toArray(new String[names.size()]), keys.size(), values.toArray());
+        return action.apply(Reflector.mappingClassName(clazz), prepare, names.toArray(new String[names.size()]), keys.size(), values.toArray());
     }
 
     /**
