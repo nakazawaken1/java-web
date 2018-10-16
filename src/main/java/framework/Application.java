@@ -39,6 +39,7 @@ import framework.annotation.Only;
 import framework.annotation.Route;
 import framework.annotation.Valid;
 import framework.annotation.Validator;
+import framework.annotation.Validator.Errors;
 
 /**
  * application scoped object
@@ -360,14 +361,15 @@ public abstract class Application implements Attributes<Object> {
                                 if (Db.class.isAssignableFrom(type)) {
                                     return db.get();
                                 }
+                                if (Errors.class.isAssignableFrom(type)) {
+                                    return binder.errors;
+                                }
                                 String name = p.getName();
-                                return binder.validator(value -> Stream.of(p.getAnnotations())
-                                    .forEach(a -> {
-                                        Validator.Constructor.instance(a)
-                                            .validate(Valid.All.class, name, value, binder);
-                                    }))
-                                    .bind(name, type, Reflector.getGenericParameters(p));
-                            })
+								return binder.validator(value -> Stream.of(p.getAnnotations())
+										.forEach(a -> Validator.Constructor.instance(a).ifPresent(
+											v -> v.validate(Valid.All.class, name, value, binder))))
+										.bind(name, type, Reflector.getGenericParameters(p));
+	                            })
                             .toArray();
                         Object response;
                         if (binder.errors.isEmpty()) {

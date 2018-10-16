@@ -19,7 +19,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import framework.AbstractValidator.ErrorAppender;
+import framework.annotation.Validator.ErrorAppender;
+import framework.annotation.Validator.Errors;
 
 /**
  * Binder
@@ -43,7 +44,7 @@ public class Binder implements ErrorAppender {
     /**
      * Errors
      */
-    Map<String, List<String>> errors = new LinkedHashMap<>();
+    public final Errors errors = new Errors();
 
     /**
      * @param parameters parameters
@@ -77,8 +78,7 @@ public class Binder implements ErrorAppender {
      */
     @Override
     public void addError(String name, String value, String error, Object... keyValues) {
-        Tool.addValue(errors, name, Formatter
-            .format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)));
+        errors.addError(name, value, error, keyValues);
     }
 
     /**
@@ -358,6 +358,6 @@ public class Binder implements ErrorAppender {
             return o;
         }
 
-        return convert(first, clazz, nest == 0 ? null : e -> null);
+        return convert(first, clazz, nest == 0 || clazz.isPrimitive() ? null : e -> null);
     }
 }

@@ -5,10 +5,14 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.stream.Stream;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
 
 import framework.AbstractValidator;
+import framework.Formatter;
 import framework.Reflector;
+import framework.Session;
 import framework.Tool;
 import framework.Try;
 
@@ -18,27 +22,58 @@ import framework.Try;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Validator {
-    /**
-     * @return apply group
-     */
-    Class<? extends AbstractValidator<?>> value();
+	/**
+	 * @return Validator implementation
+	 */
+	Class<? extends AbstractValidator<?>> value();
+
+	/**
+	 * Factory constructor
+	 */
+	class Constructor {
+		/**
+		 * @param annotation Target annotation
+		 * @return Validator instance
+		 */
+		public static Optional<AbstractValidator<?>> instance(Annotation annotation) {
+			try {
+				Class<?> clazz = annotation.annotationType();
+				return Reflector.constructor(clazz.getAnnotation(Validator.class).value(), clazz)
+						.map(Try.f(i -> i.newInstance(annotation)));
+			} catch (RuntimeException e) {
+				return Optional.empty();
+			}
+		}
+	}
 
     /**
-     * Factory constructor
+     * Error appender
      */
-    public class Constructor {
+    interface ErrorAppender {
         /**
-         * @param <T> Validate class type
-         * @param annotation Target annotation
-         * @return Validator instance
+         * @param name Name
+         * @param value Value
+         * @param error Error
+         * @param keyValues Parameters
          */
-        @SuppressWarnings("unchecked")
-        public static <T extends Annotation> AbstractValidator<T> instance(T annotation) {
-            Class<? extends Annotation> c = annotation.annotationType();
-            Class<? extends AbstractValidator<T>> d = (Class<? extends AbstractValidator<T>>) Tool.of(c.getAnnotation(Validator.class))
-                    .<Class<?>>map(Validator::value)
-                    .orElseGet(() -> Stream.of(c.getDeclaredClasses()).filter(i -> AbstractValidator.class.isAssignableFrom(i)).findFirst().get());
-            return Reflector.constructor(d, c).map(Try.f(i -> i.newInstance(annotation))).get();
-        }
+        void addError(String name, String value, String error, Object... keyValues);
     }
+	
+	/**
+	 * Errors(name, errorMessages)
+	 */
+	@SuppressWarnings("serial")
+	class Errors extends LinkedHashMap<String, List<String>> implements ErrorAppender {
+
+	    /*
+	     * (non-Javadoc)
+	     * 
+	     * @see framework.AbstractValidator.ErrorAppender#addError(java.lang.String, java.lang.String, java.lang.String, java.lang.Object[])
+	     */
+	    @Override
+	    public void addError(String name, String value, String error, Object... keyValues) {
+	        Tool.addValue(this, name, Formatter
+	            .format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)));
+	    }
+	}
 }

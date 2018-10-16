@@ -373,6 +373,17 @@ public class Formatter extends AbstractParser implements AutoCloseable {
             return text;
         }
     }
+    
+    /**
+     * HTML format
+     * @param html HTML
+     * @param map Bind parameters
+     * @return Formatted HTML
+     */
+    public static String html(String html, Map<String, ?> map) {
+    	return format(html, Formatter::excludeForHtml, Tool::htmlEscape,
+				Session.currentLocale(), map);
+    }
 
     /**
      * @param path Include file path

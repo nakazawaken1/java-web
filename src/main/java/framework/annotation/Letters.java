@@ -6,12 +6,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import framework.AbstractValidator;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * allowed or deny letters
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
+@Validator(Letters.Validator.class)
 public @interface Letters {
     /**
      * @return Apply groups
@@ -106,7 +108,7 @@ public @interface Letters {
         }
 
         @Override
-        protected void validate(String name, String value, framework.AbstractValidator.ErrorAppender appender) {
+        protected void validate(String name, String value, ErrorAppender appender) {
             if (value != null && value.chars().anyMatch(c -> annotation.value().indexOf(c) < 0)) {
                 appender.addError(name, value, annotation.message(), "value", annotation.value(), "deny", annotation.deny());
             }

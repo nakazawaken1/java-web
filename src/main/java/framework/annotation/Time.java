@@ -8,12 +8,14 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 import framework.AbstractValidator;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * Time limitation from past to future
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
+@Validator(Time.Validator.class)
 public @interface Time {
     /**
      * @return apply groups

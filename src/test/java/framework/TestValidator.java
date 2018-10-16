@@ -7,10 +7,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import framework.AbstractValidator.ErrorAppender;
 import framework.annotation.Range;
 import framework.annotation.Time;
 import framework.annotation.Valid.All;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * Validator test

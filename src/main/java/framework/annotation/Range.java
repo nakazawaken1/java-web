@@ -7,12 +7,14 @@ import java.lang.annotation.Target;
 import java.math.BigDecimal;
 
 import framework.AbstractValidator;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * value range limitation
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
+@Validator(Range.Validator.class)
 public @interface Range {
     /**
      * @return apply groups

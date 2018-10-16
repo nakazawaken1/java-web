@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.util.stream.Stream;
 
 import framework.annotation.Valid;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * Annotation validator base
@@ -41,18 +42,5 @@ public abstract class AbstractValidator<T extends Annotation> {
                 .flatMap(cs -> Stream.of(cs).filter(c -> valid.isAssignableFrom(c)).findAny()).isPresent()) {
             validate(name, value, appender);
         }
-    }
-
-    /**
-     * Error appender
-     */
-    public static interface ErrorAppender {
-        /**
-         * @param name Name
-         * @param value Value
-         * @param error Error
-         * @param keyValues Parameters
-         */
-        void addError(String name, String value, String error, Object... keyValues);
     }
 }

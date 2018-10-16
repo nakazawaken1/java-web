@@ -6,12 +6,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import framework.AbstractValidator;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * require to input
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
+@Validator(Required.Validator.class)
 public @interface Required {
     /**
      * @return apply groups

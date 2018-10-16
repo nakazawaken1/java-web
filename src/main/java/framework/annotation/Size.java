@@ -7,12 +7,14 @@ import java.lang.annotation.Target;
 
 import framework.AbstractValidator;
 import framework.Try;
+import framework.annotation.Validator.ErrorAppender;
 
 /**
  * length limitation
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
+@Validator(Size.Validator.class)
 public @interface Size {
     /**
      * @return apply groups
