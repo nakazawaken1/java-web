@@ -358,6 +358,6 @@ public class Binder implements ErrorAppender {
             return o;
         }
 
-        return convert(first, clazz, nest == 0 || clazz.isPrimitive() ? null : e -> null);
+        return convert(first, clazz, nest == 0 || clazz.isPrimitive() && clazz != char.class ? null : e -> null);
     }
 }
