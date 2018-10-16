@@ -1522,7 +1522,7 @@ public class Tool {
         return jar.stream()
             .map(JarEntry::getName)
             .filter(i -> i.startsWith(l))
-            .map(i -> trim("/", i.substring(l.length()), null));
+            .map(i -> trim("/", i.substring(l.length()), null).replace('/', '.'));
     }
 
     /**
@@ -1540,9 +1540,9 @@ public class Tool {
      */
     private static Stream<String> getResourcesFromFolder(File folder) {
         try {
-            return Files.list(folder.toPath())
-                .map(Path::getFileName)
-                .map(Object::toString);
+        	Path base = folder.toPath();
+            return Files.walk(base)
+                .map(p -> base.relativize(p).toString().replace(File.separatorChar, '.'));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
