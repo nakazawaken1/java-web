@@ -36,10 +36,12 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Timestamp;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -49,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -440,20 +443,20 @@ public class Tool {
                 traverser.end(c);
                 break;
             }
-            if (Reflector.method(c, "toString")
-                .map(Method::getDeclaringClass)
-                .filter(i -> i != Object.class)
-                .isPresent()) {
-                traverser.value(o.toString(), c, isString(o));
-                break;
-            }
+			if (o instanceof String || o instanceof Byte || o instanceof Character || o instanceof Short
+					|| o instanceof Integer || o instanceof Long || o instanceof Float || o instanceof Double
+					|| o instanceof Boolean || o instanceof Date || o instanceof java.sql.Date || o instanceof Timestamp
+					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime) {
+				traverser.value(o.toString(), c, isString(o));
+				break;
+			}
             if (cache.contains(o)) {
                 traverser.value("(loop)", c, true);
                 break;
             }
             traverser.start(c);
             Object object = o;
-            Stream.of(c.getDeclaredFields())
+            Reflector.fields(c).values().stream()
                 .filter(f -> val(f.getModifiers(), m -> !Modifier.isPrivate(m) && !Modifier.isStatic(m)))
                 .forEach(field -> {
                     try {

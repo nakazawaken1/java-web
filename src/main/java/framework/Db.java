@@ -2803,6 +2803,9 @@ public class Db implements AutoCloseable {
 	} else if (type == boolean.class || type == Boolean.class) {
 	    boolean n = rs.getBoolean(name);
 	    optional = type == Boolean.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
+        } else if(type == String.class) {
+    	    String s = rs.getString(name);
+    	    optional = rs.wasNull() ? Optional.empty() : Optional.of(s);
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
         return isOptional ? Tool.of(value) : value;

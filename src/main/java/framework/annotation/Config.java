@@ -382,7 +382,7 @@ public @interface Config {
                     Stream.of(clazz.getEnumConstants())
                         .forEach(i -> realProperties.put(newPrefix + ((Enum<?>) i).name(), ((Message) i).defaultMessage()));
                 } else {
-                    Stream.of(clazz.getDeclaredFields())
+                    Reflector.fields(clazz).values().stream()
                         .filter(f -> Modifier.isStatic(f.getModifiers()))
                         .forEach(f -> {
                             f.setAccessible(true);
@@ -467,7 +467,7 @@ public @interface Config {
                 .replace('$', '.') + '.';
             List<String> lines = new ArrayList<>();
             if (!Enum.class.isAssignableFrom(clazz)) {
-                Stream.of(clazz.getDeclaredFields())
+                Reflector.fields(clazz).values().stream()
                     .filter(f -> Modifier.isStatic(f.getModifiers()))
                     .forEach(f -> {
                         try {
