@@ -293,7 +293,7 @@ public abstract class Application implements Attributes<Object> {
             .findFirst()
             .map(p -> {
                 Reflector.<Map<String, Integer>>invoke(p.l.pattern(), "namedGroups", Tool.array())
-                    .forEach((k, v) -> Tool.setValue(parameters, p.r.l.getOrDefault(k, k), p.l.group(v)));
+                    .forEach((k, v) -> Tool.setValue(parameters, p.r.l.getOrDefault(k, k), p.l.group(v), ArrayList::new));
                 return p.r.r;
             })
             .orElse(null);
@@ -365,18 +365,15 @@ public abstract class Application implements Attributes<Object> {
                                     return binder.errors;
                                 }
                                 String name = p.getName();
-								return binder.validator(value -> Stream.of(p.getAnnotations())
-										.forEach(a -> Validator.Constructor.instance(a).ifPresent(
+                                Tool.of(p.getAnnotation(Valid.class)).ifPresent(valid ->
+                                	Validator.Manager.validateClass(valid, p.getType(), name, binder.parameters, binder));
+ 								return binder.validator(value -> Stream.of(p.getAnnotations())
+										.forEach(a -> Validator.Manager.instance(a).ifPresent(
 											v -> v.validate(Valid.All.class, name, value, binder))))
 										.bind(name, type, Reflector.getGenericParameters(p));
 	                            })
                             .toArray();
-                        Object response;
-                        if (binder.errors.isEmpty()) {
-                            response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l), args);
-                        } else {
-                            response = Response.of(Tool.array(Sys.Alert.inputError, binder.errors)).contentType(Content.JSON);
-                        }
+                        Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l), args);
                         Consumer<Response> setContentType = r -> {
                             Content content = method.getAnnotation(Content.class);
                             String[] accept = request.getHeaders()

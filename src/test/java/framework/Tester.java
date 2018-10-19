@@ -9,6 +9,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -246,6 +247,15 @@ public class Tester {
          */
         public void toEqual(Object... expected) {
             tester.test = notifier -> Assert.assertEquals(get(expected), tester.get());
+        }
+        
+        /**
+         * @param <T> Target type
+         * @param test Test
+         */
+		@SuppressWarnings("unchecked")
+		public <T> void toTest(BiConsumer<T, BiConsumer<Object, Object>> test) {
+        	tester.test = Consumer -> test.accept((T)tester.get(), Assert::assertEquals);
         }
 
         /**

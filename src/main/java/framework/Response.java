@@ -338,7 +338,7 @@ public abstract class Response {
      * @return self
      */
     public Response addHeader(String name, String value) {
-        Tool.addValue(headers, name, value);
+        Tool.addValue(headers, name, value, ArrayList::new);
         return this;
     }
 
@@ -348,7 +348,7 @@ public abstract class Response {
      * @return self
      */
     public Response setHeader(String name, String value) {
-        Tool.setValue(headers, name, value);
+        Tool.setValue(headers, name, value, ArrayList::new);
         return this;
     }
 

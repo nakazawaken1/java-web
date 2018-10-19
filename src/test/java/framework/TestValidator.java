@@ -3,14 +3,20 @@ package framework;
 import java.lang.annotation.Annotation;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import framework.annotation.Range;
+import framework.annotation.Required;
 import framework.annotation.Time;
+import framework.annotation.Valid;
 import framework.annotation.Valid.All;
+import framework.annotation.Validator;
 import framework.annotation.Validator.ErrorAppender;
+import framework.annotation.Validator.Errors;
 
 /**
  * Validator test
@@ -18,110 +24,142 @@ import framework.annotation.Validator.ErrorAppender;
 @SuppressWarnings("javadoc")
 public class TestValidator extends Tester {
 
-    boolean time(int past, int future, ChronoUnit unit, String input) {
-        final Map<String, List<String>> errors = new LinkedHashMap<>();
-        ErrorAppender appender = new ErrorAppender() {
-            @Override
-            public void addError(String name, String value, String error, Object... keyValues) {
-                Tool.addValue(errors, name, error);
-            }
-        };
-        String message = Reflector.getDefaultValue(Time.class, "message");
-        new Time.Validator(new Time() {
+	static class Data {
+		@Required
+		int id;
 
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return Time.class;
-            }
+		@Required
+		String name;
+	}
 
-            @Override
-            public Class<? extends All>[] groups() {
-                return Tool.array(All.class);
-            }
+	boolean time(int past, int future, ChronoUnit unit, String input) {
+		final Map<String, List<String>> errors = new LinkedHashMap<>();
+		ErrorAppender appender = new ErrorAppender() {
+			@Override
+			public void addError(String name, String value, String error, Object... keyValues) {
+				Tool.addValue(errors, name, error, ArrayList::new);
+			}
+		};
+		String message = Reflector.getDefaultValue(Time.class, "message");
+		new Time.Validator(new Time() {
 
-            @Override
-            public int past() {
-                return past;
-            }
+			@Override
+			public Class<? extends Annotation> annotationType() {
+				return Time.class;
+			}
 
-            @Override
-            public int future() {
-                return future;
-            }
+			@Override
+			public Class<? extends All>[] groups() {
+				return Tool.array(All.class);
+			}
 
-            @Override
-            public ChronoUnit unit() {
-                return unit;
-            }
+			@Override
+			public int past() {
+				return past;
+			}
 
-            @Override
-            public String message() {
-                return message;
-            }
-        }).validate(All.class, "name", input, appender);
-        return !message.equals(Tool.getFirst(errors, "name").orElse(null));
-    }
+			@Override
+			public int future() {
+				return future;
+			}
 
-    boolean range(double min, double value, int integerMin, int integerMax, int fractionMin, int fractionMax, String input) {
-        final Map<String, List<String>> errors = new LinkedHashMap<>();
-        ErrorAppender appender = new ErrorAppender() {
-            @Override
-            public void addError(String name, String value, String error, Object... keyValues) {
-                Tool.addValue(errors, name, error);
-            }
-        };
-        String message = Reflector.getDefaultValue(Range.class, "message");
-        new Range.Validator(new Range() {
+			@Override
+			public ChronoUnit unit() {
+				return unit;
+			}
 
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return Range.class;
-            }
+			@Override
+			public String message() {
+				return message;
+			}
+		}).validate(All.class, "name", input, appender);
+		return !message.equals(Tool.getFirst(errors, "name").orElse(null));
+	}
 
-            @Override
-            public String message() {
-                return message;
-            }
+	boolean range(double min, double value, int integerMin, int integerMax, int fractionMin, int fractionMax,
+			String input) {
+		final Map<String, List<String>> errors = new LinkedHashMap<>();
+		ErrorAppender appender = (name, x, error, xx) -> Tool.addValue(errors, name, error, ArrayList::new);
+		String message = Reflector.getDefaultValue(Range.class, "message");
+		new Range.Validator(new Range() {
 
-            @Override
-            public Class<? extends All>[] groups() {
-                return Tool.array(All.class);
-            }
+			@Override
+			public Class<? extends Annotation> annotationType() {
+				return Range.class;
+			}
 
-            @Override
-            public double min() {
-                return min;
-            }
+			@Override
+			public String message() {
+				return message;
+			}
 
-            @Override
-            public double value() {
-                return value;
-            }
+			@Override
+			public Class<? extends All>[] groups() {
+				return Tool.array(All.class);
+			}
 
-            @Override
-            public int integerMin() {
-                return integerMin;
-            }
+			@Override
+			public double min() {
+				return min;
+			}
 
-            @Override
-            public int integerMax() {
-                return integerMax;
-            }
+			@Override
+			public double value() {
+				return value;
+			}
 
-            @Override
-            public int fractionMin() {
-                return fractionMin;
-            }
+			@Override
+			public int integerMin() {
+				return integerMin;
+			}
 
-            @Override
-            public int fractionMax() {
-                return fractionMax;
-            }
-        }).validate(All.class, "name", input, appender);
-        return !message.equals(Tool.getFirst(errors, "name").orElse(null));
-    }
+			@Override
+			public int integerMax() {
+				return integerMax;
+			}
 
-    {
+			@Override
+			public int fractionMin() {
+				return fractionMin;
+			}
+
+			@Override
+			public int fractionMax() {
+				return fractionMax;
+			}
+		}).validate(All.class, "name", input, appender);
+		return !message.equals(Tool.getFirst(errors, "name").orElse(null));
+	}
+
+	{
+    	group("required", g -> {
+    		Valid valid = new Valid() {
+
+				@Override
+				public Class<? extends Annotation> annotationType() {
+					return Valid.class;
+				}
+
+				@Override
+				public Class<? extends All> value() {
+					return All.class;
+				}
+    		};
+    		String message = Reflector.getDefaultValue(Required.class, "message");
+    		expect(g + ":ok", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map("data.id", Arrays.asList("1"),  "data.name", Arrays.asList("abc")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map("data.id", Arrays.asList(),  "data.name", Arrays.asList()), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(message, Tool.getFirst(errors, "data.id").orElse(null));
+    			eq.accept(message, Tool.getFirst(errors, "data.name").orElse(null));
+    		});
+    	});
         group("time", g -> {
             expect(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
             expect(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);

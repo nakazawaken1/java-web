@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +19,8 @@ public class TestTool extends Tester {
     {
         group("add", g -> {
             Map<String, List<String>> map = new HashMap<>();
-            expect(g + ":1", n -> Tool.json(Tool.addValue(map, "key", "value1"))).toEqual(Tool.json("value1"));
-            expect(g + ":2", n -> Tool.json(Tool.addValue(map, "key", "value2"))).toEqual(Tool.json("value2"));
+            expect(g + ":1", n -> Tool.json(Tool.addValue(map, "key", "value1", ArrayList::new))).toEqual(Tool.json("value1"));
+            expect(g + ":2", n -> Tool.json(Tool.addValue(map, "key", "value2", ArrayList::new))).toEqual(Tool.json("value2"));
         });
 
         group("trim", g -> {

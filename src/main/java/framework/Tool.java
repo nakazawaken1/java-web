@@ -50,6 +50,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Deque;
@@ -2348,10 +2349,10 @@ public class Tool {
      * @param value Value
      * @return Value
      */
-    public static <T, U> U addValue(Map<T, List<U>> map, T name, U value) {
-        List<U> list = map.get(name);
+    public static <T, U, V extends Collection<U>> U addValue(Map<T, V> map, T name, U value, Supplier<V> supplier) {
+    	V list = map.get(name);
         if (list == null) {
-            list = new ArrayList<>();
+            list = supplier.get();
             map.put(name, list);
         }
         list.add(value);
@@ -2366,8 +2367,8 @@ public class Tool {
      * @param value Value
      * @return Value
      */
-    public static <T, U> U setValue(Map<T, List<U>> map, T name, U value) {
-        List<U> list = new ArrayList<>();
+    public static <T, U, V extends Collection<U>> U setValue(Map<T, V> map, T name, U value, Supplier<V> supplier) {
+        V list = supplier.get();
         list.add(value);
         map.put(name, list);
         return value;
@@ -2380,12 +2381,24 @@ public class Tool {
      * @param name Name
      * @return First value
      */
-    public static <T, U> Optional<U> getFirst(Map<T, List<U>> map, T name) {
+    public static <T, U, V extends Collection<U>> Optional<U> getFirst(Map<T, V> map, T name) {
         return of(map)
             .map(m -> m.get(name))
             .filter(a -> !a.isEmpty())
-            .map(a -> a.get(0));
+            .map(a -> a.iterator().next());
     }
+
+    /**
+     * @param <T> Name type
+     * @param <U> Value type
+     * @param map Map
+     * @param name Name
+     * @param separator Value separator
+     * @return joined value
+     */
+ 	public static <T, U, V extends Collection<U>> Optional<String> getJoin(Map<T, V> map, String name, String separator) {
+		return of(map.get(name)).map(i -> i.stream().map(String::valueOf).collect(Collectors.joining(separator))).filter(notEmpty);
+	}
 
     /**
      * @param text Text

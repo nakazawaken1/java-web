@@ -412,6 +412,9 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @return Content
      */
     public static String includeFor(String path, Iterable<?> list) {
+    	if(list == null) {
+    		return "";
+    	}
         return Tool.toURL(path).map(url -> {
             String text = Tool.using(url::openStream, Tool::loadText);
             Formatter formatter = current.get().copy();

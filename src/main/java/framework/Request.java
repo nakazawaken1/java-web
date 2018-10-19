@@ -11,6 +11,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -211,7 +212,7 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public String put(String key, String value) {
-                return Tool.setValue(map, key, value);
+                return Tool.setValue(map, key, value, ArrayList::new);
             }
 
             @Override
@@ -222,7 +223,7 @@ public abstract class Request implements Attributes<Object> {
 
             @Override
             public void putAll(Map<? extends String, ? extends String> m) {
-                m.forEach((key, value) -> Tool.setValue(map, key, value));
+                m.forEach((key, value) -> Tool.setValue(map, key, value, ArrayList::new));
             }
 
             @Override

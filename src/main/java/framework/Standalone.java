@@ -35,6 +35,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -789,9 +790,9 @@ public class Standalone {
                                 Log.info("413 payload too large");
                                 break loop;
                             }
-                            Tool.addValue(parameters, name, new String(pair.l, StandardCharsets.UTF_8));
+                            Tool.addValue(parameters, name, new String(pair.l, StandardCharsets.UTF_8), ArrayList::new);
                         } else {
-                            Tool.addValue(parameters, name, filename);
+                            Tool.addValue(parameters, name, filename, ArrayList::new);
                             if (length > 0) {
                                 if (length < fileSizeThreshold) {
                                     byte[] bytes = new byte[length];
@@ -1021,7 +1022,7 @@ public class Standalone {
                 String[] pair = part.split("[=]");
                 if (pair.length > 0) {
                     Tool.addValue(parameters, URLDecoder
-                        .decode(pair[0], StandardCharsets.UTF_8.name()), pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "");
+                        .decode(pair[0], StandardCharsets.UTF_8.name()), pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name()) : "", ArrayList::new);
                 }
             }));
         }

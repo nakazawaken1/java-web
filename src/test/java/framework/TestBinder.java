@@ -2,6 +2,7 @@ package framework;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,19 +70,9 @@ public class TestBinder extends Tester {
             FEMALE,
         }
 
-        @Override
-        public boolean equals(Object obj) {
-            return obj instanceof User && hashCode() == obj.hashCode();
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(id, name, birthday, gender);
-        }
-        
-        @Override
+		@Override
         public String toString() {
-            return String.format("id=%s, name=%s, birthday=%s, gender=%s", id, name, birthday, gender);
+            return String.format("id=%d, name=%s, birthday=%s, gender=%s", id, name, birthday, gender);
         }
         
         public User() {}
@@ -102,25 +93,22 @@ public class TestBinder extends Tester {
             };
         }
     }
+    
+    @SuppressWarnings("javadoc")
+	static class Plain {
+    	int id;
+    	String name;
+    	List<Integer> numbers;
+    }
 
     @SuppressWarnings("javadoc")
     public static class User2 {
         String name;
         int age;
-
-        @Override
-        public boolean equals(Object obj) {
-            return obj instanceof User2 && hashCode() == obj.hashCode();
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(name, age);
-        }
         
-        @Override
+		@Override
         public String toString() {
-            return String.format("name=%s, age=%s", name, age);
+            return String.format("name=%s, age=%d", name, age);
         }
     }
 
@@ -186,6 +174,34 @@ public class TestBinder extends Tester {
             expect(prefix + ":Optional:empty", n -> binder("s=").bind("s", Optional.class, String.class)).toEqual(Optional.empty());
             expect(prefix + ":Optional:null", n -> binder("a=def").bind("s", Optional.class, String.class)).toEqual(Optional.empty());
         });
+        
+        group("Plain", g -> {
+        	expect(g + ":none", n -> binder("o.id=1&o.name=abc&o.numbers=").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+        	eq.accept(o.id, 1);
+        	eq.accept("abc", o.name);
+        	eq.accept(Arrays.asList(), o.numbers);
+        });
+        	expect(g + ":single", n -> binder("o.id=1&o.name=abc&o.numbers=2").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(Arrays.asList(2), o.numbers);
+            });
+        	expect(g + ":comma", n -> binder("o.id=1&o.name=abc&o.numbers=2,3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(Arrays.asList(2,3), o.numbers);
+            });
+        	expect(g + ":index", n -> binder("o.id=1&o.name=abc&o.numbers[0]=2&o.numbers[1]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(Arrays.asList(2,3), o.numbers);
+            });
+        	expect(g + ":noindex", n -> binder("o.id=1&o.name=abc&o.numbers[]=2&o.numbers[]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(Arrays.asList(2,3), o.numbers);
+            });
+        });
 
         expect("String[]", n -> binder("a=abc&a=def").bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));
         expect("int[]", n -> binder("a=1&a=2").bind("a", int[].class)).toArrayEqual(new int[] { 1, 2 });
@@ -198,22 +214,28 @@ public class TestBinder extends Tester {
         expect("Map<int>", n -> binder("m.a=1&m.b=2").bind("m", Map.class, String.class, Integer.class)).toEqual(Tool.map("a", 1, "b", 2));
 
         expect("LocalDate", n -> binder("a=2017-01-11").bind("a", LocalDate.class)).toEqual(LocalDate.of(2017, 1, 11));
-//        expect("ClassFullArgsConstructor", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
-//            .toEqual(new User.Factory().set(id, 1, name, "abc", birthday, LocalDate.of(2001, 2, 3), gender, User.Gender.FEMALE)
-//                .get());
-//        expect("ClassNoConstructor", n -> binder("c.name=abc&c.age=22").bind("c", User2.class)).toEqual(Tool.peek(new User2(), u -> {
-//            u.name = "abc";
-//            u.age = 22;
-//        }));
+        expect("ClassFullArgsConstructor", n -> binder("c.id=1&c.name=abc&c.birthday=2001-02-03&c.gender=FEMALE").bind("c", User.class))
+            .<User>toTest((o, eq) -> {
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(LocalDate.of(2001, 2, 3), o.birthday);
+            	eq.accept(o.gender, User.Gender.FEMALE);
+            });
+        expect("ClassNoConstructor", n -> binder("c.name=abc&c.age=22").bind("c", User2.class)).<User2>toTest((o, eq) -> {
+        	eq.accept("abc", o.name);
+        	eq.accept(o.age, 22);
+        });
         expect("List<Map>", n -> binder("c[0].id=1&c[1].id=2&c[0].name=abc&c[1].name=def&c[0].birthday=2001-02-03&c[0].gender=FEMALE")
             .bind("c", List.class, Map.class))
                 .toEqual(Tool.list(Tool.map("id", "1", "name", "abc", "birthday", "2001-02-03", "gender", "FEMALE"), Tool.map("id", "2", "name", "def")));
-//        expect("List<Class>", n -> binder("c[0].id=1&c[0].name=abc&c[0].birthday=2001-02-03&c[0].gender=FEMALE").bind("c", List.class, User.class))
-//            .toEqual(Tool.list(new User.Factory().set(id, 1)
-//                .set(name, "abc")
-//                .set(birthday, LocalDate.of(2001, 2, 3))
-//                .set(gender, User.Gender.FEMALE)
-//                .get()));
+        expect("List<Class>", n -> binder("c[0].id=1&c[0].name=abc&c[0].birthday=2001-02-03&c[0].gender=FEMALE").bind("c", List.class, User.class))
+            .<List<User>>toTest((list, eq) -> {
+            	User o = list.get(0);
+            	eq.accept(o.id, 1);
+            	eq.accept("abc", o.name);
+            	eq.accept(LocalDate.of(2001, 2, 3), o.birthday);
+            	eq.accept(o.gender, User.Gender.FEMALE);
+            });
     }
     
     @SuppressWarnings("javadoc")
