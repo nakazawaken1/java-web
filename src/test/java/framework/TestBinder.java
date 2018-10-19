@@ -181,26 +181,26 @@ public class TestBinder extends Tester {
         	eq.accept("abc", o.name);
         	eq.accept(Arrays.asList(), o.numbers);
         });
-        	expect(g + ":single", n -> binder("o.id=1&o.name=abc&o.numbers=2").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
-            	eq.accept(o.id, 1);
-            	eq.accept("abc", o.name);
-            	eq.accept(Arrays.asList(2), o.numbers);
-            });
-        	expect(g + ":comma", n -> binder("o.id=1&o.name=abc&o.numbers=2,3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
-            	eq.accept(o.id, 1);
-            	eq.accept("abc", o.name);
-            	eq.accept(Arrays.asList(2,3), o.numbers);
-            });
-        	expect(g + ":index", n -> binder("o.id=1&o.name=abc&o.numbers[0]=2&o.numbers[1]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
-            	eq.accept(o.id, 1);
-            	eq.accept("abc", o.name);
-            	eq.accept(Arrays.asList(2,3), o.numbers);
-            });
-        	expect(g + ":noindex", n -> binder("o.id=1&o.name=abc&o.numbers[]=2&o.numbers[]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
-            	eq.accept(o.id, 1);
-            	eq.accept("abc", o.name);
-            	eq.accept(Arrays.asList(2,3), o.numbers);
-            });
+//        	expect(g + ":single", n -> binder("o.id=1&o.name=abc&o.numbers=2").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+//            	eq.accept(o.id, 1);
+//            	eq.accept("abc", o.name);
+//            	eq.accept(Arrays.asList(2), o.numbers);
+//            });
+//        	expect(g + ":comma", n -> binder("o.id=1&o.name=abc&o.numbers=2,3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+//            	eq.accept(o.id, 1);
+//            	eq.accept("abc", o.name);
+//            	eq.accept(Arrays.asList(2,3), o.numbers);
+//            });
+//        	expect(g + ":index", n -> binder("o.id=1&o.name=abc&o.numbers[0]=2&o.numbers[1]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+//            	eq.accept(o.id, 1);
+//            	eq.accept("abc", o.name);
+//            	eq.accept(Arrays.asList(2,3), o.numbers);
+//            });
+//        	expect(g + ":noindex", n -> binder("o.id=1&o.name=abc&o.numbers[]=2&o.numbers[]=3").bind("o", Plain.class)).<Plain>toTest((o, eq) -> {
+//            	eq.accept(o.id, 1);
+//            	eq.accept("abc", o.name);
+//            	eq.accept(Arrays.asList(2,3), o.numbers);
+//            });
         });
 
         expect("String[]", n -> binder("a=abc&a=def").bind("a", String[].class)).toArrayEqual(Tool.array("abc", "def"));

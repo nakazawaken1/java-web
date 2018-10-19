@@ -38,7 +38,7 @@ public interface Message {
             clazz = c;
             name = clazz.getSimpleName() + "." + name;
         } while (clazz.getAnnotation(Config.class) == null);
-        return Config.Injector.getSource(clazz, locale).getProperty(name + "." + ((Enum<?>) this).name());
+        return Config.Injector.getSource(clazz, locale).getProperty(name + "." + ((Enum<?>) this).name(), "");
     }
 
     /**

@@ -237,6 +237,7 @@ public class Sys {
     public static List<String> default_pages = Tool.list("index.html", "index.htm");
 
     @Help("Aliases if key file is not exists")
+    @Separator(pair = '=')
     public static Map<String, String> aliases = Tool.map("/", "/index.html", "/index.html", "/admin/index.html");
 
     @Help("Default avator")

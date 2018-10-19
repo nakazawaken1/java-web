@@ -279,7 +279,7 @@ public abstract class Application implements Attributes<Object> {
         final Optional<String> mime = Tool.string(Tool.getExtension(path))
             .map(Tool::getContentType);
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
-        final String normalizedPath = Tool.trim(null, path, "/");
+        final String normalizedPath = Tool.prefix(Tool.trim(null, path, "/"), "/");
         final Tuple<Class<?>, Method> pair = routing.entrySet()
             .stream()
             .filter(e -> e.getKey().l.isEmpty() || e.getKey().l.contains(request.getMethod()))

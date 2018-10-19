@@ -447,7 +447,7 @@ public class Tool {
 			if (o instanceof String || o instanceof Byte || o instanceof Character || o instanceof Short
 					|| o instanceof Integer || o instanceof Long || o instanceof Float || o instanceof Double
 					|| o instanceof Boolean || o instanceof Date || o instanceof java.sql.Date || o instanceof Timestamp
-					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime) {
+					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime || o instanceof Message) {
 				traverser.value(o.toString(), c, isString(o));
 				break;
 			}
@@ -2344,9 +2344,11 @@ public class Tool {
     /**
      * @param <T> Name type
      * @param <U> Value type
+     * @param <V> Container type
      * @param map Map
      * @param name Name
      * @param value Value
+     * @param supplier Container supplier
      * @return Value
      */
     public static <T, U, V extends Collection<U>> U addValue(Map<T, V> map, T name, U value, Supplier<V> supplier) {
@@ -2362,9 +2364,11 @@ public class Tool {
     /**
      * @param <T> Name type
      * @param <U> Value type
+     * @param <V> Container type
      * @param map Map
      * @param name Name
      * @param value Value
+     * @param supplier Container supplier
      * @return Value
      */
     public static <T, U, V extends Collection<U>> U setValue(Map<T, V> map, T name, U value, Supplier<V> supplier) {
@@ -2377,6 +2381,7 @@ public class Tool {
     /**
      * @param <T> Name type
      * @param <U> Value type
+     * @param <V> Container type
      * @param map Map
      * @param name Name
      * @return First value
@@ -2391,6 +2396,7 @@ public class Tool {
     /**
      * @param <T> Name type
      * @param <U> Value type
+     * @param <V> Container type
      * @param map Map
      * @param name Name
      * @param separator Value separator
@@ -3143,5 +3149,24 @@ public class Tool {
             .collect(Collectors.joining(", ")) + ")");
         }
         return items.size() == 1 ? items.get(0) : "(" + String.join(" OR ", items) + ")";
+    }
+
+    /**
+     * @param text HTMLエスケープしてから改行を&lt;br/&gt;に変換
+     * @return 変換結果
+     */
+    public static String brs(Object... text) {
+        String s = htmlEscape(Stream.of(text).map(i -> i == null ? "" : i.toString()).collect(Collectors.joining("\n")));
+        return s == null ? null : s.replaceAll("\r?\n", "<br/>");
+    }
+
+    /**
+     * el用
+     * 
+     * @param text HTMLエスケープしてから改行を&lt;br/&gt;に変換
+     * @return 変換結果
+     */
+    public static String br(Object text) {
+        return brs(text);
     }
 }
