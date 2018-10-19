@@ -3152,10 +3152,12 @@ public class Tool {
     }
 
     /**
+     * @param <T> 要素の型
      * @param text HTMLエスケープしてから改行を&lt;br/&gt;に変換
      * @return 変換結果
      */
-    public static String brs(Object... text) {
+    @SafeVarargs
+	public static <T extends Object> String brs(T... text) {
         String s = htmlEscape(Stream.of(text).map(i -> i == null ? "" : i.toString()).collect(Collectors.joining("\n")));
         return s == null ? null : s.replaceAll("\r?\n", "<br/>");
     }
