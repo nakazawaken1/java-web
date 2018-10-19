@@ -447,7 +447,7 @@ public class Tool {
 			if (o instanceof String || o instanceof Byte || o instanceof Character || o instanceof Short
 					|| o instanceof Integer || o instanceof Long || o instanceof Float || o instanceof Double
 					|| o instanceof Boolean || o instanceof Date || o instanceof java.sql.Date || o instanceof Timestamp
-					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime || o instanceof Message) {
+					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime || o instanceof Message || o instanceof Xml || o instanceof Tuple) {
 				traverser.value(o.toString(), c, isString(o));
 				break;
 			}
