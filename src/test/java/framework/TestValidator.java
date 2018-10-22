@@ -9,7 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import framework.annotation.Letters;
 import framework.annotation.Range;
+import framework.annotation.RegEx;
 import framework.annotation.Required;
 import framework.annotation.Time;
 import framework.annotation.Valid;
@@ -30,6 +32,30 @@ public class TestValidator extends Tester {
 
 		@Required
 		String name;
+	}
+	static class Digit {
+		@Letters(Letters.DIGITS)
+		int value;
+	}
+	static class Zenkaku {
+		@Letters(value = Letters.ASCII, deny=true)
+		String value;
+	}
+	static class Hankaku {
+		@Letters(Letters.ASCII)
+		String value;
+	}
+	static class AlpabetNumber {
+		@Letters(Letters.ALPHABETS_NUMBERS)
+		String value;
+	}
+	static class Tel {
+		@Letters(Letters.DIGITS + '-')
+		String value;
+	}
+	static class Real {
+		@RegEx("[+-]?[0-9]+([.][0-9]+)?")
+		String value;
 	}
 
 	boolean time(int past, int future, ChronoUnit unit, String input) {
@@ -145,19 +171,99 @@ public class TestValidator extends Tester {
 					return All.class;
 				}
     		};
-    		String message = Reflector.getDefaultValue(Required.class, "message");
+    		String required = Reflector.getDefaultValue(Required.class, "message");
+    		String letters = Reflector.getDefaultValue(Letters.class, "message");
+    		String regEx = Reflector.getDefaultValue(RegEx.class, "message");
     		expect(g + ":ok", n -> {
         		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map("data.id", Arrays.asList("1"),  "data.name", Arrays.asList("abc")), errors);
+    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+    					"data.id", Arrays.asList("1"),//
+    					"data.name", Arrays.asList("abc")//
+    					), errors);
     			return errors.size();
     		}).toEqual(0);
     		expect(g + ":ng", n -> {
         		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map("data.id", Arrays.asList(),  "data.name", Arrays.asList()), errors);
+    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+    					"data.id", Arrays.asList(),//
+    					"data.name", Arrays.asList()//
+    					), errors);
     			return errors;
     		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(message, Tool.getFirst(errors, "data.id").orElse(null));
-    			eq.accept(message, Tool.getFirst(errors, "data.name").orElse(null));
+    			eq.accept(required, Tool.getFirst(errors, "data.id").orElse(null));
+    			eq.accept(required, Tool.getFirst(errors, "data.name").orElse(null));
+    		});
+    		expect(g + ":ok:digit", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("12")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:digit", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("a")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+    		});
+    		expect(g + ":ok:zenkaku", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Zenkaku.class, "data", Tool.map("data.value", Arrays.asList("あいうえお")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:zenkaku", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Zenkaku.class, "data", Tool.map("data.value", Arrays.asList("あいaうえお")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+    		});
+    		expect(g + ":ok:hankaku", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Hankaku.class, "data", Tool.map("data.value", Arrays.asList("abc123!#$")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:hankaku", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Hankaku.class, "data", Tool.map("data.value", Arrays.asList("abc123!#あ$")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+    		});
+    		expect(g + ":ok:alphabet_number", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, AlpabetNumber.class, "data", Tool.map("data.value", Arrays.asList("abc123ABC")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:alphabet_number", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, AlpabetNumber.class, "data", Tool.map("data.value", Arrays.asList("abc123!ABC")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+    		});
+    		expect(g + ":ok:tel", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Tel.class, "data", Tool.map("data.value", Arrays.asList("1234-5678-90")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:tel", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Tel.class, "data", Tool.map("data.value", Arrays.asList("1234-#5678-90")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+    		});
+    		expect(g + ":ok:real", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Real.class, "data", Tool.map("data.value", Arrays.asList("1.23")), errors);
+    			return errors.size();
+    		}).toEqual(0);
+    		expect(g + ":ng:real", n -> {
+        		Errors errors = new Errors();
+    			Validator.Manager.validateClass(valid, Real.class, "data", Tool.map("data.value", Arrays.asList("1.2.3")), errors);
+    			return errors;
+    		}).<Errors>toTest((errors, eq) -> {
+    			eq.accept(regEx, Tool.getFirst(errors, "data.value").orElse(null));
     		});
     	});
         group("time", g -> {

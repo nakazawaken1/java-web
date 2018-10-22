@@ -86,6 +86,11 @@ public @interface Letters {
     String ALPHABETS = ALPHABET_UPPERS + ALPHABET_LOWERS;
 
     /**
+     * alphabet number characters
+     */
+    String ALPHABETS_NUMBERS = ALPHABETS + DIGITS;
+
+    /**
      * Ascii characters
      */
     String ASCII = MARKS + DIGITS + ALPHABETS;
@@ -109,7 +114,7 @@ public @interface Letters {
 
         @Override
         protected void validate(String name, String value, ErrorAppender appender) {
-            if (value != null && value.chars().anyMatch(c -> annotation.value().indexOf(c) < 0)) {
+            if (value != null && (value.chars().anyMatch(annotation.deny() ? c -> annotation.value().indexOf(c) >= 0 : c -> annotation.value().indexOf(c) < 0))) {
                 appender.addError(name, value, annotation.message(), "value", annotation.value(), "deny", annotation.deny());
             }
         }
