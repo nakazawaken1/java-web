@@ -2403,7 +2403,7 @@ public class Tool {
      * @return joined value
      */
  	public static <T, U, V extends Collection<U>> Optional<String> getJoin(Map<T, V> map, String name, String separator) {
-		return of(map.get(name)).map(i -> i.stream().map(String::valueOf).collect(Collectors.joining(separator))).filter(notEmpty);
+		return of(map.get(name)).map(i -> i.stream().filter(Objects::nonNull).map(String::valueOf).collect(Collectors.joining(separator))).filter(notEmpty);
 	}
 
     /**

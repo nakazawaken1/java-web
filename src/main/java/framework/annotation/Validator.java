@@ -5,12 +5,17 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import framework.AbstractValidator;
@@ -56,8 +61,27 @@ public @interface Validator {
 		 * @param parameterName ParameterName
 		 * @param parameters Target values
 		 * @param errors     Errors
+		 * @param parameterizedType Generic type
 		 */
-		public static void validateClass(Valid valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors) {
+		public static void validateClass(Valid valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
+			if(Iterable.class.isAssignableFrom(clazz)) {
+				AtomicInteger index = new AtomicInteger();
+				parameters.entrySet().stream()//
+					.filter(e -> e.getKey().startsWith(parameterName))//match prefix
+					.flatMap(e -> {//parse index, rest prefix, and value
+						String key = e.getKey();
+						int begin = key.indexOf('[');
+						int end = key.indexOf(']', begin + 1);
+						if(begin < end) {
+							return Stream.of(Tuple.of(Tool.integer(key.substring(begin + 1, end)).orElseGet(index::getAndIncrement), key, e.getValue()));
+						}
+						return e.getValue().stream().map(v -> Tuple.of(index.getAndIncrement(), "", Arrays.asList(v)));
+					}).collect(Collectors.groupingBy(t -> t.l))//grouping
+					.values().stream().sorted(Comparator.comparing(t -> t.get(0).l)).forEach(t -> {
+						validateClass(valid, (Class<?>)parameterizedType[0], parameterName + '[' + t.get(0).l + ']', t.stream().collect(Collectors.toMap(u -> u.r.l, u -> u.r.r)), errors);
+					});
+				return;
+			}
 			Reflector.fields(clazz).forEach((name, field) -> {
 				Stream.of(field.getAnnotations())//
 					.map(a -> Tuple.of(a, a.annotationType().getAnnotation(Validator.class)))//

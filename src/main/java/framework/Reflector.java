@@ -150,7 +150,7 @@ public class Reflector {
 	return fields.computeIfAbsent(Tuple.of(clazz, getName), pair -> {
 	    Class<?> c = pair.l;
 	    Map<String, Field> map = new LinkedHashMap<>();
-	    while (c != Object.class) {
+	    while (c != Object.class && c != null) {
 		Stream.of(c.getDeclaredFields()).map(f -> Tuple.of(getName.apply(f), f))
 			.filter(t -> !map.containsKey(t.l)).peek(t -> t.r.setAccessible(true))
 			.forEach(f -> map.put(f.l, f.r));

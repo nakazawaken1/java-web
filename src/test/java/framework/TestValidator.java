@@ -33,26 +33,32 @@ public class TestValidator extends Tester {
 		@Required
 		String name;
 	}
+
 	static class Digit {
 		@Letters(Letters.DIGITS)
 		int value;
 	}
+
 	static class Zenkaku {
-		@Letters(value = Letters.ASCII, deny=true)
+		@Letters(value = Letters.ASCII, deny = true)
 		String value;
 	}
+
 	static class Hankaku {
 		@Letters(Letters.ASCII)
 		String value;
 	}
+
 	static class AlpabetNumber {
 		@Letters(Letters.ALPHABETS_NUMBERS)
 		String value;
 	}
+
 	static class Tel {
 		@Letters(Letters.DIGITS + '-')
 		String value;
 	}
+
 	static class Real {
 		@RegEx("[+-]?[0-9]+([.][0-9]+)?")
 		String value;
@@ -158,144 +164,205 @@ public class TestValidator extends Tester {
 	}
 
 	{
-    	group("required", g -> {
-    		Valid valid = new Valid() {
+		String required = Reflector.getDefaultValue(Required.class, "message");
+		String letters = Reflector.getDefaultValue(Letters.class, "message");
+		String regEx = Reflector.getDefaultValue(RegEx.class, "message");
+		Valid valid = new Valid() {
 
-				@Override
-				public Class<? extends Annotation> annotationType() {
-					return Valid.class;
-				}
+			@Override
+			public Class<? extends Annotation> annotationType() {
+				return Valid.class;
+			}
 
-				@Override
-				public Class<? extends All> value() {
-					return All.class;
-				}
-    		};
-    		String required = Reflector.getDefaultValue(Required.class, "message");
-    		String letters = Reflector.getDefaultValue(Letters.class, "message");
-    		String regEx = Reflector.getDefaultValue(RegEx.class, "message");
-    		expect(g + ":ok", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
-    					"data.id", Arrays.asList("1"),//
-    					"data.name", Arrays.asList("abc")//
-    					), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
-    					"data.id", Arrays.asList(),//
-    					"data.name", Arrays.asList()//
-    					), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(required, Tool.getFirst(errors, "data.id").orElse(null));
-    			eq.accept(required, Tool.getFirst(errors, "data.name").orElse(null));
-    		});
-    		expect(g + ":ok:digit", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("12")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:digit", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("a")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    		expect(g + ":ok:zenkaku", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Zenkaku.class, "data", Tool.map("data.value", Arrays.asList("あいうえお")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:zenkaku", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Zenkaku.class, "data", Tool.map("data.value", Arrays.asList("あいaうえお")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    		expect(g + ":ok:hankaku", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Hankaku.class, "data", Tool.map("data.value", Arrays.asList("abc123!#$")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:hankaku", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Hankaku.class, "data", Tool.map("data.value", Arrays.asList("abc123!#あ$")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    		expect(g + ":ok:alphabet_number", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, AlpabetNumber.class, "data", Tool.map("data.value", Arrays.asList("abc123ABC")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:alphabet_number", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, AlpabetNumber.class, "data", Tool.map("data.value", Arrays.asList("abc123!ABC")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    		expect(g + ":ok:tel", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Tel.class, "data", Tool.map("data.value", Arrays.asList("1234-5678-90")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:tel", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Tel.class, "data", Tool.map("data.value", Arrays.asList("1234-#5678-90")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    		expect(g + ":ok:real", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Real.class, "data", Tool.map("data.value", Arrays.asList("1.23")), errors);
-    			return errors.size();
-    		}).toEqual(0);
-    		expect(g + ":ng:real", n -> {
-        		Errors errors = new Errors();
-    			Validator.Manager.validateClass(valid, Real.class, "data", Tool.map("data.value", Arrays.asList("1.2.3")), errors);
-    			return errors;
-    		}).<Errors>toTest((errors, eq) -> {
-    			eq.accept(regEx, Tool.getFirst(errors, "data.value").orElse(null));
-    		});
-    	});
-        group("time", g -> {
-            expect(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
-            expect(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);
-            expect(g + ":future:ok", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).minusSeconds(1).toString()))
-                    .toEqual(true);
-            expect(g + ":future:ng", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS, LocalDateTime.now().plusDays(1).plusSeconds(1).toString()))
-                    .toEqual(false);
-            expect(g + ":past:ok", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).plusSeconds(1).toString())).toEqual(true);
-            expect(g + ":past:ng", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS, LocalDateTime.now().minusDays(1).minusSeconds(1).toString()))
-                    .toEqual(false);
-        });
-        group("range", g -> {
-            expect(g + ":null", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null)).toEqual(true);
-            expect(g + ":empty", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "")).toEqual(true);
-            expect(g + ":min:ok", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1")).toEqual(true);
-            expect(g + ":min:ng", n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1.1")).toEqual(false);
-            expect(g + ":value:ok", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0")).toEqual(true);
-            expect(g + ":value:ng", n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0.1")).toEqual(false);
-            expect(g + ":integerMin:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "10.12"))
-                    .toEqual(true);
-            expect(g + ":integerMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "9.1"))
-                    .toEqual(false);
-            expect(g + ":integerMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "9.1")).toEqual(true);
-            expect(g + ":integerMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "10.12")).toEqual(false);
-            expect(g + ":fractionMin:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "10.12"))
-                    .toEqual(true);
-            expect(g + ":fractionMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "9.1"))
-                    .toEqual(false);
-            expect(g + ":fractionMax:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "9.1")).toEqual(true);
-            expect(g + ":fractionMax:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "10.12")).toEqual(false);
-        });
-    }
+			@Override
+			public Class<? extends All> value() {
+				return All.class;
+			}
+		};
+		group("list", g -> {
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
+						"list[0].name", Arrays.asList(""), "list[1].id", Arrays.asList((String) null)), errors, Data.class);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(required, Tool.getFirst(errors, "list[0].name").orElse(null));
+				eq.accept(required, Tool.getFirst(errors, "list[1].id").orElse(null));
+				eq.accept(required, Tool.getFirst(errors, "list[1].name").orElse(null));
+			});
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
+						"list[0].name", Arrays.asList("abc"), "list[1].id", Arrays.asList("2"), "list[1].name", Arrays.asList("def")), errors, Data.class);
+				return errors.size();
+			}).toEqual(0);
+		});
+		group("required", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+						"data.id", Arrays.asList("1"), //
+						"data.name", Arrays.asList("abc")//
+				), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+						"data.id", Arrays.asList(), //
+						"data.name", Arrays.asList()//
+				), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(required, Tool.getFirst(errors, "data.id").orElse(null));
+				eq.accept(required, Tool.getFirst(errors, "data.name").orElse(null));
+			});
+		});
+		group("digit", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("12")),
+						errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("a")),
+						errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("zenkaku", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Zenkaku.class, "data",
+						Tool.map("data.value", Arrays.asList("あいうえお")), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Zenkaku.class, "data",
+						Tool.map("data.value", Arrays.asList("あいaうえお")), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("hankaku", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Hankaku.class, "data",
+						Tool.map("data.value", Arrays.asList("abc123!#$")), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Hankaku.class, "data",
+						Tool.map("data.value", Arrays.asList("abc123!#あ$")), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("alphabet", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, AlpabetNumber.class, "data",
+						Tool.map("data.value", Arrays.asList("abc123ABC")), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, AlpabetNumber.class, "data",
+						Tool.map("data.value", Arrays.asList("abc123!ABC")), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("tel", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Tel.class, "data",
+						Tool.map("data.value", Arrays.asList("1234-5678-90")), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Tel.class, "data",
+						Tool.map("data.value", Arrays.asList("1234-#5678-90")), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("real", g -> {
+			expect(g + ":ok", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Real.class, "data",
+						Tool.map("data.value", Arrays.asList("1.23")), errors);
+				return errors.size();
+			}).toEqual(0);
+			expect(g + ":ng", n -> {
+				Errors errors = new Errors();
+				Validator.Manager.validateClass(valid, Real.class, "data",
+						Tool.map("data.value", Arrays.asList("1.2.3")), errors);
+				return errors;
+			}).<Errors>toTest((errors, eq) -> {
+				eq.accept(regEx, Tool.getFirst(errors, "data.value").orElse(null));
+			});
+		});
+		group("time", g -> {
+			expect(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
+			expect(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);
+			expect(g + ":future:ok", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS,
+					LocalDateTime.now().plusDays(1).minusSeconds(1).toString())).toEqual(true);
+			expect(g + ":future:ng", n -> time(Integer.MAX_VALUE, 1, ChronoUnit.DAYS,
+					LocalDateTime.now().plusDays(1).plusSeconds(1).toString())).toEqual(false);
+			expect(g + ":past:ok", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS,
+					LocalDateTime.now().minusDays(1).plusSeconds(1).toString())).toEqual(true);
+			expect(g + ":past:ng", n -> time(1, Integer.MAX_VALUE, ChronoUnit.DAYS,
+					LocalDateTime.now().minusDays(1).minusSeconds(1).toString())).toEqual(false);
+		});
+		group("range", g -> {
+			expect(g + ":null", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0,
+					Integer.MAX_VALUE, null)).toEqual(true);
+			expect(g + ":empty", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0,
+					Integer.MAX_VALUE, "")).toEqual(true);
+			expect(g + ":min:ok",
+					n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1"))
+							.toEqual(true);
+			expect(g + ":min:ng",
+					n -> range(-1, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "-1.1"))
+							.toEqual(false);
+			expect(g + ":value:ok",
+					n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0"))
+							.toEqual(true);
+			expect(g + ":value:ng",
+					n -> range(Double.NEGATIVE_INFINITY, 0, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "0.1"))
+							.toEqual(false);
+			expect(g + ":integerMin:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2,
+					Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "10.12")).toEqual(true);
+			expect(g + ":integerMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 2,
+					Integer.MAX_VALUE, 0, Integer.MAX_VALUE, "9.1")).toEqual(false);
+			expect(g + ":integerMax:ok",
+					n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "9.1"))
+							.toEqual(true);
+			expect(g + ":integerMax:ng",
+					n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, 1, 0, Integer.MAX_VALUE, "10.12"))
+							.toEqual(false);
+			expect(g + ":fractionMin:ok", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0,
+					Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "10.12")).toEqual(true);
+			expect(g + ":fractionMin:ng", n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0,
+					Integer.MAX_VALUE, 2, Integer.MAX_VALUE, "9.1")).toEqual(false);
+			expect(g + ":fractionMax:ok",
+					n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "9.1"))
+							.toEqual(true);
+			expect(g + ":fractionMax:ng",
+					n -> range(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0, Integer.MAX_VALUE, 0, 1, "10.12"))
+							.toEqual(false);
+		});
+	}
 }
