@@ -35,6 +35,7 @@ import framework.Tool.CsvTraverser;
 import framework.Tool.JsonTraverser;
 import framework.Tool.Traverser;
 import framework.Tool.XmlTraverser;
+import framework.Try.TryConsumer;
 import framework.Try.TryTriConsumer;
 import framework.annotation.Content;
 import framework.annotation.Letters;
@@ -536,14 +537,14 @@ public abstract class Response {
      * writer
      */
     @FunctionalInterface
-    public interface Writer extends Consumer<PrintWriter> {
+    public interface Writer extends TryConsumer<PrintWriter> {
     }
 
     /**
      * output
      */
     @FunctionalInterface
-    public interface Output extends Consumer<OutputStream> {
+    public interface Output extends TryConsumer<OutputStream> {
     }
 
     /**

@@ -151,10 +151,10 @@ public class Reflector {
 	    Class<?> c = pair.l;
 	    Map<String, Field> map = new LinkedHashMap<>();
 	    while (c != Object.class && c != null) {
-		Stream.of(c.getDeclaredFields()).map(f -> Tuple.of(getName.apply(f), f))
+			Stream.of(c.getDeclaredFields()).filter(f -> !f.getName().contains("$")).map(f -> Tuple.of(getName.apply(f), f))
 			.filter(t -> !map.containsKey(t.l)).peek(t -> t.r.setAccessible(true))
 			.forEach(f -> map.put(f.l, f.r));
-		c = c.getSuperclass();
+			c = c.getSuperclass();
 	    }
 	    return map;
 	});
