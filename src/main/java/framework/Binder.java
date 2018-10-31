@@ -3,12 +3,14 @@ package framework;
 import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -167,22 +170,25 @@ public class Binder implements ErrorAppender {
      * @return Mapper
      */
     @SuppressWarnings("unchecked")
-    public Function<Object, Object> rebind(int nest, Class<?> type) {
+    public Function<Object, Stream<Object>> rebind(int nest, Class<?> type) {
         return i -> {
             if (i instanceof Map) {
                 if (type == Map.class) {
-                    return ((Map<String, List<String>>) i).entrySet()
+                    return Stream.of(((Map<String, List<String>>) i).entrySet()
                         .stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, e -> Tool.<List<String>, String>val(e.getValue(), j -> j.isEmpty() ? "" : j.get(0))));
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> Tool.<List<String>, String>val(e.getValue(), j -> j.isEmpty() ? "" : j.get(0)))));
                 }
                 Object instance = Reflector.instance(type);
                 Reflector.fields(type)
                     .forEach(Try.biC((n, field) -> {
                         field.set(instance, bind((Map<String, List<String>>) i, nest + 1, n, field.getType(), Reflector.getGenericParameters(field)));
                     }));
-                return instance;
+                return Stream.of(instance);
             }
-            return convert((String) i, type, null);
+            if(i != null && type.isPrimitive() || Number.class.isAssignableFrom(type)) {
+                return Stream.of(((String) i).split("[^-.0-9]+")).map(j -> convert(j, type, null));
+            }
+            return Stream.of(convert((String) i, type, null));
         };
     }
 
@@ -202,8 +208,9 @@ public class Binder implements ErrorAppender {
         // List<String> values = Tool.or(parameters.get(name), () -> parameters.get(name + "[]")).orElse(null);
         List<Object> sub = new ArrayList<>();
         parameters.forEach((key, value) -> {
-            int start = key.indexOf('[');
-            int dot = key.indexOf('.');
+            int prefixLength = name.length();
+            int start = key.indexOf('[', prefixLength);
+            int dot = key.indexOf('.', prefixLength);
             int min = start < 0 ? (dot < 0 ? key.length() : dot) : (dot < 0 ? start : Math.min(start, dot));
             String realKey = key.substring(0, min);
             if (!name.equals(realKey)) {
@@ -213,7 +220,7 @@ public class Binder implements ErrorAppender {
                 sub.addAll(value);
             }
             if (start >= 0 && (dot == -1 || start < dot)) {
-                int end = key.indexOf(']');
+                int end = key.indexOf(']', prefixLength);
                 if (start + 1 < end) {
                     int index = Integer.parseInt(key.substring(start + 1, end));
                     while (sub.size() <= index) {
@@ -225,6 +232,10 @@ public class Binder implements ErrorAppender {
                             sub.set(index, o = new LinkedHashMap<>());
                         }
                         ((Map<String, List<String>>) o).put(key.substring(dot + 1), value);
+                    } else {
+                        for (String i : value) {
+                            sub.set(index, i);
+                        }
                     }
                 } else {
                     key = key.substring(end + 1);
@@ -308,35 +319,54 @@ public class Binder implements ErrorAppender {
                 return to;
             }
             return sub.stream()
-                .map(rebind(nest, component))
+                .flatMap(rebind(nest, component))
                 .toArray(n -> (Object[]) Array.newInstance(component, n));
         }
 
+        Function<Integer, Class<?>> genericType = index -> {
+            if(parameterizedType.length > index) {
+                return (Class<?>)parameterizedType[index];
+            }
+            Type[] types = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments();
+            if(types != null && types.length > index) {
+                return (Class<?>)types[index];
+            }
+            return Object.class;
+        };
+        
         if (List.class.isAssignableFrom(clazz)) {
+            Supplier<List<Object>> constructor = Try.s(() -> (List<Object>) Stream.of(clazz.getDeclaredConstructors())
+                    .filter(c -> c.getParameterCount() == 0).findFirst()
+                    .orElseGet(Try.s(ArrayList.class::getConstructor)).newInstance());
             return sub.stream()
-                .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
-                .collect(Collectors.toList());
+                .flatMap(rebind(nest, genericType.apply(0)))
+                .collect(constructor, List::add, List::addAll);
         }
 
         if (Set.class.isAssignableFrom(clazz)) {
+            Supplier<Set<Object>> constructor = Try.s(() -> (Set<Object>) Stream.of(clazz.getDeclaredConstructors())
+                    .filter(c -> c.getParameterCount() == 0).findFirst()
+                    .orElseGet(Try.s(HashSet.class::getConstructor)).newInstance());
             return sub.stream()
-                .map(rebind(nest, parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class))
-                .collect(Collectors.toSet());
+                .flatMap(rebind(nest, genericType.apply(0)))
+                .collect(constructor, Set::add, Set::addAll);
         }
 
         if (Map.class.isAssignableFrom(clazz)) {
+            Supplier<Map<Object, Object>> constructor = Try.s(() -> (Map<Object, Object>) Stream.of(clazz.getDeclaredConstructors())
+                    .filter(c -> c.getParameterCount() == 0).findFirst()
+                    .orElseGet(Try.s(Attributes.Impl.class::getConstructor)).newInstance());
             String prefix = name + ".";
             return parameters.entrySet()
                 .stream()
                 .filter(e -> e.getKey()
                     .startsWith(prefix))
-                .collect(Attributes.Impl::new, (map, e) -> map.put(e.getKey()
-                    .substring(prefix.length()), bind(parameters, nest + 1, e.getKey(), parameterizedType.length > 1 ? (Class<?>) parameterizedType[1]
-                            : Object.class)), Map::putAll);
+                .collect(constructor, (map, e) -> map.put(e.getKey()
+                    .substring(prefix.length()), bind(parameters, nest + 1, e.getKey(), genericType.apply(1))), Map::putAll);
         }
 
         if (clazz == Optional.class) {
-            Class<?> c = parameterizedType.length > 0 ? (Class<?>) parameterizedType[0] : Object.class;
+            Class<?> c = genericType.apply(0);
             return c == String.class ? Tool.string(bind(parameters, nest + 1, name, c)) : Tool.of(bind(parameters, nest + 1, name, c));
         }
 

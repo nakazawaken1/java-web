@@ -34,6 +34,8 @@ public @interface Stringer {
          * @param value Value
          * @param traverser Callback handler
          */
-        void toString(T value, Traverser traverser);
+        default void toString(T value, Traverser traverser) {
+            traverser.value(String.valueOf(value), value.getClass(), true);
+        }
     }
 }

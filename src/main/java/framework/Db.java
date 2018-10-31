@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -55,6 +56,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import framework.Try.PentaFunction;
 import framework.Try.QuadFunction;
 import framework.Try.TriConsumer;
+import framework.Try.TryBiFunction;
 import framework.Try.TryConsumer;
 import framework.Try.TryFunction;
 import framework.Tuple.Tuple3;
@@ -2581,7 +2583,7 @@ public class Db implements AutoCloseable {
      * @return executable SQL
      */
     public String preparedSQL(String sql, Object... values) {
-        Function<Object, String> cut = s -> Tool.cut((String) s, Sys.Log.parameter_max_letters, " ...");
+        Function<Object, String> cut = s -> Tool.cut(Tool.string(s).orElse(""), Sys.Log.parameter_max_letters, " ...");
         Function<Object, String> to = v -> v instanceof Collection ? ((Collection<?>) v).stream()
             .map(cut)
             .map(builder::escape)
@@ -2734,6 +2736,55 @@ public class Db implements AutoCloseable {
             return builder.get();   
         };
     }
+    
+    /**
+     * ResultSet to Value
+     */
+    public static final Map<Class<?>, TryBiFunction<ResultSet, String, Optional<Object>>> mapper;
+    static {    
+        mapper = new ConcurrentHashMap<>();
+        mapper.put(int.class, (rs, name) -> Optional.of(rs.getInt(name)));
+        mapper.put(Integer.class, (rs, name) -> {
+            int n = rs.getInt(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(long.class, (rs, name) -> Optional.of(rs.getLong(name)));
+        mapper.put(Long.class, (rs, name) -> {
+            long n = rs.getLong(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(short.class, (rs, name) -> Optional.of(rs.getShort(name)));
+        mapper.put(Short.class, (rs, name) -> {
+            short n = rs.getShort(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(float.class, (rs, name) -> Optional.of(rs.getFloat(name)));
+        mapper.put(Float.class, (rs, name) -> {
+            float n = rs.getFloat(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(double.class, (rs, name) -> Optional.of(rs.getDouble(name)));
+        mapper.put(double.class, (rs, name) -> {
+            double n = rs.getDouble(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(boolean.class, (rs, name) -> Optional.of(rs.getBoolean(name)));
+        mapper.put(Boolean.class, (rs, name) -> {
+            boolean n = rs.getBoolean(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(String.class, (rs, name) -> {
+            String s = rs.getString(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(s);
+        });
+        mapper.put(Date.class, (rs, name) -> Tool.of(rs.getDate(name)).map(d -> new Date(d.getTime())));
+        mapper.put(java.sql.Date.class, (rs, name) -> Tool.of(rs.getDate(name)));
+        mapper.put(Timestamp.class, (rs, name) -> Tool.of(rs.getTimestamp(name)));
+        mapper.put(LocalDate.class, (rs, name) -> Tool.of(rs.getDate(name)).map(java.sql.Date::toLocalDate));
+        mapper.put(LocalTime.class, (rs, name) -> Tool.of(rs.getTime(name)).map(java.sql.Time::toLocalTime));
+        mapper.put(LocalDateTime.class,
+                (rs, name) -> Tool.of(rs.getTimestamp(name)).map(java.sql.Timestamp::toLocalDateTime));
+    }
 
     /**
      * db value to java value
@@ -2769,43 +2820,8 @@ public class Db implements AutoCloseable {
             } else {
                 optional = Optional.of(Enum.valueOf((Class<T>) type, rs.getString(name)));
             }
-        } else if (type == Date.class) {
-            optional = Tool.val(rs.getDate(name), v -> Tool.of(v)
-                .map(d -> new Date(d.getTime())));
-        } else if (type == java.sql.Date.class) {
-            optional = Tool.of(rs.getDate(name));
-        } else if (type == Timestamp.class) {
-            optional = Tool.of(rs.getTimestamp(name));
-        } else if (type == LocalDate.class) {
-            optional = Tool.val(rs.getDate(name), v -> Tool.of(v)
-                .map(java.sql.Date::toLocalDate));
-        } else if (type == LocalTime.class) {
-            optional = Tool.val(rs.getTime(name), v -> Tool.of(v)
-                .map(java.sql.Time::toLocalTime));
-        } else if (type == LocalDateTime.class) {
-            optional = Tool.val(rs.getTimestamp(name), v -> Tool.of(v)
-                .map(java.sql.Timestamp::toLocalDateTime));
-	} else if (type == int.class || type == Integer.class) {
-	    int n = rs.getInt(name);
-	    optional = type == Integer.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-	} else if (type == long.class || type == Long.class) {
-	    long n = rs.getLong(name);
-	    optional = type == Long.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-	} else if (type == short.class || type == Short.class) {
-	    short n = rs.getShort(name);
-	    optional = type == Short.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-	} else if (type == float.class || type == Float.class) {
-	    float n = rs.getFloat(name);
-	    optional = type == Float.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-	} else if (type == double.class || type == Double.class) {
-	    double n = rs.getDouble(name);
-	    optional = type == Double.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-	} else if (type == boolean.class || type == Boolean.class) {
-	    boolean n = rs.getBoolean(name);
-	    optional = type == Boolean.class && rs.wasNull() ? Optional.empty() : Optional.of(n);
-        } else if(type == String.class) {
-    	    String s = rs.getString(name);
-    	    optional = rs.wasNull() ? Optional.empty() : Optional.of(s);
+        } else if(mapper.containsKey(type)) {
+            optional = Try.biF(mapper.get(type)).apply(rs, name);
         }
         Object value = optional.orElseGet(Try.s(() -> rs.getObject(name), e -> null));
         return isOptional ? Tool.of(value) : value;
