@@ -14,7 +14,6 @@ import framework.annotation.Range;
 import framework.annotation.RegEx;
 import framework.annotation.Required;
 import framework.annotation.Time;
-import framework.annotation.Valid;
 import framework.annotation.Valid.All;
 import framework.annotation.Validator;
 import framework.annotation.Validator.ErrorAppender;
@@ -62,6 +61,10 @@ public class TestValidator extends Tester {
 	static class Real {
 		@RegEx("[+-]?[0-9]+([.][0-9]+)?")
 		String value;
+	}
+	
+	static class Items {
+	    List<Data> items;
 	}
 
 	boolean time(int past, int future, ChronoUnit unit, String input) {
@@ -167,22 +170,10 @@ public class TestValidator extends Tester {
 		String required = Reflector.getDefaultValue(Required.class, "message");
 		String letters = Reflector.getDefaultValue(Letters.class, "message");
 		String regEx = Reflector.getDefaultValue(RegEx.class, "message");
-		Valid valid = new Valid() {
-
-			@Override
-			public Class<? extends Annotation> annotationType() {
-				return Valid.class;
-			}
-
-			@Override
-			public Class<? extends All> value() {
-				return All.class;
-			}
-		};
 		group("list", g -> {
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
+				Validator.Manager.validateClass(All.class, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
 						"list[0].name", Arrays.asList(""), "list[1].id", Arrays.asList((String) null)), errors, Data.class);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
@@ -192,7 +183,7 @@ public class TestValidator extends Tester {
 			});
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
+				Validator.Manager.validateClass(All.class, List.class, "list", Tool.map("list[0].id", Arrays.asList("1"),
 						"list[0].name", Arrays.asList("abc"), "list[1].id", Arrays.asList("2"), "list[1].name", Arrays.asList("def")), errors, Data.class);
 				return errors.size();
 			}).toEqual(0);
@@ -200,7 +191,7 @@ public class TestValidator extends Tester {
 		group("required", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+				Validator.Manager.validateClass(All.class, Data.class, "data", Tool.map(//
 						"data.id", Arrays.asList("1"), //
 						"data.name", Arrays.asList("abc")//
 				), errors);
@@ -208,7 +199,7 @@ public class TestValidator extends Tester {
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Data.class, "data", Tool.map(//
+				Validator.Manager.validateClass(All.class, Data.class, "data", Tool.map(//
 						"data.id", Arrays.asList(), //
 						"data.name", Arrays.asList()//
 				), errors);
@@ -221,13 +212,13 @@ public class TestValidator extends Tester {
 		group("digit", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("12")),
+				Validator.Manager.validateClass(All.class, Digit.class, "data", Tool.map("data.value", Arrays.asList("12")),
 						errors);
 				return errors.size();
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Digit.class, "data", Tool.map("data.value", Arrays.asList("a")),
+				Validator.Manager.validateClass(All.class, Digit.class, "data", Tool.map("data.value", Arrays.asList("a")),
 						errors);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
@@ -237,13 +228,13 @@ public class TestValidator extends Tester {
 		group("zenkaku", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Zenkaku.class, "data",
+				Validator.Manager.validateClass(All.class, Zenkaku.class, "data",
 						Tool.map("data.value", Arrays.asList("あいうえお")), errors);
 				return errors.size();
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Zenkaku.class, "data",
+				Validator.Manager.validateClass(All.class, Zenkaku.class, "data",
 						Tool.map("data.value", Arrays.asList("あいaうえお")), errors);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
@@ -253,13 +244,13 @@ public class TestValidator extends Tester {
 		group("hankaku", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Hankaku.class, "data",
+				Validator.Manager.validateClass(All.class, Hankaku.class, "data",
 						Tool.map("data.value", Arrays.asList("abc123!#$")), errors);
 				return errors.size();
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Hankaku.class, "data",
+				Validator.Manager.validateClass(All.class, Hankaku.class, "data",
 						Tool.map("data.value", Arrays.asList("abc123!#あ$")), errors);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
@@ -269,13 +260,13 @@ public class TestValidator extends Tester {
 		group("alphabet", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, AlpabetNumber.class, "data",
+				Validator.Manager.validateClass(All.class, AlpabetNumber.class, "data",
 						Tool.map("data.value", Arrays.asList("abc123ABC")), errors);
 				return errors.size();
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, AlpabetNumber.class, "data",
+				Validator.Manager.validateClass(All.class, AlpabetNumber.class, "data",
 						Tool.map("data.value", Arrays.asList("abc123!ABC")), errors);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
@@ -285,35 +276,54 @@ public class TestValidator extends Tester {
 		group("tel", g -> {
 			expect(g + ":ok", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Tel.class, "data",
+				Validator.Manager.validateClass(All.class, Tel.class, "data",
 						Tool.map("data.value", Arrays.asList("1234-5678-90")), errors);
 				return errors.size();
 			}).toEqual(0);
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Tel.class, "data",
+				Validator.Manager.validateClass(All.class, Tel.class, "data",
 						Tool.map("data.value", Arrays.asList("1234-#5678-90")), errors);
 				return errors;
 			}).<Errors>toTest((errors, eq) -> {
 				eq.accept(letters, Tool.getFirst(errors, "data.value").orElse(null));
 			});
 		});
-		group("real", g -> {
-			expect(g + ":ok", n -> {
-				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Real.class, "data",
-						Tool.map("data.value", Arrays.asList("1.23")), errors);
-				return errors.size();
-			}).toEqual(0);
-			expect(g + ":ng", n -> {
-				Errors errors = new Errors();
-				Validator.Manager.validateClass(valid, Real.class, "data",
-						Tool.map("data.value", Arrays.asList("1.2.3")), errors);
-				return errors;
-			}).<Errors>toTest((errors, eq) -> {
-				eq.accept(regEx, Tool.getFirst(errors, "data.value").orElse(null));
-			});
-		});
+        group("real", g -> {
+            expect(g + ":ok", n -> {
+                Errors errors = new Errors();
+                Validator.Manager.validateClass(All.class, Real.class, "data",
+                        Tool.map("data.value", Arrays.asList("1.23")), errors);
+                return errors.size();
+            }).toEqual(0);
+            expect(g + ":ng", n -> {
+                Errors errors = new Errors();
+                Validator.Manager.validateClass(All.class, Real.class, "data",
+                        Tool.map("data.value", Arrays.asList("1.2.3")), errors);
+                return errors;
+            }).<Errors>toTest((errors, eq) -> {
+                eq.accept(regEx, Tool.getFirst(errors, "data.value").orElse(null));
+            });
+        });
+        group("items", g -> {
+            expect(g + ":ok", n -> {
+                Errors errors = new Errors();
+                Validator.Manager.validateClass(All.class, Items.class, "data",
+                        Tool.map("data.items[0].id", Arrays.asList("1"), "data.items[1].id", Arrays.asList("2"), "data.items[0].name", Arrays.asList("a"), "data.items[1].name", Arrays.asList("b")), errors);
+                return errors.size();
+            }).toEqual(0);
+            expect(g + ":ng", n -> {
+                Errors errors = new Errors();
+                Map<String, List<String>> parameters = Tool.map("data.items[0].id", Arrays.asList("1"), "data.items[1].id", Arrays.asList(), "data.items[0].name", Arrays.asList(), "data.items[1].name", Arrays.asList("b"));
+                Validator.Manager.validateClass(All.class, Data.class, "data.items[0]", parameters, errors);
+                Validator.Manager.validateClass(All.class, Data.class, "data.items[1]", parameters, errors);
+                return errors;
+            }).<Errors>toTest((errors, eq) -> {
+                eq.accept(2, errors.size());
+                eq.accept(required, Tool.getFirst(errors, "data.items[0].name").orElse(null));
+                eq.accept(required, Tool.getFirst(errors, "data.items[1].id").orElse(null));
+            });
+        });
 		group("time", g -> {
 			expect(g + ":null", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, null)).toEqual(true);
 			expect(g + ":empty", n -> time(Integer.MAX_VALUE, Integer.MAX_VALUE, ChronoUnit.DAYS, "")).toEqual(true);

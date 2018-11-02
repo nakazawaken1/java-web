@@ -366,7 +366,7 @@ public abstract class Application implements Attributes<Object> {
                                 }
                                 String name = p.getName();
                                 Tool.of(p.getAnnotation(Valid.class)).ifPresent(valid ->
-                                	Validator.Manager.validateClass(valid, p.getType(), name, binder.parameters, binder));
+                                	Validator.Manager.validateClass(valid.value(), p.getType(), name, binder.parameters, binder));
  								return binder.validator(value -> Stream.of(p.getAnnotations())
 										.forEach(a -> Validator.Manager.instance(a).ifPresent(
 											v -> v.validate(Valid.All.class, name, value, binder))))

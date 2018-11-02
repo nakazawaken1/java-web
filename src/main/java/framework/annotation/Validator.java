@@ -25,6 +25,7 @@ import framework.Session;
 import framework.Tool;
 import framework.Try;
 import framework.Tuple;
+import framework.annotation.Valid.All;
 
 /**
  * Validator info
@@ -63,7 +64,7 @@ public @interface Validator {
 		 * @param errors     Errors
 		 * @param parameterizedType Generic type
 		 */
-		public static void validateClass(Valid valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
+		public static void validateClass(Class<? extends All> valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
 			if(Iterable.class.isAssignableFrom(clazz)) {
 				AtomicInteger index = new AtomicInteger();
 				parameters.entrySet().stream()//
@@ -89,7 +90,7 @@ public @interface Validator {
 					.forEach(t -> instance(t.l).ifPresent(v -> {
 						String fullName = parameterName + "." + name;
 						String value = Tool.getJoin(parameters, fullName, ",").orElse(null);
-						v.validate(valid.value(), fullName, value, errors);
+						v.validate(valid, fullName, value, errors);
 					}));
 			});
 		}
