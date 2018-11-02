@@ -327,9 +327,12 @@ public class Binder implements ErrorAppender {
             if(parameterizedType.length > index) {
                 return (Class<?>)parameterizedType[index];
             }
-            Type[] types = ((ParameterizedType)clazz.getGenericSuperclass()).getActualTypeArguments();
-            if(types != null && types.length > index) {
-                return (Class<?>)types[index];
+            Type type = clazz.getGenericSuperclass();
+            if(type != null) {
+	            Type[] types = ((ParameterizedType)type).getActualTypeArguments();
+	            if(types != null && types.length > index) {
+	                return (Class<?>)types[index];
+	            }
             }
             return Object.class;
         };
