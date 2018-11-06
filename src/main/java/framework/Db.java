@@ -2754,6 +2754,12 @@ public class Db implements AutoCloseable {
             long n = rs.getLong(name);
             return rs.wasNull() ? Optional.empty() : Optional.of(n);
         });
+        mapper.put(byte.class, (rs, name) -> Optional.of(rs.getByte(name)));
+        mapper.put(Byte.class, (rs, name) -> {
+            short n = rs.getByte(name);
+            return rs.wasNull() ? Optional.empty() : Optional.of(n);
+        });
+        mapper.put(byte[].class, (rs, name) -> Tool.of(rs.getBytes(name)));
         mapper.put(short.class, (rs, name) -> Optional.of(rs.getShort(name)));
         mapper.put(Short.class, (rs, name) -> {
             short n = rs.getShort(name);
