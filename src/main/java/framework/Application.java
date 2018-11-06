@@ -419,8 +419,11 @@ public abstract class Application implements Attributes<Object> {
                     }
                 } catch(Exception e) {
                     Throwable t = e.getCause();
-                    if (t != null && "ClientAbortException".equals(t.getClass().getSimpleName())) {
+                    if (t != null && ("ClientAbortException".equals(t.getClass().getSimpleName())
+                            || t.getMessage().startsWith("確立された接続")
+                            || t.getMessage().startsWith("An established connection"))) {
                         Log.warning(t.toString());
+                        return;
                     } else {
                         throw e;
                     }
