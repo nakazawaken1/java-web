@@ -36,17 +36,16 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -444,13 +443,12 @@ public class Tool {
                 traverser.end(c);
                 break;
             }
-			if (o instanceof String || o instanceof Byte || o instanceof Character || o instanceof Short
-					|| o instanceof Integer || o instanceof Long || o instanceof Float || o instanceof Double
-					|| o instanceof Boolean || o instanceof Date || o instanceof java.sql.Date || o instanceof Timestamp
-					|| o instanceof LocalDate || o instanceof LocalDateTime || o instanceof LocalTime || o instanceof Message || o instanceof Xml || o instanceof Tuple) {
-				traverser.value(o.toString(), c, isString(o));
-				break;
-			}
+            if (o instanceof String || o instanceof Number || o instanceof Character || o instanceof Boolean
+                    || o instanceof Date || o instanceof Temporal || o instanceof Message || o instanceof Xml
+                    || o instanceof Tuple) {
+                traverser.value(o.toString(), c, isString(o));
+                break;
+            }
             if (cache.contains(o)) {
                 traverser.value("(loop)", c, true);
                 break;
