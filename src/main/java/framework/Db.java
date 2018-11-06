@@ -6,6 +6,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -2764,7 +2765,7 @@ public class Db implements AutoCloseable {
             return rs.wasNull() ? Optional.empty() : Optional.of(n);
         });
         mapper.put(double.class, (rs, name) -> Optional.of(rs.getDouble(name)));
-        mapper.put(double.class, (rs, name) -> {
+        mapper.put(Double.class, (rs, name) -> {
             double n = rs.getDouble(name);
             return rs.wasNull() ? Optional.empty() : Optional.of(n);
         });
@@ -2777,6 +2778,8 @@ public class Db implements AutoCloseable {
             String s = rs.getString(name);
             return rs.wasNull() ? Optional.empty() : Optional.of(s);
         });
+        mapper.put(BigDecimal.class, (rs, name) -> Tool.of(rs.getBigDecimal(name)));
+        mapper.put(BigInteger.class, (rs, name) -> Tool.of(rs.getBigDecimal(name)).map(BigDecimal::toBigInteger));
         mapper.put(Date.class, (rs, name) -> Tool.of(rs.getDate(name)).map(d -> new Date(d.getTime())));
         mapper.put(java.sql.Date.class, (rs, name) -> Tool.of(rs.getDate(name)));
         mapper.put(Timestamp.class, (rs, name) -> Tool.of(rs.getTimestamp(name)));
