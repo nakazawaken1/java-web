@@ -221,7 +221,16 @@ public @interface Job {
          * shutdown
          */
         public static void shutdown() {
-            Tool.of(scheduler.get()).ifPresent(ScheduledExecutorService::shutdown);
+            Tool.of(scheduler.get()).ifPresent(i -> {
+                i.shutdown();
+                try {
+                    if(!i.awaitTermination(1, TimeUnit.SECONDS)) {
+                        i.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    i.shutdownNow(); 
+                }
+            });
         }
 
         /**
