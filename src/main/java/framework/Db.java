@@ -692,23 +692,32 @@ public class Db implements AutoCloseable {
      */
     public int execute(String sql, Map<String, ?> map, Object... values) {
         int total = 0;
-        for (String s : sql.split(";[ \t\r]*\n\\s*")) {
-            s = sql(Tool.trim("", s, ";"), map, values);
-            Integer hash = null;
-            try (PreparedStatement ps = connection.prepareStatement(s)) {
-                hash = ps.hashCode();
-                Log.config("PreparedStatement created #" + hash);
-                Log.info(s + ";");
-                total += ps.executeUpdate();
-            } catch (SQLException e) {
-                Try.r(connection::rollback)
-                    .run();
-                throw new UncheckedSQLException(e);
-            } finally {
-                Log.config("PreparedStatement dropped #" + hash);
-            }
+        for (String s : sql(Tool.trim("", sql, ";"), map, values).split(";[ \t\r]*\n\\s*")) {
+            total += executeOne(s);
         }
         return total;
+    }
+    
+    /**
+     * execute(multi sql not support)
+     *
+     * @param sql SQL
+     * @return affected rows
+      */
+    public int executeOne(String sql) {
+        Integer hash = null;
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            hash = ps.hashCode();
+            Log.config("PreparedStatement created #" + hash);
+            Log.info(sql + ";");
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            Try.r(connection::rollback)
+                .run();
+            throw new UncheckedSQLException(e);
+        } finally {
+            Log.config("PreparedStatement dropped #" + hash);
+        }
     }
 
     /**
@@ -905,7 +914,7 @@ public class Db implements AutoCloseable {
             });
         }
         buildWhere(sql, names, primary, values);
-        return execute(sql.toString(), null);
+        return executeOne(sql.toString());
     }
 
     /**
@@ -1025,8 +1034,7 @@ public class Db implements AutoCloseable {
             }
             first = false;
         }
-        return execute(sql.append(")")
-            .toString(), null);
+        return executeOne(sql.append(")").toString());
     }
 
     /**
@@ -1042,7 +1050,7 @@ public class Db implements AutoCloseable {
         StringBuilder sql = new StringBuilder("DELETE FROM ");
         sql.append(table);
         buildWhere(sql, names, primary, values);
-        return execute(sql.toString(), null);
+        return executeOne(sql.toString());
     }
 
     /**
@@ -1051,7 +1059,7 @@ public class Db implements AutoCloseable {
      * @param table table name
      */
     public void truncate(String table) {
-        execute("TRUNCATE TABLE " + table, null);
+        executeOne("TRUNCATE TABLE " + table);
     }
 
     /**
@@ -1217,7 +1225,7 @@ public class Db implements AutoCloseable {
      * @return column names
      */
     public String[] create(String table, int primary, Column... columns) {
-        execute(createSql(table, primary, columns), null);
+        executeOne(createSql(table, primary, columns));
         return Stream.of(columns)
             .map(column -> column.name)
             .toArray(String[]::new);
@@ -1272,7 +1280,7 @@ public class Db implements AutoCloseable {
      * @param table table name
      */
     public void drop(String table) {
-        execute("DROP TABLE " + table, null);
+        executeOne("DROP TABLE " + table);
     }
 
     /**
@@ -3015,7 +3023,7 @@ public class Db implements AutoCloseable {
      * @param clazz target class
      */
     public void create(Class<?> clazz) {
-        execute(createSql(clazz), null);
+        executeOne(createSql(clazz));
     }
 
     /**

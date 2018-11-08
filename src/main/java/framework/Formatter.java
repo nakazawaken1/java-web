@@ -31,6 +31,7 @@ import javax.el.PropertyNotWritableException;
 import javax.el.StandardELContext;
 
 import app.config.Sys;
+import framework.Try.TriFunction;
 import framework.annotation.Config;
 
 /**
@@ -273,6 +274,15 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * @return formatted text
      */
     public String format(String text) {
+    	return format(text, (before, prefix, suffix) -> Tool.string(eval(before, prefix, suffix)).orElse(""));
+    }
+
+    /**
+     * @param text target
+     * @param convert convert expression
+     * @return formatted text
+     */
+    public String format(String text, TriFunction<String, Integer, Integer, String> convert) {
         if (text == null) {
             return null;
         }
@@ -333,7 +343,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 int end = index;
                 if (start + prefix < end - suffix) {
                     String before = subSequence(start, end).toString();
-                    String after = Tool.string(eval(before, prefix, suffix)).orElse("");
+                    String after = convert.apply(before, prefix, suffix);
                     replace(start, end, after);
                     index = end + after.length() - before.length();
                 }
@@ -348,6 +358,31 @@ public class Formatter extends AbstractParser implements AutoCloseable {
      * el processor
      */
     ELProcessor el = null;
+
+    /**
+     * format
+     * @param converter Converter
+     * @param text target({key} replace messages, ${expression} replace el value with escape, #{expression} replace el value with no escape)
+     * @param exclude exclude
+     * @param escape escape
+     * @param locale locale
+     * @param map ${key} replace to value
+     * @param values {0}, {1}... replace to value
+     * @return result text
+     */
+    public static String format(TriFunction<String, Integer, Integer, String> converter, String text, Function<Formatter, Result> exclude, Function<Object, String> escape, Locale locale, Map<String, ?> map,
+            Object... values) {
+        try (Formatter formatter = new Formatter(exclude, escape, locale, map, values)) {
+            for(;;) {
+                String text0 = text;
+                text = formatter.format(text, converter);
+                if(text0.equals(text)) {
+                    break;
+                }
+            }
+            return text;
+        }
+    }
 
     /**
      * format
