@@ -8,10 +8,13 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -19,6 +22,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import framework.AbstractValidator;
+import framework.Application;
 import framework.Formatter;
 import framework.Reflector;
 import framework.Session;
@@ -57,6 +61,7 @@ public @interface Validator {
 		}
 		
 		/**
+		 * @param validators All field Validators
 		 * @param valid      Valid
 		 * @param clazz      Target class
 		 * @param parameterName ParameterName
@@ -64,7 +69,7 @@ public @interface Validator {
 		 * @param errors     Errors
 		 * @param parameterizedType Generic type
 		 */
-		public static void validateClass(Class<? extends All> valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
+		public static void validateClass(Collection<AbstractValidator<?>> validators, Class<? extends All> valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
 			if(Iterable.class.isAssignableFrom(clazz)) {
 				AtomicInteger index = new AtomicInteger();
 				parameters.entrySet().stream()//
@@ -84,15 +89,26 @@ public @interface Validator {
 				return;
 			}
 			Reflector.fields(clazz).forEach((name, field) -> {
-				Stream.of(field.getAnnotations())//
-					.map(a -> Tuple.of(a, a.annotationType().getAnnotation(Validator.class)))//
-					.filter(t -> t.r != null)//
-					.forEach(t -> instance(t.l).ifPresent(v -> {
-						String fullName = parameterName + "." + name;
-						String value = Tool.getJoin(parameters, fullName, ",").orElse(null);
-						v.validate(valid, fullName, value, errors);
-					}));
+				String fullName = parameterName + "." + name;
+				String value = Tool.getJoin(parameters, fullName, ",").orElse(null);
+				Stream.concat(validators.stream(), Stream.of(field.getAnnotations())//
+					.filter(a -> a.annotationType().getAnnotation(Validator.class) != null)//
+					.map(a -> Manager.instance(a).orElse(null))//
+					.filter(Objects::nonNull))//
+					.forEach(v -> v.validate(valid, fullName, value, errors));
 			});
+		}
+
+		/**
+		 * @param valid      Valid
+		 * @param clazz      Target class
+		 * @param parameterName ParameterName
+		 * @param parameters Target values
+		 * @param errors     Errors
+		 * @param parameterizedType Generic type
+		 */
+		public static void validateClass(Class<? extends All> valid, Class<?> clazz, String parameterName, Map<String, List<String>> parameters, ErrorAppender errors, Type... parameterizedType) {
+			validateClass(Application.current().map(a -> a.globalValidators).orElseGet(Collections::emptySet), valid, clazz, parameterName, parameters, errors, parameterizedType);
 		}
 	}
 
@@ -122,7 +138,7 @@ public @interface Validator {
 	     */
 	    @Override
 	    public void addError(String name, String value, String error, Object... keyValues) {
-	        Tool.addValue(this, name, Formatter
+	        Tool.addValueIfAbsent(this, name, Formatter
 	            .format(error, Formatter::excludeForHtml, Tool::htmlEscape, Session.currentLocale(), Tool.map("validatedValue", value, keyValues)), ArrayList::new);
 	    }
 

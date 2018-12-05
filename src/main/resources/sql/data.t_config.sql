@@ -42,3 +42,4 @@ INSERT INTO t_config(id, name, value, locale) VALUES(41,'Sys.Item.route','ルー
 INSERT INTO t_config(id, name, value, locale) VALUES(42,'Sys.Item.file','ファイル選択...','ja');
 INSERT INTO t_config(id, name, value, locale) VALUES(43,'Sys.Prompt.login','ログインID・パスワードを入力して、\nログインボタンを押して下さい。','ja');
 INSERT INTO t_config(id, name, value, locale) VALUES(44,'Sys.Item.copyright','©2017, All Rights Reserved.','ja');
+INSERT INTO t_config(id, name, value, locale) VALUES(45,'Sys.Alert.matches','使用できない文字が含まれています。','ja');

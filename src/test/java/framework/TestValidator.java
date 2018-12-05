@@ -11,7 +11,7 @@ import java.util.Map;
 
 import framework.annotation.Letters;
 import framework.annotation.Range;
-import framework.annotation.RegEx;
+import framework.annotation.Matches;
 import framework.annotation.Required;
 import framework.annotation.Time;
 import framework.annotation.Valid.All;
@@ -59,7 +59,7 @@ public class TestValidator extends Tester {
 	}
 
 	static class Real {
-		@RegEx("[+-]?[0-9]+([.][0-9]+)?")
+		@Matches("[+-]?[0-9]+([.][0-9]+)?")
 		String value;
 	}
 	
@@ -169,7 +169,7 @@ public class TestValidator extends Tester {
 	{
 		String required = Reflector.getDefaultValue(Required.class, "message");
 		String letters = Reflector.getDefaultValue(Letters.class, "message");
-		String regEx = Reflector.getDefaultValue(RegEx.class, "message");
+		String regEx = Reflector.getDefaultValue(Matches.class, "message");
 		group("list", g -> {
 			expect(g + ":ng", n -> {
 				Errors errors = new Errors();

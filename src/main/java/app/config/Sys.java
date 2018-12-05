@@ -314,6 +314,8 @@ public class Sys {
         @Mapping("Invalid characer")
         letters,
         @Mapping("Input required")
+        matches,
+        @Mapping("Invalid pattern")
         required,
         @Mapping("Value is out of range")
         range,

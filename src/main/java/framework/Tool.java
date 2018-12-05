@@ -2350,12 +2350,34 @@ public class Tool {
      * @return Value
      */
     public static <T, U, V extends Collection<U>> U addValue(Map<T, V> map, T name, U value, Supplier<V> supplier) {
-    	V list = map.get(name);
+        V list = map.get(name);
         if (list == null) {
             list = supplier.get();
             map.put(name, list);
         }
         list.add(value);
+        return value;
+    }
+
+    /**
+     * @param <T> Name type
+     * @param <U> Value type
+     * @param <V> Container type
+     * @param map Map
+     * @param name Name
+     * @param value Value
+     * @param supplier Container supplier
+     * @return Value
+     */
+    public static <T, U, V extends Collection<U>> U addValueIfAbsent(Map<T, V> map, T name, U value, Supplier<V> supplier) {
+        V list = map.get(name);
+        if (list == null) {
+            list = supplier.get();
+            map.put(name, list);
+        }
+        if(!list.contains(value)) {
+            list.add(value);
+        }
         return value;
     }
 

@@ -13,8 +13,8 @@ import framework.annotation.Validator.ErrorAppender;
  */
 @Target({ ElementType.PARAMETER, ElementType.FIELD })
 @Retention(RetentionPolicy.RUNTIME)
-@Validator(RegEx.Validator.class)
-public @interface RegEx {
+@Validator(Matches.Validator.class)
+public @interface Matches {
 	/**
 	 * @return Apply groups
 	 */
@@ -28,11 +28,11 @@ public @interface RegEx {
 	/**
 	 * @return Error message
 	 */
-	String message() default "{App.Alert.real}";
+	String message() default "{Sys.Alert.matches}";
 
 	@SuppressWarnings("javadoc")
-	class Validator extends AbstractValidator<RegEx> {
-		public Validator(RegEx annotation) {
+	class Validator extends AbstractValidator<Matches> {
+		public Validator(Matches annotation) {
 			super(annotation);
 		}
 

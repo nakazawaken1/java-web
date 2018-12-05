@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -40,9 +40,9 @@ public class Binder implements ErrorAppender {
     Map<String, Tuple<byte[], File>> files;
 
     /**
-     * Validator(validatee, errors)
+     * Validator(name, value)
      */
-    Consumer<String> validator;
+    BiConsumer<String, String> validator;
 
     /**
      * Errors
@@ -69,7 +69,7 @@ public class Binder implements ErrorAppender {
      * @param validator Validator
      * @return Self
      */
-    public Binder validator(Consumer<String> validator) {
+    public Binder validator(BiConsumer<String, String> validator) {
         this.validator = validator;
         return this;
     }
@@ -85,14 +85,15 @@ public class Binder implements ErrorAppender {
     }
 
     /**
+     * @param name Name
      * @param clazz class
      * @param text text
      * @param error action if error(allow null:retry that text is "0")
      * @return value
      */
-    Object convert(String text, Type clazz, Function<Exception, Object> error) {
+    Object convert(String name, String text, Type clazz, Function<Exception, Object> error) {
         if (validator != null) {
-            validator.accept(text);
+            validator.accept(name, text);
         }
         Function<Function<String, Object>, Object> toNumber = f -> Try
             .s(() -> f.apply(text), error == null ? (Function<Exception, Object>) (e -> f.apply("0")) : error)
@@ -165,12 +166,13 @@ public class Binder implements ErrorAppender {
     }
 
     /**
+     * @param name Name
      * @param nest Nest level
      * @param type Value type
      * @return Mapper
      */
     @SuppressWarnings("unchecked")
-    public Function<Object, Stream<Object>> rebind(int nest, Class<?> type) {
+    public Function<Object, Stream<Object>> rebind(String name, int nest, Class<?> type) {
         return i -> {
             if (i instanceof Map) {
                 if (type == Map.class) {
@@ -186,9 +188,9 @@ public class Binder implements ErrorAppender {
                 return Stream.of(instance);
             }
             if(i != null && type.isPrimitive() || Number.class.isAssignableFrom(type)) {
-                return Stream.of(((String) i).split("[^-.0-9]+")).map(j -> convert(j, type, null));
+                return Stream.of(((String) i).split("[^-.0-9]+")).map(j -> convert(name, j, type, null));
             }
-            return Stream.of(convert((String) i, type, null));
+            return Stream.of(convert(name, (String) i, type, null));
         };
     }
 
@@ -261,7 +263,7 @@ public class Binder implements ErrorAppender {
         Class<?> component = clazz.getComponentType();
         if (component != null) {
             Stream<Object> stream = sub.stream()
-                .map(value -> convert((String) value, component, null));
+                .map(value -> convert(name, (String) value, component, null));
             if (clazz == int[].class) {
                 return stream.mapToInt(Integer.class::cast)
                     .toArray();
@@ -319,7 +321,7 @@ public class Binder implements ErrorAppender {
                 return to;
             }
             return sub.stream()
-                .flatMap(rebind(nest, component))
+                .flatMap(rebind(name, nest, component))
                 .toArray(n -> (Object[]) Array.newInstance(component, n));
         }
 
@@ -342,7 +344,7 @@ public class Binder implements ErrorAppender {
                     .filter(c -> c.getParameterCount() == 0).findFirst()
                     .orElseGet(Try.s(ArrayList.class::getConstructor)).newInstance());
             return sub.stream()
-                .flatMap(rebind(nest, genericType.apply(0)))
+                .flatMap(rebind(name, nest, genericType.apply(0)))
                 .collect(constructor, List::add, List::addAll);
         }
 
@@ -351,7 +353,7 @@ public class Binder implements ErrorAppender {
                     .filter(c -> c.getParameterCount() == 0).findFirst()
                     .orElseGet(Try.s(HashSet.class::getConstructor)).newInstance());
             return sub.stream()
-                .flatMap(rebind(nest, genericType.apply(0)))
+                .flatMap(rebind(name, nest, genericType.apply(0)))
                 .collect(constructor, Set::add, Set::addAll);
         }
 
@@ -391,6 +393,6 @@ public class Binder implements ErrorAppender {
             return o;
         }
 
-        return convert(first, clazz, nest == 0 || clazz.isPrimitive() && clazz != char.class ? null : e -> null);
+        return convert(name, first, clazz, nest == 0 || clazz.isPrimitive() && clazz != char.class ? null : e -> null);
     }
 }

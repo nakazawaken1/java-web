@@ -3,6 +3,7 @@ package framework;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintWriter;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -14,9 +15,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,6 +54,11 @@ public abstract class Application implements Attributes<Object> {
      * Singleton
      */
     static Application CURRENT;
+    
+    /**
+     * Global validators
+     */
+    public final Set<AbstractValidator<?>> globalValidators = new LinkedHashSet<>();
 
     /**
      * Shutdown actions
@@ -365,14 +373,19 @@ public abstract class Application implements Attributes<Object> {
                                     return binder.errors;
                                 }
                                 String name = p.getName();
-                                Tool.of(p.getAnnotation(Valid.class)).ifPresent(valid ->
-                                	Validator.Manager.validateClass(valid.value(), p.getType(), name, binder.parameters, binder));
- 								return binder.validator(value -> Stream.of(p.getAnnotations())
-										.forEach(a -> Validator.Manager.instance(a).ifPresent(
-											v -> v.validate(Valid.All.class, name, value, binder))))
-										.bind(name, type, Reflector.getGenericParameters(p));
-	                            })
-                            .toArray();
+                                Valid valid = p.getAnnotation(Valid.class);
+                                if(valid != null) {
+                                	Validator.Manager.validateClass(valid.value(), p.getType(), name, binder.parameters, binder);
+                                	binder.validator(null);
+                                } else {
+                                	binder.validator((n, value) -> Stream.concat(globalValidators.stream(), //
+											Stream.of(p.getAnnotations())//
+													.map(a -> Validator.Manager.instance(a).orElse(null))//
+													.filter(Objects::nonNull))//
+											.forEach(v -> v.validate(Valid.All.class, n, value, binder)));
+                                }
+								return binder.bind(name, type, Reflector.getGenericParameters(p));
+	                        }).toArray();
                         Object response = method.invoke(Modifier.isStatic(method.getModifiers()) ? null : Reflector.instance(pair.l), args);
                         Consumer<Response> setContentType = r -> {
                             Content content = method.getAnnotation(Content.class);
@@ -443,4 +456,11 @@ public abstract class Application implements Attributes<Object> {
             }
         }
     }
+
+	/**
+	 * @param annotation Annotation
+	 */
+	public void addGlobalValidator(Annotation annotation) {
+		globalValidators.add(Validator.Manager.instance(annotation).get());
+	}
 }
