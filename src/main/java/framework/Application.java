@@ -281,11 +281,30 @@ public abstract class Application implements Attributes<Object> {
             return;
         }
 
-        Job.Scheduler.trigger(Job.OnRequest);
+        final Optional<String> mime = Tool.string(Tool.getExtension(path))
+                .map(Tool::getContentType);
+
+        /* Pre-request event */
+        Object result = Job.Scheduler.trigger(Job.OnRequest);
+        if(result != null) {
+            Consumer<Response> setContentType = r -> {
+                Tool.ifPresentOr(mime, m -> r.contentType(m, Tool.isTextContent(path) ? StandardCharsets.UTF_8 : null), () -> {});
+            };
+            if (result instanceof Response) {
+                Tool.peek((Response) result, r -> {
+                    if (r.headers == null || !r.headers.containsKey("Content-Type")) {
+                        setContentType.accept(r);
+                    }
+                })
+                    .flush();
+            } else {
+                Tool.peek(Response.of(result), setContentType::accept)
+                    .flush();
+            }
+            return;
+        }
 
         /* action */
-        final Optional<String> mime = Tool.string(Tool.getExtension(path))
-            .map(Tool::getContentType);
         Map<String, List<String>> parameters = new HashMap<>(request.getParameters());
         final String normalizedPath = Tool.prefix(Tool.trim(null, path, "/"), "/");
         final Tuple<Class<?>, Method> pair = routing.entrySet()

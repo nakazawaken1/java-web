@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +60,11 @@ public @interface Job {
      * @return schedule
      */
     String value();
+
+    /**
+     * @return Priority
+     */
+    int priority() default 0;
 
     /**
      * Job on application start
@@ -235,11 +241,15 @@ public @interface Job {
 
         /**
          * @param event Event
+         * @return first non-null result
          */
-        public static void trigger(String event) {
+        public static Object trigger(String event) {
+        	Object[] result = {null};
             try (Lazy<Db> db = new Lazy<>(Db::connect)) {
-                eventMap.getOrDefault(event, Collections.emptyList()).forEach(method -> {
-                    Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
+                eventMap.getOrDefault(event, Collections.emptyList()).stream()//
+                	.sorted(Comparator.<Method>comparingInt(m -> m.getAnnotation(Job.class).priority()).reversed())//
+                	.forEach(method -> {
+                    Object r = Reflector.invoke(method, Stream.of(method.getParameters()).map(Parameter::getType).map(type -> {
                         if (Application.class.isAssignableFrom(type)) {
                             return Application.current().orElse(null);
                         }
@@ -278,8 +288,12 @@ public @interface Job {
                         }
                         return null;
                     }).toArray());
+                    if(result[0] == null && r != null) {
+                    	result[0] = r;
+                    }
                 });
             }
+            return result[0];
         }
     }
 }
