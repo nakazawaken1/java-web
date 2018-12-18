@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -43,6 +44,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -2731,15 +2733,18 @@ public class Db implements AutoCloseable {
     /**
      * @param <T> taget class type
      * @param clazz target class
+     * @param excludeColumns Exclude columns(Db Column name)
      * @return object
      */
-    public static <T> TryFunction<ResultSet, T> toObject(Class<T> clazz) {
+    public static <T> TryFunction<ResultSet, T> toObject(Class<T> clazz, String... excludeColumns) {
         Map<String, Field> map = Reflector.mappingFields(clazz);
+        List<String> excludes = Arrays.asList(excludeColumns);
         return rs -> {
             ResultSetMetaData meta = rs.getMetaData();
             AbstractBuilder<T, ?, ?> builder = Factory.Constructor.instance(clazz);
             IntStream.rangeClosed(1, meta.getColumnCount())
                 .mapToObj(Try.intF(meta::getColumnName))
+                .filter(Tool.not(excludes::contains))
                 .forEach(columnName -> Tool.getIgnoreCase(map, columnName)
                 	.ifPresent(Try.c(field -> builder.accept(field.getType(), field.getName(), resultSetToObject(field, rs, Reflector.mappingFieldName(field))))));
             return builder.get();   
