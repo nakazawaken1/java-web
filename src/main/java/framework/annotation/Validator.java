@@ -90,7 +90,7 @@ public @interface Validator {
 			}
 			Reflector.fields(clazz).forEach((name, field) -> {
 				String fullName = parameterName + "." + name;
-				String value = Tool.getJoin(parameters, fullName, ",").orElse(null);
+				String value = Tool.getJoin(parameters, fullName, ",").orElseGet(() -> Tool.getJoin(parameters, fullName + "[]", ",").orElse(null));
 				Stream.concat(validators.stream(), Stream.of(field.getAnnotations())//
 					.filter(a -> a.annotationType().getAnnotation(Validator.class) != null)//
 					.map(a -> Manager.instance(a).orElse(null))//
