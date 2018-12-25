@@ -6,6 +6,13 @@
   <packaging>jar</packaging>
   <version>2.0.28</version>
 
+  <name>java-web</name>
+  <url>https://github.com/nakazawaken1/java-web</url>
+  <scm><url>https://github.com/nakazawaken1/java-web.git</url></scm>
+  <developers><developer><name>nakazawaken1</name></developer></developers>
+  <description>web framework for after java8</description>
+  <licenses><license><name>Apache License Version 2.0</name></license></licenses>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
