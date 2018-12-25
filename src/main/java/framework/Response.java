@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -359,6 +360,7 @@ public abstract class Response {
      * @return self
      */
     public Response contentType(String contentType, Charset charset) {
+    	charset(charset);
         return setHeader("Content-Type", setCharset(contentType, charset));
     }
 
@@ -368,7 +370,10 @@ public abstract class Response {
      * @return self
      */
     public Response contentTypeIfEmpty(String contentType, Charset charset) {
-        return headers.containsKey("Content-Type") ? this : setHeader("Content-Type", setCharset(contentType, charset));
+        if(headers.containsKey("Content-Type")) {
+        	return this;
+        }
+        return contentType(contentType, charset);
     }
 
     /**
@@ -739,7 +744,9 @@ public abstract class Response {
                             break;
                         case Content.CSV:
                             OutputStream o = out.get();
-                            o.write(Tool.BOM);
+                            if(Objects.equals(response.charset(), StandardCharsets.UTF_8)) {
+                            	o.write(Tool.BOM);
+                            }
                             Tool.traverse(response.content, Tool.peek(response.traverser(CsvTraverser.class), t -> {
                                 t.out = o;
                                 t.charset = response.charset();
