@@ -515,7 +515,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
                 Log.warning(e.toString());
                 return null;
             } catch (Exception e) {
-                Log.warning(e, () -> "el error");
+                Log.warning(e, () -> expression);
                 return expression;
             }
         }
