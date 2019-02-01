@@ -183,10 +183,9 @@ public @interface Config {
         public static void loadSystemProperties() {
             System.getProperties()
                 .forEach((name, value) -> {
-                    if (!configKeys.contains(name)) { // overwrite only
-                        return;
+                    if (configKeys.contains(name) || ((String) name).startsWith("Sys.Db.")) { // overwrite only
+                        set((String) name, (String) value, "");
                     }
-                    set((String) name, (String) value, "");
                 });
             sourceCache.clear();
         }
