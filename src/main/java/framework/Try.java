@@ -17,6 +17,7 @@ import java.util.function.ObjIntConsumer;
 import java.util.function.ObjLongConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 /**
  * support lambda exception
@@ -484,6 +485,47 @@ public class Try {
      */
     public static <R> IntFunction<R> intF(TryIntFunction<R> function) {
         return intF(function, (e, i) -> catcher.accept(e));
+    }
+
+    /**
+     * throwable function
+     *
+     * @param <T> parameter type
+     */
+    @FunctionalInterface
+    public interface TryToIntFunction<T> {
+        /**
+         * @param t object
+         * @return value
+         * @throws Exception exception
+         */
+        int apply(T t) throws Exception;
+    }
+
+    /**
+     * @param <T> parameter type
+     * @param function throwable function
+     * @param error error action
+     * @return function
+     */
+    public static <T> ToIntFunction<T> toIntF(TryToIntFunction<T> function, BiConsumer<Exception, T> error) {
+        return i -> {
+            try {
+                return function.apply(i);
+            } catch (Exception e) {
+                error.accept(e, i);
+                return 0;
+            }
+        };
+    }
+
+    /**
+     * @param <T> parameter type
+     * @param function throwable function
+     * @return function
+     */
+    public static <T> ToIntFunction<T> toIntF(TryToIntFunction<T> function) {
+        return toIntF(function, (e, i) -> catcher.accept(e));
     }
 
     /**
