@@ -752,6 +752,20 @@ public class Db implements AutoCloseable {
             .orElse(name + " not found"));
         return url.map(Try.f(i -> builder.replace(Tool.loadText(i.openStream()))));
     }
+    
+    /**
+     * @param prepare Prepare(names, values, true if insert)
+     * @param names row names(arrange primary key in left)
+     * @param values save values
+     * @param insert True if insert else update
+     * @return names, values
+     */
+    static Tuple<String[], Object[]> prepare(TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, Object[] values, boolean insert) {
+    	List<String> nameList = Tool.list(names);
+    	List<Object> valueList = Tool.list(values);
+    	prepare.accept(nameList, valueList, insert);
+    	return Tuple.of(nameList.toArray(new String[nameList.size()]), valueList.toArray(new Object[valueList.size()]));
+    }
 
     /**
      * update if exists row, else insert
@@ -789,6 +803,22 @@ public class Db implements AutoCloseable {
 
     /**
      * update if exists row, else insert
+     * 
+     * @param update Prepare for update
+     * @param insert Prepare for insert
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return true: inserted、 false: updated
+     */
+    public boolean save(Consumer<Map<String, Object>> update, Consumer<Map<String, Object>> insert, Class<?> table, Enum<?>[] names, int primary,
+            Object... values) {
+        return save(update, insert, Reflector.mappingClassName(table), Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
+    }
+
+    /**
+     * update if exists row, else insert
      *
      * @param table table name
      * @param names row names(arrange primary key in left)
@@ -799,19 +829,18 @@ public class Db implements AutoCloseable {
     public boolean save(String table, String[] names, int primary, Object... values) {
     	return save(table, null, names, primary, values);
     }
-    
+
     /**
-     * @param prepare Prepare(names, values, true if insert)
+     * update if exists row, else insert
+     *
+     * @param table table name
      * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
      * @param values save values
-     * @param insert True if insert else update
-     * @return names, values
+     * @return true: inserted、 false: updated
      */
-    static Tuple<String[], Object[]> prepare(TriConsumer<List<String>, List<Object>, Boolean> prepare, String[] names, Object[] values, boolean insert) {
-    	List<String> nameList = Tool.list(names);
-    	List<Object> valueList = Tool.list(values);
-    	prepare.accept(nameList, valueList, insert);
-    	return Tuple.of(nameList.toArray(new String[nameList.size()]), valueList.toArray(new Object[valueList.size()]));
+    public boolean save(Class<?> table, Enum<?>[] names, int primary, Object... values) {
+    	return save(table, null, names, primary, values);
     }
     
     /**
@@ -849,6 +878,19 @@ public class Db implements AutoCloseable {
         }
         return empty;
     }
+    
+    /**
+     * update if exists row, else insert
+     * @param prepare Prepare(names, values, true if insert)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return true: inserted、 false: updated
+     */
+    public boolean save(Class<?> table, TriConsumer<List<String>, List<Object>, Boolean> prepare, Enum<?>[] names, int primary, Object... values) {
+        return save(Reflector.mappingClassName(table), prepare, Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
+    }
 
     /**
      * update row
@@ -880,6 +922,32 @@ public class Db implements AutoCloseable {
     		values = pair.r;
     	}
     	return update(null, table, names, primary, values);
+    }
+
+    /**
+     * update row
+     *
+     * @param table table name
+     * @param prepare Prepare
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int update(Class<?> table, TriConsumer<List<String>, List<Object>, Boolean> prepare, Enum<?>[] names, int primary, Object... values) {
+    	return update(Reflector.mappingClassName(table), prepare, Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
+    }
+    /**
+     * update row
+     *
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return updated rows
+     */
+    public int update(Class<?> table, Enum<?>[] names, int primary, Object... values) {
+        return update(null, table, names, primary, values);
     }
 
     /**
@@ -916,6 +984,20 @@ public class Db implements AutoCloseable {
         }
         buildWhere(sql, names, primary, values);
         return executeOne(sql.toString());
+    }
+
+    /**
+     * update row
+     * 
+     * @param prepare Prepare(ex. set common column info)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return updated rows
+     */
+    public int update(Consumer<Map<String, Object>> prepare, Class<?> table, Enum<?>[] names, int primary, Object... values) {
+        return update(prepare, Reflector.mappingClassName(table), Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
     }
 
     /**
@@ -990,6 +1072,47 @@ public class Db implements AutoCloseable {
     		values = pair.r;
     	}
     	return insert(null, table, names, primary, values);
+    }
+
+    /**
+     * insert row
+     *
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int insert(Class<?> table, Enum<?>[] names, int primary, Object... values) {
+        return insert(null, table, names, primary, values);
+    }
+
+    /**
+     * insert row
+     *
+     * @param table table name
+     * @param prepare Prepare
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int insert(Class<?> table, TriConsumer<List<String>, List<Object>, Boolean> prepare, Enum<?>[] names, int primary, Object... values) {
+    	return insert(Reflector.mappingClassName(table), prepare, Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
+    }
+
+    /**
+     * insert row
+     * 
+     * @param prepare Prepare(ex. set common column info)
+     * @param table table name
+     * @param names row names(arrange primary key in left)
+     * @param primary primary key columns
+     * @param values save values
+     * @return inserted rows
+     */
+    public int insert(Consumer<Map<String, Object>> prepare, Class<?> table, Enum<?>[] names, int primary, Object... values) {
+        return insert(prepare, Reflector.mappingClassName(table), Stream.of(names).map(Enum::toString).toArray(String[]::new), primary, values);
     }
 
     /**
