@@ -76,6 +76,34 @@ import framework.annotation.Stringer;
  * database
  */
 public class Db implements AutoCloseable {
+	
+	/**
+	 * For table and column name
+	 */
+	public interface Table {
+
+		/**
+		 * @return Sort name
+		 */
+		default String s() {
+			return toString();
+		}
+
+		/**
+		 * @return Full name
+		 */
+		default String f() {
+			return t() + "." + s();
+		}
+
+		/**
+		 * @return Table name
+		 */
+		default String t() {
+			final Class<?> c = getClass();
+			return c.getEnclosingClass().getSimpleName() + "_" + c.getSimpleName();
+		}
+	}
 
     /**
      * support db type
@@ -1302,6 +1330,9 @@ public class Db implements AutoCloseable {
     public static final Function<Enum<?>, String> toColumn = e -> {
         Class<?> clazz = Reflector.getGenericParameter(e.getClass()
             .getDeclaringClass(), 0);
+        if(clazz == null) {
+        	return e.name();
+        }
         return Reflector.mappingFieldName(Reflector.field(clazz, e.name())
             .get());
     };
@@ -2559,7 +2590,7 @@ public class Db implements AutoCloseable {
          * @return Self
          */
         public Query orderByDesc(Enum<?>... fields) {
-            return orderBy(Stream.of(fields)
+            return orderByDesc(Stream.of(fields)
                 .map(toColumn)
                 .toArray(String[]::new));
         }

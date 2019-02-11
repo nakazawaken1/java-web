@@ -191,12 +191,13 @@ public class Reflector {
         for (Class<?> c = start; c != Object.class; c = c.getSuperclass()) {
             Mapping mapping = c.getAnnotation(Mapping.class);
             if (mapping != null) {
-		return Reflector.invoke(Reflector.constInstance(mapping.mapper()), "map",
-			Tool.array(Class.class, Field.class, String.class),
-			clazz, null, mapping.value());
+                return Reflector.invoke(Reflector.constInstance(mapping.mapper()), "map",
+                        Tool.array(Class.class, Field.class, String.class),
+                        clazz, null, mapping.value());
             }
         }
-	return start.getSimpleName();
+        final String prefix = Optional.ofNullable(start.getEnclosingClass()).map(c -> c.getSimpleName() + "_").filter(s -> s.length() <= 2).orElse("");
+        return prefix + start.getSimpleName();
     }
 
     /**
@@ -260,7 +261,11 @@ public class Reflector {
      */
     @SuppressWarnings("unchecked")
     public static <T> Class<T> getGenericParameter(Class<?> clazz, int index) {
-        return (Class<T>) getGenericParameters(clazz)[index];
+    	final Type[] types = getGenericParameters(clazz);
+    	if(types.length <= 0) {
+    		return null;
+    	}
+        return (Class<T>) types[index];
     }
 
     /**

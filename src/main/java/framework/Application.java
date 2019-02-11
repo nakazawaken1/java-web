@@ -346,7 +346,7 @@ public abstract class Application implements Attributes<Object> {
                         session.put("alert", Sys.Alert.timeout);
                     }
                     if(Tool.getFirst(request.getHeaders(), "X-requested-with").filter(i -> i.equals("XMLHttpRequest")).isPresent()) {
-                        Response.error(Status.No_Content).flush();
+                        Response.error(Status.Unauthorized).flush();
                         return;
                     }
                     Response.redirect(Tool.path(getContextPath(), Sys.redirect_if_not_login.get())
