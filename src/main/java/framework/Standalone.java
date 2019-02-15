@@ -99,7 +99,8 @@ public class Standalone {
             } catch (Exception e) {
                 Log.warning(e, () -> "500");
                 exchange.sendResponseHeaders(500, -1);
-                exchange.close();
+            } finally {
+            	exchange.close();
             }
         };
 

@@ -102,10 +102,7 @@ public abstract class Session implements Attributes<Serializable> {
      */
     public boolean login(String loginId, String password) {
         Optional<Account> a = Try
-                .s(() -> Reflector.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password), e -> {
-                    Log.warning(() -> Tool.print(e::printStackTrace));
-                    return Optional.<Account>empty();
-                }).get();
+                .s(() -> Reflector.<Optional<Account>>invoke(Sys.login_method, Tool.array(String.class, String.class), loginId, password)).get();
         return Tool.ifPresentOr(a, i -> {
             setAttr(sessionKey, i);
             Job.Scheduler.trigger(Job.OnLoggedIn);
