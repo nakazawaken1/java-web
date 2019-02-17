@@ -450,7 +450,7 @@ public abstract class Application implements Attributes<Object> {
                         throw e;
                     }
                 } catch(Exception e) {
-                    Throwable t = e.getCause();
+                    Throwable t = e;
                     while(t.getCause() != null) {
                     	t = t.getCause();
                     }
@@ -470,7 +470,10 @@ public abstract class Application implements Attributes<Object> {
         try {
             Response.file(path).flush();
         } catch(Exception e) {
-            Throwable t = e.getCause();
+            Throwable t = e;
+            while(t.getCause() != null) {
+            	t = t.getCause();
+            }
             if (t != null && "ClientAbortException".equals(t.getClass().getSimpleName())) {
                 Log.warning(t.toString());
             } else {
