@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.text.MessageFormat;
 import java.time.chrono.JapaneseDate;
 import java.util.Arrays;
@@ -551,6 +552,86 @@ public class Formatter extends AbstractParser implements AutoCloseable {
     private ELProcessor el() {
         if (el == null) {
             el = new ELProcessor();
+			el.getELManager().addELResolver(new ELResolver() { /*lambda*/
+
+				@Override
+				public Object invoke(final ELContext context, final Object base, final Object method,
+						final Class<?>[] paramTypes, final Object[] params) {
+					if (context == null || base == null || !(method instanceof String) || params == null) {
+						return null;
+					}
+					for (int i = 0; i < params.length; ++i) {
+						if (params[i] instanceof javax.el.LambdaExpression) {
+							for (Method m : base.getClass().getMethods()) {
+								if (m.getName().equals(method) && m.getParameterCount() == params.length) {
+									final Class<?>[] types = m.getParameterTypes();
+									if (types[i].isAnnotationPresent(FunctionalInterface.class)) {
+										params[i] = coerceToFunctionalInterface(context, (LambdaExpression) params[i],
+												types[i]);
+									}
+								}
+							}
+						}
+					}
+					return null;
+				}
+
+				@Override
+				public Class<?> getType(ELContext context, Object base, Object property) {
+					return null;
+				}
+
+				@Override
+				public void setValue(ELContext context, Object base, Object property, Object value) {
+				}
+
+				@Override
+				public boolean isReadOnly(ELContext context, Object base, Object property) {
+					return false;
+				}
+
+				@Override
+				public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
+					return null;
+				}
+
+				@Override
+				public Class<?> getCommonPropertyType(ELContext context, Object base) {
+					return String.class;
+				}
+
+				@Override
+				public Object convertToType(ELContext context, Object obj, Class<?> targetType) {
+					if (obj instanceof LambdaExpression && targetType.isAnnotationPresent(FunctionalInterface.class)) {
+						context.setPropertyResolved(obj, targetType);
+						return coerceToFunctionalInterface(context, (LambdaExpression) obj, targetType);
+					}
+					return null;
+				}
+
+				private Object coerceToFunctionalInterface(final ELContext context, final LambdaExpression elLambda,
+						final Class<?> targetType) {
+
+					assert targetType.isAnnotationPresent(FunctionalInterface.class);
+					return Proxy.newProxyInstance(targetType.getClassLoader(), new Class[] { targetType },
+							(Object obj, Method method, Object[] args) -> {
+								if (Modifier.isAbstract(method.getModifiers())) {
+									return elLambda.invoke(context, args);
+								} else if ("toString".equals(method.getName())) {
+									return "Proxy[" + targetType.getName() + ", wrapping "
+											+ elLambda.getClass().getName() + ']';
+								} else {
+									throw new AssertionError("Method not expected: " + method.getName());
+								}
+							});
+				}
+
+				@Override
+				public Object getValue(ELContext context, Object base, Object property) {
+					return null;
+				}
+
+			});
             el.getELManager().addELResolver(new ELResolver() { /* top level empty, Optional.map, Optional.flatMap, Optional.orElseGet resolver */
 
                 @Override
