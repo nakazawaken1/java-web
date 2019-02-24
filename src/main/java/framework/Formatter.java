@@ -532,7 +532,7 @@ public class Formatter extends AbstractParser implements AutoCloseable {
         }
 
         /* bind config {key:parameter1:...} */
-        if (key.indexOf('\n') < 0) {
+        if (key.indexOf('\n') < 0 && key.indexOf(' ') < 0) {
             String[] keys = key.split("\\s*:\\s*");
             boolean hasParameter = keys.length > 1;
             String realKey = hasParameter ? keys[0] : key;
@@ -562,7 +562,8 @@ public class Formatter extends AbstractParser implements AutoCloseable {
 					}
 					for (int i = 0; i < params.length; ++i) {
 						if (params[i] instanceof javax.el.LambdaExpression) {
-							for (Method m : base.getClass().getMethods()) {
+							final Class<?> clazz = base instanceof ELClass ? ((ELClass)base).getKlass() : base.getClass();
+							for (Method m : clazz.getMethods()) {
 								if (m.getName().equals(method) && m.getParameterCount() == params.length) {
 									final Class<?>[] types = m.getParameterTypes();
 									if (types[i].isAnnotationPresent(FunctionalInterface.class)) {

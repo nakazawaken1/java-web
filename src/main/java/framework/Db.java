@@ -2660,7 +2660,7 @@ public class Db implements AutoCloseable {
          */
         public boolean exists() {
             try (Stream<ResultSet> stream = stream()) {
-                return stream.findAny()
+                return stream.findFirst()
                     .isPresent();
             }
         }
