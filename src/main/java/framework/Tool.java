@@ -2593,6 +2593,9 @@ public class Tool {
             .chars()
             .forEach(c -> {
                 switch (c) {
+                case '\\':
+                    s.append("\\\\");
+                    break;
                 case '"':
                     s.append("\\\"");
                     break;
