@@ -97,11 +97,28 @@ public class Db implements AutoCloseable {
 		}
 
 		/**
+		 * @param alias Alias
+		 * @return Full name
+		 */
+		default String f(String alias) {
+			return alias + "." + s();
+		}
+
+		/**
 		 * @return Table name
 		 */
 		default String t() {
 			final Class<?> c = getClass();
 			return c.getEnclosingClass().getSimpleName() + "_" + c.getSimpleName();
+		}
+
+		/**
+		 * @param clazz Table class
+		 * @param alias Table alias
+		 * @return Table name
+		 */
+		static String name(Class<?> clazz, String... alias) {
+			return clazz.getEnclosingClass().getSimpleName() + "_" + clazz.getSimpleName() + (alias.length > 0 ? " " + alias[0] : "");
 		}
 	}
 
@@ -255,6 +272,55 @@ public class Db implements AutoCloseable {
             this.raw = raw;
         }
     }
+    
+    /**
+     * Distinct
+     */
+    public static final String DISTINCT = "DISTINCT ";
+    /**
+     * Not Equals
+     */
+    public static final String NE = "<>";
+    /**
+     * Greater than or equals
+     */
+    public static final String GE = ">=";
+    /**
+     * Less than or equals
+     */
+    public static final String LE = "<";
+    /**
+     * Greater than
+     */
+    public static final String GT = ">";
+    /**
+     * Less than
+     */
+    public static final String LT = "<";
+    /**
+     * Like
+     */
+    public static final String LIKE = "LIKE";
+    /**
+     * Not like
+     */
+    public static final String NOT_LIKE = "NOT LIKE";
+    /**
+     * In
+     */
+    public static final String IN = "IN";
+    /**
+     * Not in
+     */
+    public static final String NOT_IN = "NOT IN";
+    /**
+     * Exists
+     */
+    public static final String EXISTS = "EXISTS";
+    /**
+     * Not Exists
+     */
+    public static final String NOT_EXISTS = "NOT EXISTS";
 
     /**
      * @param sql SQL
@@ -637,6 +703,28 @@ public class Db implements AutoCloseable {
      */
     public Builder getBuilder() {
         return builder;
+    }
+
+    /**
+     * escape value
+     *
+     * @param value value
+     * @return escaped value
+     */
+    public String escape(Object value) {
+        return builder.escape(value);
+    }
+
+    /**
+     * escape value
+     *
+     * @param prefix Prefix
+     * @param value Value
+     * @param suffix Suffix
+     * @return Escaped value
+     */
+    public String escape(String prefix, Object value, String suffix) {
+        return builder.escape(prefix, value, suffix);
     }
 
     /*
@@ -1354,11 +1442,11 @@ public class Db implements AutoCloseable {
     /**
      * FROM clause(can use without select)
      *
-     * @param table table
+     * @param tables Tables
      * @return Query
      */
-    public Query from(String... table) {
-	return new Query(this).from(table);
+    public Query from(String... tables) {
+	return new Query(this).from(tables);
     }
 
     /**
@@ -1612,9 +1700,9 @@ public class Db implements AutoCloseable {
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ")
                 .append(q.fields == null ? "*" : join("", q.fields, ", "));
-            if (q.table != null) {
+            if (q.tables != null) {
                 sql.append(" FROM ")
-                    .append(q.table);
+                    .append(String.join(" ", q.tables));
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" HAVING ", q.havings, " AND "));
@@ -1643,7 +1731,7 @@ public class Db implements AutoCloseable {
             StringBuilder sql = new StringBuilder();
             sql.append("DELETE");
             sql.append(" FROM ")
-                .append(q.table);
+                .append(q.tables.get(0));
             sql.append(join(" WHERE ", q.wheres, " AND "));
             return sql.toString();
         }
@@ -1689,6 +1777,9 @@ public class Db implements AutoCloseable {
          */
         @SuppressFBWarnings("BC_UNCONFIRMED_CAST")
         public String escape(String prefix, Object value, String suffix) {
+            if(value instanceof Table) {
+                return ((Table)value).s();
+            }
             if(value instanceof Raw) {
                 return ((Raw)value).raw;
             }
@@ -1776,9 +1867,9 @@ public class Db implements AutoCloseable {
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ")
                 .append(q.fields == null ? "*" : join("", q.fields, ", "));
-            if (q.table != null) {
+            if (q.tables != null) {
                 sql.append(" FROM ")
-                    .append(q.table);
+                    .append(String.join(" ", q.tables));
                 sql.append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" ORDER BY ", q.orders, ", "));
@@ -1849,9 +1940,9 @@ public class Db implements AutoCloseable {
                 }
                 sql.append(" N__");
             }
-            if (q.table != null) {
+            if (q.tables != null) {
                 sql.append(" FROM ")
-                    .append(q.table);
+                    .append(String.join(" ", q.tables));
                 if (q.forUpdate) {
                     sql.append(" WITH (UPDLOCK)");
                 }
@@ -1954,9 +2045,9 @@ public class Db implements AutoCloseable {
             sql.append("SELECT ");
             sql.append(q.fields == null ? "*" : join("", q.fields, ", "));
             String orderBy = join(" ORDER BY ", q.orders, ", ");
-            if (q.table != null) {
+            if (q.tables != null) {
                 sql.append(" FROM ")
-                    .append(q.table)
+                    .append(String.join(" ", q.tables))
                     .append(join(" WHERE ", q.wheres, " AND "));
                 sql.append(join(" GROUP BY ", q.groups, ", "));
                 sql.append(join(" HAVING ", q.havings, " AND "));
@@ -2273,9 +2364,9 @@ public class Db implements AutoCloseable {
     public static class Query {
 
         /**
-         * table
+         * tables
          */
-        String table;
+        List<String> tables;
         /**
          * fields
          */
@@ -2321,27 +2412,78 @@ public class Db implements AutoCloseable {
         protected Query(Db db) {
             this.db = db;
         }
+        
+        @Override
+        public String toString() {
+        	return sql();
+        }
 
         /**
          * from
          *
-         * @param table table
+         * @param tables Tables
          * @return Self
          */
-	public Query from(String... table) {
-	    this.table = String.join(" ", table);
+	public Query from(String... tables) {
+	    this.tables = new ArrayList<>(Arrays.asList(tables));
             return this;
         }
 
         /**
          * from
          *
-         * @param table table
+         * @param table Table
          * @return Self
          */
         public Query from(Class<?> table) {
-            this.table = Reflector.mappingClassName(table);
+            this.tables = new ArrayList<>(Arrays.asList(Reflector.mappingClassName(table)));
             return this;
+        }
+        
+        /**
+         * @param term Term
+         * @return text
+         */
+        public static String term(Object term) {
+        	if(term instanceof Table) {
+        		return ((Table)term).f();
+        	}
+        	return String.valueOf(term);
+        }
+
+        /**
+         * @param type Type of join
+         * @param table Table
+         * @param pairs On conditions
+         * @return Self
+         */
+        public Query join(String type, Object table, Object... pairs) {
+        	final String t = table instanceof Class ? Reflector.mappingClassName(table) : String.valueOf(table);
+        	final String p = IntStream.range(0, pairs.length / 2)//
+        			.mapToObj(i -> term(pairs[i + i]) + " = " + term(pairs[i + i + 1]))//
+        			.collect(Collectors.joining(" AND "));
+        	this.tables.add(type + " JOIN " + t + " ON " + p);
+        	return this;
+        }
+
+        /**
+         * @param table Table
+         * @param pairs On conditions
+         * @return Self
+         */
+        public Query innerJoin(Object table, Object... pairs) {
+        	join("INNER", table, pairs);
+        	return this;
+        }
+
+        /**
+         * @param table Table
+         * @param pairs On conditions
+         * @return Self
+         */
+        public Query leftOuterJoin(Object table, Object... pairs) {
+        	join("LEFT OUTER", table, pairs);
+        	return this;
         }
 
         /**
@@ -2413,6 +2555,23 @@ public class Db implements AutoCloseable {
         }
 
         /**
+         * @param wheres Or conditions
+         * @return Self
+         */
+        @SafeVarargs
+		public final Query or(final Consumer<Query>... wheres) {
+        	final List<String> ors = new ArrayList<>();
+        	for(final Consumer<Query> where : wheres) {
+            	final Query q = db.from();
+        		where.accept(q);
+        		if(hasWhere()) {
+        			ors.add(String.join(" AND ", q.wheres));
+        		}
+        	}
+        	return where("(" + String.join(") OR (", ors) + ")");
+        }
+
+        /**
          * condition(equals)
          *
          * @param field field
@@ -2462,6 +2621,9 @@ public class Db implements AutoCloseable {
          */
         public Query where(String field, String operator, Object value) {
             if (value == null) {
+            	if("<>".equals(operator)) {
+            		return where(field + " IS NOT NULL");
+            	}
                 return where(field + " IS NULL");
             }
             return where(field + ' ' + operator + ' ' + db.builder.escape(value));
@@ -2494,6 +2656,19 @@ public class Db implements AutoCloseable {
                 return where(field + " IS NULL");
             }
             return where(field + ' ' + operator + ' ' + db.builder.escape(prefix, value, suffix));
+        }
+
+        /**
+         * condition(for between)
+         *
+         * @param field Field
+         * @param left Left term
+         * @param right Right term
+         * @param not NOT BETWEEN if true
+         * @return Self
+         */
+        public Query whereBetween(Object field, Object left, Object right, boolean... not) {
+            return where(db.escape(field) + (not.length > 0 && not[0] ? " NOT" : "") + " BETWEEN " + db.escape(left) + " AND " + db.escape(right));
         }
 
         /**
@@ -2737,6 +2912,16 @@ public class Db implements AutoCloseable {
                 throw new UncheckedSQLException(e);
             }
         }
+
+		/**
+		 * @param prefixSuffix [0]prefix, [1]suffix
+		 * @return Wrapped sql
+		 */
+		public String wrap(String... prefixSuffix) {
+			return Tool.at(prefixSuffix, 0).flatMap(Tool::string).map(s -> s + " ").orElse("")//
+					+ "(" + sql() + ")"//
+					+ Tool.at(prefixSuffix, 1).flatMap(Tool::string).map(s -> " " + s).orElse("");
+		}
     }
 
     /**

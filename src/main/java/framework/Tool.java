@@ -3181,7 +3181,7 @@ public class Tool {
      */
     @SafeVarargs
 	public static <T extends Object> String brs(T... text) {
-        String s = htmlEscape(Stream.of(text).map(i -> i == null ? "" : i.toString()).collect(Collectors.joining("\n")));
+        String s = htmlEscape(Stream.of(text).filter(Objects::nonNull).map(String::valueOf).collect(Collectors.joining("\n")));
         return s == null ? null : s.replaceAll("\r?\n", "<br/>");
     }
 
