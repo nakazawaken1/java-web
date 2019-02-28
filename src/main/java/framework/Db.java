@@ -2424,8 +2424,14 @@ public class Db implements AutoCloseable {
          * @param tables Tables
          * @return Self
          */
-	public Query from(String... tables) {
-	    this.tables = new ArrayList<>(Arrays.asList(tables));
+        public Query from(String... tables) {
+            if(this.tables == null) {
+            	this.tables = new ArrayList<>(Arrays.asList(tables));
+            } else {
+            	for(String table : tables) {
+            		this.tables.add(table);
+            	}
+            }
             return this;
         }
 
@@ -2436,8 +2442,7 @@ public class Db implements AutoCloseable {
          * @return Self
          */
         public Query from(Class<?> table) {
-            this.tables = new ArrayList<>(Arrays.asList(Reflector.mappingClassName(table)));
-            return this;
+            return from(Reflector.mappingClassName(table));
         }
         
         /**
@@ -2454,35 +2459,34 @@ public class Db implements AutoCloseable {
         /**
          * @param type Type of join
          * @param table Table
-         * @param pairs On conditions
+         * @param wheres Or conditions
          * @return Self
          */
-        public Query join(String type, Object table, Object... pairs) {
+        @SafeVarargs
+        public final Query join(String type, Object table, Consumer<Query>... wheres) {
         	final String t = table instanceof Class ? Reflector.mappingClassName(table) : String.valueOf(table);
-        	final String p = IntStream.range(0, pairs.length / 2)//
-        			.mapToObj(i -> term(pairs[i + i]) + " = " + term(pairs[i + i + 1]))//
-        			.collect(Collectors.joining(" AND "));
-        	this.tables.add(type + " JOIN " + t + " ON " + p);
+        	return from(type + " JOIN " + t + " ON " + makeOr(wheres));
+        }
+
+        /**
+         * @param table Table
+         * @param wheres Or conditions
+         * @return Self
+         */
+        @SafeVarargs
+        public final  Query innerJoin(Object table, Consumer<Query>... wheres) {
+        	join("INNER", table, wheres);
         	return this;
         }
 
         /**
          * @param table Table
-         * @param pairs On conditions
+         * @param wheres Or conditions
          * @return Self
          */
-        public Query innerJoin(Object table, Object... pairs) {
-        	join("INNER", table, pairs);
-        	return this;
-        }
-
-        /**
-         * @param table Table
-         * @param pairs On conditions
-         * @return Self
-         */
-        public Query leftOuterJoin(Object table, Object... pairs) {
-        	join("LEFT OUTER", table, pairs);
+        @SafeVarargs
+        public final  Query leftOuterJoin(Object table, Consumer<Query>... wheres) {
+        	join("LEFT OUTER", table, wheres);
         	return this;
         }
 
@@ -2560,15 +2564,24 @@ public class Db implements AutoCloseable {
          */
         @SafeVarargs
 		public final Query or(final Consumer<Query>... wheres) {
+        	return where(makeOr(wheres));
+        }
+        
+        /**
+         * @param wheres Or conditions
+         * @return Or text
+         */
+        @SafeVarargs
+        public final String makeOr(final Consumer<Query>... wheres) {
         	final List<String> ors = new ArrayList<>();
         	for(final Consumer<Query> where : wheres) {
             	final Query q = db.from();
         		where.accept(q);
-        		if(hasWhere()) {
+        		if(q.hasWhere()) {
         			ors.add(String.join(" AND ", q.wheres));
         		}
         	}
-        	return where("(" + String.join(") OR (", ors) + ")");
+        	return ors.size() == 1 ? ors.get(0) : "(" + String.join(") OR (", ors) + ")";
         }
 
         /**
@@ -2608,6 +2621,9 @@ public class Db implements AutoCloseable {
          * @return Self
          */
         public Query where(Enum<?> field, Object value) {
+        	if(value instanceof Table && field instanceof Table) {
+                return where(((Table)field).f() + " = " + ((Table)value).f());
+        	}
             return where(toColumn.apply(field), value);
         }
 

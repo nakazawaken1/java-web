@@ -1454,7 +1454,7 @@ public class Tool {
     public static <T> Optional<T> at(T[] array, int i) {
         int max = array.length;
         int n = i < 0 ? max + i : i;
-        return n < 0 || max <= n ? Optional.empty() : Optional.of(array[n]);
+        return n < 0 || max <= n ? Optional.empty() : Optional.ofNullable(array[n]);
     }
 
     /**
