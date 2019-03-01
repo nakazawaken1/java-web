@@ -2581,7 +2581,7 @@ public class Db implements AutoCloseable {
         			ors.add(String.join(" AND ", q.wheres));
         		}
         	}
-        	return ors.size() == 1 ? ors.get(0) : "(" + String.join(") OR (", ors) + ")";
+        	return ors.size() == 1 ? ors.get(0) : "(" + String.join(" OR ", ors) + ")";
         }
 
         /**
@@ -2934,7 +2934,7 @@ public class Db implements AutoCloseable {
 		 * @return Wrapped sql
 		 */
 		public String wrap(String... prefixSuffix) {
-			return Tool.at(prefixSuffix, 0).flatMap(Tool::string).map(s -> s + " ").orElse("")//
+			return Tool.at(prefixSuffix, 0).flatMap(Tool::string).map(s -> " " + s + " ").orElse("")//
 					+ "(" + sql() + ")"//
 					+ Tool.at(prefixSuffix, 1).flatMap(Tool::string).map(s -> " " + s).orElse("");
 		}
