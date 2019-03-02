@@ -5,6 +5,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -135,6 +137,12 @@ public class Binder implements ErrorAppender {
         }
         if (clazz == double.class || clazz == Double.class) {
             return toNumber.apply(Double::valueOf);
+        }
+        if (clazz == BigInteger.class) {
+            return toNumber.apply(BigInteger::new);
+        }
+        if (clazz == BigDecimal.class) {
+            return toNumber.apply(BigDecimal::new);
         }
         if (clazz == LocalDate.class) {
             return Try.<String, LocalDate>f(LocalDate::parse, (e, s) -> error == null ? null : (LocalDate) error.apply(null))
