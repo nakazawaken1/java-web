@@ -1373,7 +1373,7 @@ public class Db implements AutoCloseable {
      * @param args arguments
      * @return native sql
      */
-    public String fn(String function, String... args) {
+    public String fn(String function, Object... args) {
         return builder.fn(function, args);
     }
 
@@ -1753,7 +1753,7 @@ public class Db implements AutoCloseable {
          * @param args arguments
          * @return native sql
          */
-        public String fn(String function, String... args) {
+        public String fn(String function, Object... args) {
             return function + "(" + join("", Tool.list(args), ", ") + ")";
         }
 
@@ -1894,7 +1894,7 @@ public class Db implements AutoCloseable {
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
-        public String fn(String function, String... args) {
+        public String fn(String function, Object... args) {
             switch (function.toUpperCase(Locale.ENGLISH)) {
             case "YEAR":
             case "MONTH":
@@ -2002,6 +2002,16 @@ public class Db implements AutoCloseable {
             }
             return "SELECT COUNT(*) FROM (" + sql + ") T__";
         }
+        
+        @Override
+        public String fn(String function, Object... args) {
+        	switch(function) {
+        	case "SUBSTR":
+        		function = "SUBSTRING";
+        		break;
+        	}
+        	return super.fn(function, args);
+        }
     }
 
     /**
@@ -2022,7 +2032,7 @@ public class Db implements AutoCloseable {
          * @see framework.Db.Builder#fn(java.lang.String, java.lang.String[])
          */
         @Override
-        public String fn(String function, String... args) {
+        public String fn(String function, Object... args) {
             switch (function.toUpperCase(Locale.ENGLISH)) {
             case "NOW":
                 return "SYSDATE";
@@ -2030,6 +2040,9 @@ public class Db implements AutoCloseable {
             case "MONTH":
             case "DAY":
                 return "EXTRACT(" + function + " FROM " + join("", Tool.list(args), ", ") + ")";
+            case "SUBSTRING":
+            	function = "SUBSTR";
+            	break;
             }
             return function + "(" + join("", Tool.list(args), ", ") + ")";
         }
