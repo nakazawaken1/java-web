@@ -627,8 +627,11 @@ public @interface Config {
             } else {
                 pattern = separator.prefix() + separator.value() + separator.suffix();
             }
-            return Stream.of(String.valueOf(text)
-                .split(pattern));
+            String[] items = String.valueOf(text).split(pattern);
+            if(items.length == 1 && (items[0] == null || items[0].isEmpty())) {
+            	return Stream.empty();
+            }
+            return Stream.of(items);
         }
 
         /**
